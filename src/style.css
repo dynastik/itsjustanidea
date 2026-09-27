@@ -1,0 +1,48 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: monospace;
+}
+
+#ui-overlay {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  color: white;
+  text-shadow: 0 0 4px black;
+  font-size: 18px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#typing-panel {
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px 14px;
+  border-radius: 6px;
+  width: 260px;
+}
+
+#target-word {
+  font-size: 24px;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+#typed-input {
+  font-size: 16px;
+  color: #aaa;
+  min-height: 20px;
+}
+
+#stats {
+  font-size: 14px;
+  margin-top: 6px;
+  color: #ccc;
+}
+
+#hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #ddd;
+}
