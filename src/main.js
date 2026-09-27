@@ -52,7 +52,42 @@ async function main() {
   scene.add(sunTarget);
   sunLight.target = sunTarget;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambientLight);
+
+  // ===================== DAY → DUSK TRANSITION SYSTEM =====================
+  // worldTime goes 0 (bright calm day) -> 1 (eerie dusk). This is the seed
+  // system the full horror pivot will build on later: lighting, fog, and
+  // eventually spawning/behavior can all key off this same value.
+  let worldTime = 0;
+  const dayLengthSeconds = 180; // tune this — how long until full dusk. Short now for testing.
+
+  const skyDay = new THREE.Color(0x87ceeb);
+  const skyDusk = new THREE.Color(0x2b1f38); // muted eerie purple-grey
+  const lightColorDay = new THREE.Color(0xffffff);
+  const lightColorDusk = new THREE.Color(0x9aa0c8); // cold dim blue
+  const lightIntensityDay = 1.5;
+  const lightIntensityDusk = 0.35;
+  const ambientDay = 0.4;
+  const ambientDusk = 0.12;
+
+  scene.fog = new THREE.Fog(skyDay.clone(), 120, 320);
+  const fogNearDay = 120, fogFarDay = 320;
+  const fogNearDusk = 15, fogFarDusk = 70; // fog closes in a lot at dusk — atmosphere + hides draw distance
+
+  function updateWorldTime(dt) {
+    worldTime = Math.min(worldTime + dt / dayLengthSeconds, 1);
+
+    const skyColor = skyDay.clone().lerp(skyDusk, worldTime);
+    scene.background = skyColor;
+    scene.fog.color.copy(skyColor);
+    scene.fog.near = THREE.MathUtils.lerp(fogNearDay, fogNearDusk, worldTime);
+    scene.fog.far = THREE.MathUtils.lerp(fogFarDay, fogFarDusk, worldTime);
+
+    sunLight.color.copy(lightColorDay.clone().lerp(lightColorDusk, worldTime));
+    sunLight.intensity = THREE.MathUtils.lerp(lightIntensityDay, lightIntensityDusk, worldTime);
+    ambientLight.intensity = THREE.MathUtils.lerp(ambientDay, ambientDusk, worldTime);
+  }
 
   // ===================== GROUND WITH STRIPES =====================
   const groundGeo = new THREE.PlaneGeometry(400, 400, 1, 1);
@@ -74,6 +109,45 @@ async function main() {
 
   const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   world.createCollider(RAPIER.ColliderDesc.cuboid(200, 0.1, 200), groundBody);
+
+  // ===================== ROADSIDE TREES (instanced for performance) =====================
+  const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.2, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3d2b });
+  const leavesGeo = new THREE.ConeGeometry(1.1, 2.2, 7);
+  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d5a34 });
+
+  const treeCount = 160; // 80 per side
+  const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
+  const leavesMesh = new THREE.InstancedMesh(leavesGeo, leavesMat, treeCount);
+  trunkMesh.castShadow = true;
+  leavesMesh.castShadow = true;
+
+  const dummy = new THREE.Object3D();
+  let treeIndex = 0;
+  for (let side = -1; side <= 1; side += 2) {
+    for (let z = -200; z < 200; z += 5) {
+      const x = side * (10 + Math.random() * 6); // roadside offset with jitter
+      const zJitter = z + (Math.random() - 0.5) * 3;
+      const scaleVariation = 0.7 + Math.random() * 0.6;
+
+      dummy.position.set(x, 0.6 * scaleVariation, zJitter);
+      dummy.scale.setScalar(scaleVariation);
+      dummy.updateMatrix();
+      trunkMesh.setMatrixAt(treeIndex, dummy.matrix);
+
+      dummy.position.set(x, (1.2 + 1.1) * scaleVariation, zJitter);
+      dummy.updateMatrix();
+      leavesMesh.setMatrixAt(treeIndex, dummy.matrix);
+
+      treeIndex++;
+      if (treeIndex >= treeCount) break;
+    }
+    if (treeIndex >= treeCount) break;
+  }
+  trunkMesh.instanceMatrix.needsUpdate = true;
+  leavesMesh.instanceMatrix.needsUpdate = true;
+  scene.add(trunkMesh);
+  scene.add(leavesMesh);
 
   // ===================== LOAD TRUCK MODEL =====================
   const truckVisual = new THREE.Group();
@@ -116,10 +190,6 @@ async function main() {
     }
   );
 
-  // --- KINEMATIC body: WE fully control its position/rotation each frame,
-  // via proper bicycle-model math below, instead of letting Rapier's force/
-  // velocity physics decide movement. Still participates in collision for
-  // future obstacles. ---
   const truckBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 1, 0);
   const truckBody = world.createRigidBody(truckBodyDesc);
   world.createCollider(RAPIER.ColliderDesc.cuboid(0.6, 0.6, 1.2), truckBody);
@@ -140,24 +210,28 @@ async function main() {
   const keys = { w: false, a: false, s: false, d: false };
 
   let heading = 0;
-  // "rearAxle" is the point that actually moves in a straight-ish line and
-  // is the true pivot of rotation — the vehicle's rendered center is offset
-  // forward from it by half the wheelbase, which is what makes turns pivot
-  // around the rear axle rather than the vehicle's geometric center.
   const rearAxle = { x: 0, z: 0 };
-  const wheelbase = 1.8; // distance between front and rear axle, tune to the model's real proportions
+  const wheelbase = 1.8;
   const halfWheelbase = wheelbase / 2;
 
-  let speed = 0; // signed: positive = forward, negative = reverse
-  const acceleration = 14; // units/sec^2 while holding W
-  const brakeDecel = 20; // units/sec^2 while holding S (braking, or reversing once stopped)
-  const dragDecel = 8; // natural coast-down when no input held
+  let speed = 0;
+  const acceleration = 14;
+  const brakeDecel = 20;
+  const dragDecel = 8;
   const maxSpeed = 16;
   const reverseMaxSpeed = 6;
 
-  let steerAngle = 0; // current front-wheel angle, radians
-  const maxSteerAngle = 0.55; // ~31.5 degrees, typical car max lock
-  const steerLerpSpeed = 5; // how fast the wheel turns toward input, not the car itself
+  let steerAngle = 0;
+  const maxSteerAngle = 0.55;
+  const steerLerpSpeed = 5;
+
+  // low-speed turn damping: on top of the physically-correct bicycle model,
+  // this further suppresses rotation at very low speed, so crawling forward
+  // doesn't produce noticeable spin even with full lock applied
+  const lowSpeedTurnThreshold = 4; // units/sec — below this, turning scales down further
+  function lowSpeedTurnFactor(currentSpeed) {
+    return Math.min(Math.abs(currentSpeed) / lowSpeedTurnThreshold, 1);
+  }
 
   // ===================== HIGHWAY (TYPING) DRIVING =====================
   const wordBank = [
@@ -176,8 +250,8 @@ async function main() {
   let keystrokesTotal = 0;
   let typingStartTime = null;
   const highwayMaxSpeed = 26;
-  const wordSpeedBoost = 6; // instant speed gain per completed word
-  const highwayDrag = 3; // constant coast-down, keeps typing necessary to maintain speed
+  const wordSpeedBoost = 6;
+  const highwayDrag = 3;
 
   function pickNewWord() {
     targetWord = wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -265,14 +339,14 @@ async function main() {
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
+    updateWorldTime(dt);
+
     if (mode === 'city') {
-      // --- steering angle (the wheel), smoothed toward input ---
       let steerTarget = 0;
       if (keys.a) steerTarget = maxSteerAngle;
       if (keys.d) steerTarget = -maxSteerAngle;
       steerAngle += (steerTarget - steerAngle) * Math.min(steerLerpSpeed * dt, 1);
 
-      // --- speed (throttle/brake/drag) ---
       if (keys.w) {
         speed += acceleration * dt;
       } else if (keys.s) {
@@ -284,26 +358,18 @@ async function main() {
       }
       speed = Math.max(-reverseMaxSpeed, Math.min(maxSpeed, speed));
 
-      // --- BICYCLE MODEL: this is the actual fix ---
-      // Angular velocity is proportional to speed for a given wheel angle —
-      // so rotation rate genuinely scales with how fast you're going, and
-      // there's no rotation at all when speed is 0, matching a real car.
-      const angularVelocity = (speed / wheelbase) * Math.tan(steerAngle);
-      heading += angularVelocity * dt;
+      const baseAngularVelocity = (speed / wheelbase) * Math.tan(steerAngle);
+      const dampedAngularVelocity = baseAngularVelocity * lowSpeedTurnFactor(speed);
+      heading += dampedAngularVelocity * dt;
 
-      // rear axle moves forward along the (now-updated) heading
       rearAxle.x += speed * Math.sin(heading) * dt;
       rearAxle.z += speed * Math.cos(heading) * dt;
     } else {
-      // highway: no steering, straight line, speed decays unless fed by typing
       speed = Math.max(0, speed - highwayDrag * dt);
       rearAxle.x += speed * Math.sin(heading) * dt;
       rearAxle.z += speed * Math.cos(heading) * dt;
     }
 
-    // vehicle's rendered/collider center sits half a wheelbase ahead of the
-    // rear axle along current heading — this is what makes it visually pivot
-    // around the rear axle rather than its own geometric middle
     const centerX = rearAxle.x + halfWheelbase * Math.sin(heading);
     const centerZ = rearAxle.z + halfWheelbase * Math.cos(heading);
 
