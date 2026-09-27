@@ -32,6 +32,7 @@ async function main() {
   const debugBoxGeo = new THREE.BoxGeometry(1.2, 1.2, 2.4);
   const debugBoxMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
   const debugBox = new THREE.Mesh(debugBoxGeo, debugBoxMat);
+  debugBox.visible = false; // was always visible before — only show in debug mode
   scene.add(debugBox);
 
   // ===================== LIGHTING =====================
@@ -159,7 +160,10 @@ async function main() {
 
   const loader = new GLTFLoader();
   loader.load(
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMilkTruck/glTF-Binary/CesiumMilkTruck.glb',
+    // loads from /public/models/truck.glb — drop truck.glb in that folder
+    // (create it if it doesn't exist yet). BASE_URL keeps this working
+    // whether you're on localhost or a GitHub Pages subpath.
+    `${import.meta.env.BASE_URL}models/truck.glb`,
     (gltf) => {
       const model = gltf.scene;
       model.position.y = TRUCK_Y_OFFSET;
@@ -206,6 +210,22 @@ async function main() {
     if (mode === 'highway') pickNewWord();
   }
 
+  // ===================== AUTO MODE ZONES (placeholder) =====================
+  // TODO: replace with real city/highway environments once those exist.
+  // For now, driving far enough down the road auto-switches you into
+  // highway mode; hysteresis keeps it from flickering back and forth
+  // right at the boundary.
+  const HIGHWAY_ZONE_Z = 80;
+  const ZONE_HYSTERESIS = 10;
+
+  function updateZoneMode() {
+    if (mode === 'city' && rearAxle.z > HIGHWAY_ZONE_Z + ZONE_HYSTERESIS) {
+      setMode('highway');
+    } else if (mode === 'highway' && rearAxle.z < HIGHWAY_ZONE_Z - ZONE_HYSTERESIS) {
+      setMode('city');
+    }
+  }
+
   // ===================== BICYCLE MODEL STATE =====================
   const keys = { w: false, a: false, s: false, d: false };
 
@@ -234,10 +254,13 @@ async function main() {
   }
 
   // ===================== HIGHWAY (TYPING) DRIVING =====================
+  // Highway is hands-off: the truck auto-steers itself, and speed
+  // continuously chases a target based on your live WPM + accuracy —
+  // no manual acceleration once you're out here.
   const wordBank = [
-    'sunset', 'highway', 'engine', 'gravel', 'horizon', 'mirror',
+    'sunset', 'highway', 'engine', 'gravel', 'horizon',
     'static', 'exhaust', 'asphalt', 'flicker', 'signal', 'distance',
-    'headlight', 'shoulder', 'mileage', 'wander', 'silence', 'radio'
+    'headlight', 'shoulder', 'wander', 'silence', 'radio'
   ];
   let targetWord = '';
   let typedBuffer = '';
@@ -249,9 +272,23 @@ async function main() {
   let keystrokesCorrect = 0;
   let keystrokesTotal = 0;
   let typingStartTime = null;
-  const highwayMaxSpeed = 26;
-  const wordSpeedBoost = 6;
-  const highwayDrag = 3;
+
+  const highwayMinSpeed = 4;        // idle coasting speed even at 0 WPM
+  const highwayMaxSpeed = 26;       // reached at/above highwayWpmForMaxSpeed
+  const highwayWpmForMaxSpeed = 60; // tune this as the word bank gets harder
+  const highwaySpeedResponse = 2;   // how fast actual speed chases the target
+  const steerCenteringGain = 0.04;  // how hard auto-steer pulls back to x=0
+  const maxAutoSteer = 0.4;
+  const autoSteerResponse = 3;
+
+  function computeWpm() {
+    const elapsedMin = typingStartTime ? (performance.now() - typingStartTime) / 60000 : 0;
+    return elapsedMin > 0 ? wordsCompleted / elapsedMin : 0;
+  }
+
+  function computeAccuracy() {
+    return keystrokesTotal > 0 ? keystrokesCorrect / keystrokesTotal : 1;
+  }
 
   function pickNewWord() {
     targetWord = wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -270,25 +307,26 @@ async function main() {
 
     typedInputEl.textContent = typedBuffer;
 
-    const elapsedMin = typingStartTime ? (performance.now() - typingStartTime) / 60000 : 0;
-    const wpm = elapsedMin > 0 ? Math.round((wordsCompleted / elapsedMin)) : 0;
-    const accuracy = keystrokesTotal > 0
-      ? Math.round((keystrokesCorrect / keystrokesTotal) * 100)
-      : 100;
+    const wpm = Math.round(computeWpm());
+    const accuracy = Math.round(computeAccuracy() * 100);
     statsEl.textContent = `WPM: ${wpm} | Accuracy: ${accuracy}%`;
   }
 
   window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
 
-    if (key === 'm') {
-      setMode(mode === 'city' ? 'highway' : 'city');
+    // Debug + dev-only controls live on non-letter keys so they can never
+    // collide with typing gameplay, which uses the full alphabet.
+    if (key === '`') {
+      debugMode = !debugMode;
+      orbitControls.enabled = debugMode;
+      debugBox.visible = debugMode;
       return;
     }
 
-    if (key === 'c') {
-      debugMode = !debugMode;
-      orbitControls.enabled = debugMode;
+    if (key === 'tab') {
+      e.preventDefault(); // don't let it tab focus off the canvas
+      setMode(mode === 'city' ? 'highway' : 'city'); // dev override — real switch is zone-based
       return;
     }
 
@@ -310,7 +348,6 @@ async function main() {
 
       if (typedBuffer === targetWord) {
         wordsCompleted++;
-        speed = Math.min(speed + wordSpeedBoost, highwayMaxSpeed);
         pickNewWord();
       } else {
         updateTypingUI();
@@ -320,7 +357,7 @@ async function main() {
 
   window.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
-    if (mode === 'city' && key in keys) keys[key] = false;
+    if (key in keys) keys[key] = false;
   });
 
   window.addEventListener('resize', () => {
@@ -340,6 +377,7 @@ async function main() {
     lastTime = now;
 
     updateWorldTime(dt);
+    updateZoneMode();
 
     if (mode === 'city') {
       let steerTarget = 0;
@@ -365,7 +403,16 @@ async function main() {
       rearAxle.x += speed * Math.sin(heading) * dt;
       rearAxle.z += speed * Math.cos(heading) * dt;
     } else {
-      speed = Math.max(0, speed - highwayDrag * dt);
+      // HIGHWAY: no WASD input read here at all — auto-steer back toward
+      // the road center, and let speed continuously chase a WPM/accuracy
+      // derived target instead of jumping on each completed word.
+      const centerPull = THREE.MathUtils.clamp(-rearAxle.x * steerCenteringGain, -maxAutoSteer, maxAutoSteer);
+      heading += (centerPull - heading) * Math.min(autoSteerResponse * dt, 1);
+
+      const wpmFactor = THREE.MathUtils.clamp(computeWpm() / highwayWpmForMaxSpeed, 0, 1);
+      const targetSpeed = THREE.MathUtils.lerp(highwayMinSpeed, highwayMaxSpeed, wpmFactor) * computeAccuracy();
+      speed += (targetSpeed - speed) * Math.min(highwaySpeedResponse * dt, 1);
+
       rearAxle.x += speed * Math.sin(heading) * dt;
       rearAxle.z += speed * Math.cos(heading) * dt;
     }
