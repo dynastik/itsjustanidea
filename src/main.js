@@ -24,7 +24,7 @@ async function main() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // ===================== DEBUG TOOLS (temporary, remove later) =====================
+  // ===================== DEBUG TOOLS =====================
   let debugMode = false;
   const orbitControls = new OrbitControls(camera, renderer.domElement);
   orbitControls.enabled = false;
@@ -34,23 +34,28 @@ async function main() {
   const debugBox = new THREE.Mesh(debugBoxGeo, debugBoxMat);
   scene.add(debugBox);
 
+  // ===================== LIGHTING =====================
   const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-  sunLight.position.set(5, 10, 5);
   sunLight.castShadow = true;
-  sunLight.shadow.camera.left = -50;
-  sunLight.shadow.camera.right = 50;
-  sunLight.shadow.camera.top = 50;
-  sunLight.shadow.camera.bottom = -50;
+  sunLight.shadow.camera.left = -30;
+  sunLight.shadow.camera.right = 30;
+  sunLight.shadow.camera.top = 30;
+  sunLight.shadow.camera.bottom = -30;
   sunLight.shadow.camera.near = 1;
-  sunLight.shadow.camera.far = 100;
+  sunLight.shadow.camera.far = 60;
   sunLight.shadow.mapSize.width = 2048;
   sunLight.shadow.mapSize.height = 2048;
   sunLight.shadow.bias = -0.001;
   scene.add(sunLight);
+
+  const sunTarget = new THREE.Object3D();
+  scene.add(sunTarget);
+  sunLight.target = sunTarget;
+
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
   // ===================== GROUND WITH STRIPES =====================
-  const groundGeo = new THREE.PlaneGeometry(200, 200, 1, 1);
+  const groundGeo = new THREE.PlaneGeometry(400, 400, 1, 1);
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7c3a });
   const groundMesh = new THREE.Mesh(groundGeo, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
@@ -59,7 +64,7 @@ async function main() {
 
   const stripeGroup = new THREE.Group();
   const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  for (let i = -100; i < 100; i += 5) {
+  for (let i = -200; i < 200; i += 5) {
     const stripeGeo = new THREE.BoxGeometry(0.3, 0.02, 2);
     const stripe = new THREE.Mesh(stripeGeo, stripeMat);
     stripe.position.set(0, 0.01, i);
@@ -68,14 +73,15 @@ async function main() {
   scene.add(stripeGroup);
 
   const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  world.createCollider(RAPIER.ColliderDesc.cuboid(100, 0.1, 100), groundBody);
+  world.createCollider(RAPIER.ColliderDesc.cuboid(200, 0.1, 200), groundBody);
 
   // ===================== LOAD TRUCK MODEL =====================
   const truckVisual = new THREE.Group();
   scene.add(truckVisual);
 
   const TRUCK_Y_OFFSET = -0.72;
-  let wheelMeshes = [];
+  let mixer = null;
+  let wheelAction = null;
 
   const loader = new GLTFLoader();
   loader.load(
@@ -88,11 +94,17 @@ async function main() {
           child.castShadow = true;
           child.receiveShadow = true;
         }
-        if (child.name.toLowerCase().includes('wheel')) {
-          wheelMeshes.push(child);
-        }
       });
       truckVisual.add(model);
+
+      if (gltf.animations && gltf.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(model);
+        wheelAction = mixer.clipAction(gltf.animations[0]);
+        wheelAction.play();
+        wheelAction.timeScale = 0;
+      } else {
+        console.warn('No animations found on truck model — wheels will stay static.');
+      }
     },
     undefined,
     (error) => {
@@ -104,10 +116,11 @@ async function main() {
     }
   );
 
-  const truckBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-    .setTranslation(0, 1, 0)
-    .lockRotations()
-    .setLinearDamping(1.5);
+  // --- KINEMATIC body: WE fully control its position/rotation each frame,
+  // via proper bicycle-model math below, instead of letting Rapier's force/
+  // velocity physics decide movement. Still participates in collision for
+  // future obstacles. ---
+  const truckBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 1, 0);
   const truckBody = world.createRigidBody(truckBodyDesc);
   world.createCollider(RAPIER.ColliderDesc.cuboid(0.6, 0.6, 1.2), truckBody);
 
@@ -123,12 +136,28 @@ async function main() {
     if (mode === 'highway') pickNewWord();
   }
 
-  // ===================== CITY (WASD) DRIVING =====================
+  // ===================== BICYCLE MODEL STATE =====================
   const keys = { w: false, a: false, s: false, d: false };
+
   let heading = 0;
-  const turnSpeed = 2.0;
-  const driveForce = 25;
-  const maxSpeed = 8;
+  // "rearAxle" is the point that actually moves in a straight-ish line and
+  // is the true pivot of rotation — the vehicle's rendered center is offset
+  // forward from it by half the wheelbase, which is what makes turns pivot
+  // around the rear axle rather than the vehicle's geometric center.
+  const rearAxle = { x: 0, z: 0 };
+  const wheelbase = 1.8; // distance between front and rear axle, tune to the model's real proportions
+  const halfWheelbase = wheelbase / 2;
+
+  let speed = 0; // signed: positive = forward, negative = reverse
+  const acceleration = 14; // units/sec^2 while holding W
+  const brakeDecel = 20; // units/sec^2 while holding S (braking, or reversing once stopped)
+  const dragDecel = 8; // natural coast-down when no input held
+  const maxSpeed = 16;
+  const reverseMaxSpeed = 6;
+
+  let steerAngle = 0; // current front-wheel angle, radians
+  const maxSteerAngle = 0.55; // ~31.5 degrees, typical car max lock
+  const steerLerpSpeed = 5; // how fast the wheel turns toward input, not the car itself
 
   // ===================== HIGHWAY (TYPING) DRIVING =====================
   const wordBank = [
@@ -146,10 +175,9 @@ async function main() {
   let keystrokesCorrect = 0;
   let keystrokesTotal = 0;
   let typingStartTime = null;
-  let highwayForce = 0;
-  const highwayMaxSpeed = 20;
-  const highwayBoost = 30;
-  const highwayDamping = 0.6;
+  const highwayMaxSpeed = 26;
+  const wordSpeedBoost = 6; // instant speed gain per completed word
+  const highwayDrag = 3; // constant coast-down, keeps typing necessary to maintain speed
 
   function pickNewWord() {
     targetWord = wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -208,7 +236,7 @@ async function main() {
 
       if (typedBuffer === targetWord) {
         wordsCompleted++;
-        highwayForce = highwayBoost;
+        speed = Math.min(speed + wordSpeedBoost, highwayMaxSpeed);
         pickNewWord();
       } else {
         updateTypingUI();
@@ -227,83 +255,96 @@ async function main() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  const clock = new THREE.Clock();
+  let lastTime = performance.now();
   const camCurrentPos = new THREE.Vector3(0, 3, 8);
   const camLookTarget = new THREE.Vector3();
 
   function animate() {
     requestAnimationFrame(animate);
-    const dt = clock.getDelta();
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
 
     if (mode === 'city') {
-      if (keys.a) heading += turnSpeed * dt;
-      if (keys.d) heading -= turnSpeed * dt;
+      // --- steering angle (the wheel), smoothed toward input ---
+      let steerTarget = 0;
+      if (keys.a) steerTarget = maxSteerAngle;
+      if (keys.d) steerTarget = -maxSteerAngle;
+      steerAngle += (steerTarget - steerAngle) * Math.min(steerLerpSpeed * dt, 1);
 
-      let forceMagnitude = 0;
-      if (keys.w) forceMagnitude = driveForce;
-      if (keys.s) forceMagnitude = -driveForce * 0.6;
+      // --- speed (throttle/brake/drag) ---
+      if (keys.w) {
+        speed += acceleration * dt;
+      } else if (keys.s) {
+        speed -= brakeDecel * dt;
+      } else if (speed > 0) {
+        speed = Math.max(0, speed - dragDecel * dt);
+      } else if (speed < 0) {
+        speed = Math.min(0, speed + dragDecel * dt);
+      }
+      speed = Math.max(-reverseMaxSpeed, Math.min(maxSpeed, speed));
 
-      const forceX = Math.sin(heading) * forceMagnitude;
-      const forceZ = Math.cos(heading) * forceMagnitude;
-      truckBody.resetForces(true);
-      truckBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
-      clampSpeed(maxSpeed);
+      // --- BICYCLE MODEL: this is the actual fix ---
+      // Angular velocity is proportional to speed for a given wheel angle —
+      // so rotation rate genuinely scales with how fast you're going, and
+      // there's no rotation at all when speed is 0, matching a real car.
+      const angularVelocity = (speed / wheelbase) * Math.tan(steerAngle);
+      heading += angularVelocity * dt;
+
+      // rear axle moves forward along the (now-updated) heading
+      rearAxle.x += speed * Math.sin(heading) * dt;
+      rearAxle.z += speed * Math.cos(heading) * dt;
     } else {
-      truckBody.resetForces(true);
-      const forceZ = Math.cos(heading) * highwayForce;
-      const forceX = Math.sin(heading) * highwayForce;
-      truckBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
-      highwayForce = Math.max(0, highwayForce - highwayForce * highwayDamping * dt);
-      clampSpeed(highwayMaxSpeed);
+      // highway: no steering, straight line, speed decays unless fed by typing
+      speed = Math.max(0, speed - highwayDrag * dt);
+      rearAxle.x += speed * Math.sin(heading) * dt;
+      rearAxle.z += speed * Math.cos(heading) * dt;
     }
 
+    // vehicle's rendered/collider center sits half a wheelbase ahead of the
+    // rear axle along current heading — this is what makes it visually pivot
+    // around the rear axle rather than its own geometric middle
+    const centerX = rearAxle.x + halfWheelbase * Math.sin(heading);
+    const centerZ = rearAxle.z + halfWheelbase * Math.cos(heading);
+
     const halfAngle = heading / 2;
-    truckBody.setRotation(
-      { x: 0, y: Math.sin(halfAngle), z: 0, w: Math.cos(halfAngle) },
-      true
-    );
+    const quat = { x: 0, y: Math.sin(halfAngle), z: 0, w: Math.cos(halfAngle) };
+
+    truckBody.setNextKinematicTranslation({ x: centerX, y: 1, z: centerZ });
+    truckBody.setNextKinematicRotation(quat);
 
     world.step();
 
-    const pos = truckBody.translation();
-    const rot = truckBody.rotation();
-    truckVisual.position.set(pos.x, pos.y, pos.z);
-    truckVisual.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+    truckVisual.position.set(centerX, 1, centerZ);
+    truckVisual.quaternion.set(quat.x, quat.y, quat.z, quat.w);
 
-    debugBox.position.set(pos.x, pos.y, pos.z);
-    debugBox.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+    debugBox.position.set(centerX, 1, centerZ);
+    debugBox.quaternion.set(quat.x, quat.y, quat.z, quat.w);
 
-    const vel = truckBody.linvel();
-    const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-    wheelMeshes.forEach((wheel) => {
-      wheel.rotation.x -= speed * dt * 2;
-    });
+    sunLight.position.set(centerX + 15, 21, centerZ + 10);
+    sunTarget.position.set(centerX, 1, centerZ);
+
+    if (mixer && wheelAction) {
+      wheelAction.timeScale = Math.abs(speed) * 0.6;
+      mixer.update(dt);
+    }
 
     if (!debugMode) {
       const desiredCamPos = new THREE.Vector3(
-        pos.x - Math.sin(heading) * 7,
-        pos.y + 3.5,
-        pos.z - Math.cos(heading) * 7
+        centerX - Math.sin(heading) * 7,
+        4.5,
+        centerZ - Math.cos(heading) * 7
       );
       camCurrentPos.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
       camera.position.copy(camCurrentPos);
 
-      camLookTarget.lerp(new THREE.Vector3(pos.x, pos.y + 0.5, pos.z), 1 - Math.pow(0.001, dt));
+      camLookTarget.lerp(new THREE.Vector3(centerX, 1.5, centerZ), 1 - Math.pow(0.001, dt));
       camera.lookAt(camLookTarget);
     } else {
       orbitControls.update();
     }
 
     renderer.render(scene, camera);
-  }
-
-  function clampSpeed(cap) {
-    const vel = truckBody.linvel();
-    const horizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-    if (horizSpeed > cap) {
-      const scale = cap / horizSpeed;
-      truckBody.setLinvel({ x: vel.x * scale, y: vel.y, z: vel.z * scale }, true);
-    }
   }
 
   animate();
