@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 async function main() {
@@ -19,10 +20,12 @@ async function main() {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
   const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
   sunLight.position.set(5, 10, 5);
+  sunLight.castShadow = true;
   scene.add(sunLight);
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
@@ -30,25 +33,53 @@ async function main() {
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7c3a });
   const groundMesh = new THREE.Mesh(groundGeo, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
   const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   world.createCollider(RAPIER.ColliderDesc.cuboid(100, 0.1, 100), groundBody);
 
-  const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
-  const cubeMat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
-  const cubeMesh = new THREE.Mesh(cubeGeo, cubeMat);
-  scene.add(cubeMesh);
+  // ===================== LOAD TRUCK MODEL =====================
+  // We create the physics body immediately (game logic doesn't wait on loading),
+  // but the visual mesh gets swapped in once the model finishes loading async.
+  let truckMesh = new THREE.Group(); // placeholder empty group until model loads
+  scene.add(truckMesh);
 
-  const cubeBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+  const loader = new GLTFLoader();
+  loader.load(
+    '/models/truck.glb',
+    (gltf) => {
+      scene.remove(truckMesh);
+      truckMesh = gltf.scene;
+      truckMesh.scale.set(1, 1, 1); // adjust if the model is too big/small — Kenney models are usually close to real-world scale in meters
+      truckMesh.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(truckMesh);
+    },
+    undefined,
+    (error) => {
+      console.error('Failed to load truck model:', error);
+      // fallback: red box so you know loading failed, instead of silently seeing nothing
+      const fallbackGeo = new THREE.BoxGeometry(1, 1, 2);
+      const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+      truckMesh = new THREE.Mesh(fallbackGeo, fallbackMat);
+      scene.add(truckMesh);
+    }
+  );
+
+  const truckBodyDesc = RAPIER.RigidBodyDesc.dynamic()
     .setTranslation(0, 1, 0)
     .lockRotations()
     .setLinearDamping(1.5);
-  const cubeBody = world.createRigidBody(cubeBodyDesc);
-  world.createCollider(RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5), cubeBody);
+  const truckBody = world.createRigidBody(truckBodyDesc);
+  world.createCollider(RAPIER.ColliderDesc.cuboid(0.6, 0.6, 1.2), truckBody); // roughly truck-shaped collider
 
   // ===================== MODE SYSTEM =====================
-  let mode = 'city'; // 'city' or 'highway'
+  let mode = 'city';
   const modeLabel = document.getElementById('mode-label');
   const typingPanel = document.getElementById('typing-panel');
 
@@ -82,10 +113,10 @@ async function main() {
   let keystrokesCorrect = 0;
   let keystrokesTotal = 0;
   let typingStartTime = null;
-  let highwayForce = 0; // decays over time, refilled by correct words
-  const highwayMaxSpeed = 20; // faster than city, it's a highway
-  const highwayBoost = 30; // force applied on word completion
-  const highwayDamping = 0.6; // how fast the boost fades (per second, roughly)
+  let highwayForce = 0;
+  const highwayMaxSpeed = 20;
+  const highwayBoost = 30;
+  const highwayDamping = 0.6;
 
   function pickNewWord() {
     targetWord = wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -94,7 +125,6 @@ async function main() {
   }
 
   function updateTypingUI() {
-    // render target word with typed portion highlighted vs remaining
     const typedPart = targetWord.slice(0, typedBuffer.length);
     const remainingPart = targetWord.slice(typedBuffer.length);
     const isCorrectSoFar = targetWord.startsWith(typedBuffer);
@@ -116,7 +146,6 @@ async function main() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
 
-    // mode switch always active
     if (key === 'm') {
       setMode(mode === 'city' ? 'highway' : 'city');
       return;
@@ -128,7 +157,7 @@ async function main() {
     }
 
     if (mode === 'highway') {
-      if (key.length !== 1 || !/[a-z]/.test(key)) return; // ignore non-letter keys
+      if (key.length !== 1 || !/[a-z]/.test(key)) return;
       if (!typingStartTime) typingStartTime = performance.now();
 
       const expectedChar = targetWord[typedBuffer.length];
@@ -137,11 +166,10 @@ async function main() {
         keystrokesCorrect++;
         typedBuffer += key;
       }
-      // wrong key: counted against accuracy, buffer does NOT advance (must retype correctly)
 
       if (typedBuffer === targetWord) {
         wordsCompleted++;
-        highwayForce = highwayBoost; // apply a burst of forward force
+        highwayForce = highwayBoost;
         pickNewWord();
       } else {
         updateTypingUI();
@@ -162,6 +190,10 @@ async function main() {
 
   const clock = new THREE.Clock();
 
+  // --- Camera smoothing state, so it eases instead of snapping every frame ---
+  const camCurrentPos = new THREE.Vector3(0, 3, 8);
+  const camLookTarget = new THREE.Vector3();
+
   function animate() {
     requestAnimationFrame(animate);
     const dt = clock.getDelta();
@@ -176,53 +208,52 @@ async function main() {
 
       const forceX = Math.sin(heading) * forceMagnitude;
       const forceZ = Math.cos(heading) * forceMagnitude;
-      cubeBody.resetForces(true);
-      cubeBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
+      truckBody.resetForces(true);
+      truckBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
       clampSpeed(maxSpeed);
     } else {
-      // highway mode: straight line, force comes from typing bursts that decay
-      cubeBody.resetForces(true);
+      truckBody.resetForces(true);
       const forceZ = Math.cos(heading) * highwayForce;
       const forceX = Math.sin(heading) * highwayForce;
-      cubeBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
+      truckBody.addForce({ x: forceX, y: 0, z: forceZ }, true);
       highwayForce = Math.max(0, highwayForce - highwayForce * highwayDamping * dt);
       clampSpeed(highwayMaxSpeed);
     }
 
     const halfAngle = heading / 2;
-    cubeBody.setRotation(
+    truckBody.setRotation(
       { x: 0, y: Math.sin(halfAngle), z: 0, w: Math.cos(halfAngle) },
       true
     );
 
     world.step();
 
-    const pos = cubeBody.translation();
-    const rot = cubeBody.rotation();
-    cubeMesh.position.set(pos.x, pos.y, pos.z);
-    cubeMesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+    const pos = truckBody.translation();
+    const rot = truckBody.rotation();
+    truckMesh.position.set(pos.x, pos.y, pos.z);
+    truckMesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
 
-    const camOffset = new THREE.Vector3(
-      -Math.sin(heading) * 6,
-      3,
-      -Math.cos(heading) * 6
+    // --- Smoothed chase camera (lerp instead of snapping) ---
+    const desiredCamPos = new THREE.Vector3(
+      pos.x - Math.sin(heading) * 7,
+      pos.y + 3.5,
+      pos.z - Math.cos(heading) * 7
     );
-    camera.position.set(
-      cubeMesh.position.x + camOffset.x,
-      cubeMesh.position.y + camOffset.y,
-      cubeMesh.position.z + camOffset.z
-    );
-    camera.lookAt(cubeMesh.position);
+    camCurrentPos.lerp(desiredCamPos, 1 - Math.pow(0.001, dt)); // frame-rate independent smoothing
+    camera.position.copy(camCurrentPos);
+
+    camLookTarget.lerp(new THREE.Vector3(pos.x, pos.y + 0.5, pos.z), 1 - Math.pow(0.001, dt));
+    camera.lookAt(camLookTarget);
 
     renderer.render(scene, camera);
   }
 
   function clampSpeed(cap) {
-    const vel = cubeBody.linvel();
+    const vel = truckBody.linvel();
     const horizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
     if (horizSpeed > cap) {
       const scale = cap / horizSpeed;
-      cubeBody.setLinvel({ x: vel.x * scale, y: vel.y, z: vel.z * scale }, true);
+      truckBody.setLinvel({ x: vel.x * scale, y: vel.y, z: vel.z * scale }, true);
     }
   }
 
