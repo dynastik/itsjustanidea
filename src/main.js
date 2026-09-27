@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 async function main() {
@@ -23,51 +24,83 @@ async function main() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
+  // ===================== DEBUG TOOLS (temporary, remove later) =====================
+  let debugMode = false;
+  const orbitControls = new OrbitControls(camera, renderer.domElement);
+  orbitControls.enabled = false;
+
+  const debugBoxGeo = new THREE.BoxGeometry(1.2, 1.2, 2.4);
+  const debugBoxMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+  const debugBox = new THREE.Mesh(debugBoxGeo, debugBoxMat);
+  scene.add(debugBox);
+
   const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
   sunLight.position.set(5, 10, 5);
   sunLight.castShadow = true;
+  sunLight.shadow.camera.left = -50;
+  sunLight.shadow.camera.right = 50;
+  sunLight.shadow.camera.top = 50;
+  sunLight.shadow.camera.bottom = -50;
+  sunLight.shadow.camera.near = 1;
+  sunLight.shadow.camera.far = 100;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  sunLight.shadow.bias = -0.001;
   scene.add(sunLight);
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-  const groundGeo = new THREE.PlaneGeometry(200, 200);
+  // ===================== GROUND WITH STRIPES =====================
+  const groundGeo = new THREE.PlaneGeometry(200, 200, 1, 1);
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7c3a });
   const groundMesh = new THREE.Mesh(groundGeo, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
+  const stripeGroup = new THREE.Group();
+  const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  for (let i = -100; i < 100; i += 5) {
+    const stripeGeo = new THREE.BoxGeometry(0.3, 0.02, 2);
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(0, 0.01, i);
+    stripeGroup.add(stripe);
+  }
+  scene.add(stripeGroup);
+
   const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   world.createCollider(RAPIER.ColliderDesc.cuboid(100, 0.1, 100), groundBody);
 
   // ===================== LOAD TRUCK MODEL =====================
-  // We create the physics body immediately (game logic doesn't wait on loading),
-  // but the visual mesh gets swapped in once the model finishes loading async.
-  let truckMesh = new THREE.Group(); // placeholder empty group until model loads
-  scene.add(truckMesh);
+  const truckVisual = new THREE.Group();
+  scene.add(truckVisual);
+
+  const TRUCK_Y_OFFSET = -0.72;
+  let wheelMeshes = [];
 
   const loader = new GLTFLoader();
   loader.load(
-    '/models/truck.glb',
+    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMilkTruck/glTF-Binary/CesiumMilkTruck.glb',
     (gltf) => {
-      scene.remove(truckMesh);
-      truckMesh = gltf.scene;
-      truckMesh.scale.set(1, 1, 1); // adjust if the model is too big/small — Kenney models are usually close to real-world scale in meters
-      truckMesh.traverse((child) => {
+      const model = gltf.scene;
+      model.position.y = TRUCK_Y_OFFSET;
+      model.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
         }
+        if (child.name.toLowerCase().includes('wheel')) {
+          wheelMeshes.push(child);
+        }
       });
-      scene.add(truckMesh);
+      truckVisual.add(model);
     },
     undefined,
     (error) => {
       console.error('Failed to load truck model:', error);
-      // fallback: red box so you know loading failed, instead of silently seeing nothing
       const fallbackGeo = new THREE.BoxGeometry(1, 1, 2);
       const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-      truckMesh = new THREE.Mesh(fallbackGeo, fallbackMat);
-      scene.add(truckMesh);
+      const fallback = new THREE.Mesh(fallbackGeo, fallbackMat);
+      truckVisual.add(fallback);
     }
   );
 
@@ -76,7 +109,7 @@ async function main() {
     .lockRotations()
     .setLinearDamping(1.5);
   const truckBody = world.createRigidBody(truckBodyDesc);
-  world.createCollider(RAPIER.ColliderDesc.cuboid(0.6, 0.6, 1.2), truckBody); // roughly truck-shaped collider
+  world.createCollider(RAPIER.ColliderDesc.cuboid(0.6, 0.6, 1.2), truckBody);
 
   // ===================== MODE SYSTEM =====================
   let mode = 'city';
@@ -151,6 +184,12 @@ async function main() {
       return;
     }
 
+    if (key === 'c') {
+      debugMode = !debugMode;
+      orbitControls.enabled = debugMode;
+      return;
+    }
+
     if (mode === 'city') {
       if (key in keys) keys[key] = true;
       return;
@@ -189,8 +228,6 @@ async function main() {
   });
 
   const clock = new THREE.Clock();
-
-  // --- Camera smoothing state, so it eases instead of snapping every frame ---
   const camCurrentPos = new THREE.Vector3(0, 3, 8);
   const camLookTarget = new THREE.Vector3();
 
@@ -230,20 +267,32 @@ async function main() {
 
     const pos = truckBody.translation();
     const rot = truckBody.rotation();
-    truckMesh.position.set(pos.x, pos.y, pos.z);
-    truckMesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+    truckVisual.position.set(pos.x, pos.y, pos.z);
+    truckVisual.quaternion.set(rot.x, rot.y, rot.z, rot.w);
 
-    // --- Smoothed chase camera (lerp instead of snapping) ---
-    const desiredCamPos = new THREE.Vector3(
-      pos.x - Math.sin(heading) * 7,
-      pos.y + 3.5,
-      pos.z - Math.cos(heading) * 7
-    );
-    camCurrentPos.lerp(desiredCamPos, 1 - Math.pow(0.001, dt)); // frame-rate independent smoothing
-    camera.position.copy(camCurrentPos);
+    debugBox.position.set(pos.x, pos.y, pos.z);
+    debugBox.quaternion.set(rot.x, rot.y, rot.z, rot.w);
 
-    camLookTarget.lerp(new THREE.Vector3(pos.x, pos.y + 0.5, pos.z), 1 - Math.pow(0.001, dt));
-    camera.lookAt(camLookTarget);
+    const vel = truckBody.linvel();
+    const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+    wheelMeshes.forEach((wheel) => {
+      wheel.rotation.x -= speed * dt * 2;
+    });
+
+    if (!debugMode) {
+      const desiredCamPos = new THREE.Vector3(
+        pos.x - Math.sin(heading) * 7,
+        pos.y + 3.5,
+        pos.z - Math.cos(heading) * 7
+      );
+      camCurrentPos.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
+      camera.position.copy(camCurrentPos);
+
+      camLookTarget.lerp(new THREE.Vector3(pos.x, pos.y + 0.5, pos.z), 1 - Math.pow(0.001, dt));
+      camera.lookAt(camLookTarget);
+    } else {
+      orbitControls.update();
+    }
 
     renderer.render(scene, camera);
   }
