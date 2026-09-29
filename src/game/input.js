@@ -5,8 +5,8 @@ import { HIGHWAY_CONFIG, getWpm, getAccuracy } from './typing.js';
 export const KEYS = {
   debug: '`',
   devModeSwitch: 'tab',
-  cabView: 'f2',
-  reset: 'f4',
+  cabView: 'v',
+  reset: 'r',
   mute: 'f9',
   pause: 'escape',
 };
