@@ -120,10 +120,12 @@ export function createWorld(scene, physics, RAPIER) {
     RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)
   );
   let terrainCollider = physics.createCollider(
-    (() => {
-      const mesh = buildTerrainColliderMesh(centerZ);
-      return RAPIER.ColliderDesc.trimesh(mesh.vertices, mesh.indices).setFriction(0.8);
-    })(),
+    RAPIER.ColliderDesc.heightfield(
+      TERRAIN_SEGMENTS + 1,
+      TERRAIN_SEGMENTS + 1,
+      buildTerrainHeights(centerZ),
+      { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
+    ).setFriction(0.8),
     terrainBody
   );
 
