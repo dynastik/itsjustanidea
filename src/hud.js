@@ -1,0 +1,43 @@
+import { state } from '../game/state.js';
+import { getWpm, getAccuracy } from '../game/typing.js';
+
+export function createHud() {
+  const $ = (id) => document.getElementById(id);
+  const modeLabel = $('mode-label');
+  const typingPanel = $('typing-panel');
+  const targetWordEl = $('target-word');
+  const typedInputEl = $('typed-input');
+  const statsEl = $('stats');
+  const speedoEl = $('speedo');
+  const pauseEl = $('pause-overlay');
+
+  const cache = {};
+  function set(el, key, value, prop = 'textContent') {
+    if (cache[key] !== value) {
+      cache[key] = value;
+      el[prop] = value;
+    }
+  }
+
+  function update() {
+    const highway = state.mode === 'highway';
+    const dev = state.zoneAuto ? '' : ' [DEV]';
+    set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev);
+    set(typingPanel.style, 'panel', highway ? 'block' : 'none', 'display');
+    set(speedoEl, 'speed', `${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
+    set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
+
+    if (highway) {
+      const t = state.typing;
+      const flash = state.time - t.lastErrorAt < 0.15;
+      const html = flash
+        ? `<span style="color:#f44336">${t.target}</span>`
+        : `<span style="color:#4caf50">${t.buffer}</span><span style="color:#333">${t.target.slice(t.buffer.length)}</span>`;
+      set(targetWordEl, 'word', html, 'innerHTML');
+      set(typedInputEl, 'typed', t.buffer);
+      set(statsEl, 'stats', `WPM: ${Math.round(getWpm())} | Accuracy: ${Math.round(getAccuracy() * 100)}%`);
+    }
+  }
+
+  return { update };
+}
