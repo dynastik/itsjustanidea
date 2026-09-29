@@ -86,9 +86,9 @@ async function main() {
     state.worldTime = Math.min(state.worldTime + dt / DAY_LENGTH_SECONDS, 1);
     updateZoneMode();
 
-    const surface = world.surfaceAt(vehicle.center.x);
+    const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
-    else writeHighwayInput(driveInput, vehicle);
+    else writeHighwayInput(driveInput, vehicle, world);
 
     // fixed-timestep physics, render pose interpolated between steps
     accumulator += dt;
