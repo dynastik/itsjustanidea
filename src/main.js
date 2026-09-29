@@ -20,6 +20,14 @@ const HIGHWAY_ZONE_Z = 80;
 const ZONE_HYSTERESIS = 10;
 const MAX_STEPS_PER_FRAME = 5;
 
+function showStartupError(error) {
+  console.error('[itsjustanidea] startup failed:', error);
+  const panel = document.createElement('pre');
+  panel.id = 'startup-error';
+  panel.textContent = 'GAME STARTUP ERROR\\n\\n' + (error?.stack || error?.message || String(error));
+  document.body.appendChild(panel);
+}
+
 async function main() {
   await RAPIER.init();
   const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
