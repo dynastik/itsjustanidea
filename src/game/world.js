@@ -135,8 +135,6 @@ export function createWorld(scene, physics, RAPIER) {
   );
   let terrainCollider = physics.createCollider(
     RAPIER.ColliderDesc.heightfield(
-      TERRAIN_SEGMENTS + 1,
-      TERRAIN_SEGMENTS + 1,
       buildTerrainHeights(centerZ),
       { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
     ).setFriction(0.8),
