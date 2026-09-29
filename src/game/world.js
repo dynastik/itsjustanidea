@@ -3,66 +3,6 @@ import * as THREE from 'three';
 export const ROAD_HALF_WIDTH = 4.5;
 const VIEW = 320;        // how far ahead/behind the world is kept alive
 const ROAD_PERIOD = 10;  // metres per repeat of the road texture
-const TERRAIN_SIZE = VIEW * 2;
-const TERRAIN_SEGMENTS = 64;
-const TERRAIN_REPEAT = 200;
-
-function roadHeight(z) {
-  const t = (((z % TERRAIN_REPEAT) + TERRAIN_REPEAT) % TERRAIN_REPEAT) / TERRAIN_REPEAT * Math.PI * 2;
-  return 0.35 * Math.sin(t) + 0.12 * Math.sin(t * 2 + 0.7);
-}
-
-export function terrainHeight(x, z) {
-  const road = roadHeight(z);
-  const natural =
-    0.9 * Math.sin(z * Math.PI * 2 / 140) +
-    0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 90) +
-    0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 32);
-  const roadBlend = THREE.MathUtils.smoothstep(
-    Math.abs(x), ROAD_HALF_WIDTH + 0.5, ROAD_HALF_WIDTH + 5
-  );
-  return THREE.MathUtils.lerp(road, natural, roadBlend);
-}
-
-function buildTerrainGeometry(centerZ) {
-  const g = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
-  const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
-    const z = centerZ + p.getY(i);
-    p.setXYZ(i, x, terrainHeight(x, z), z - centerZ);
-  }
-  p.needsUpdate = true;
-  g.computeVertexNormals();
-  return g;
-}
-
-function buildTerrainHeights(centerZ) {
-  const n = TERRAIN_SEGMENTS + 1;
-  const heights = new Float32Array(n * n);
-  for (let x = 0; x < n; x++) {
-    const localX = (x / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
-    for (let z = 0; z < n; z++) {
-      const localZ = (z / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
-      // Rapier stores 3D heightfields column-major: x column, then z row.
-      heights[x * n + z] = terrainHeight(localX, centerZ + localZ);
-    }
-  }
-  return heights;
-}
-
-function buildRoadGeometry(centerZ) {
-  const g = new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, TERRAIN_SIZE, 1, TERRAIN_SEGMENTS);
-  const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
-    const z = centerZ + p.getY(i);
-    p.setXYZ(i, x, roadHeight(z) + 0.035, z - centerZ);
-  }
-  p.needsUpdate = true;
-  g.computeVertexNormals();
-  return g;
-}
 
 function makeRoadTexture() {
   const c = document.createElement('canvas');
@@ -93,18 +33,21 @@ function makeRoadTexture() {
 // Trees have real colliders, so hitting one costs you speed. Phase 2 replaces all of this
 // with the terrain + road generator; surfaceAt() and the tree-collider pattern carry over.
 export function createWorld(scene, physics, RAPIER) {
-  // Phase 2 terrain pass: deterministic repeating hills. The physics collider
-  // remains the flat ground until the dedicated terrain-collider checklist item.
-  let centerZ = 0;
-  const terrain = new THREE.Mesh(
-    buildTerrainGeometry(centerZ),
-    new THREE.MeshStandardMaterial({ color: 0x4a7c3a, roughness: 1 })
+  // ground (visual follows the vehicle; the collider is snapped to a 50m grid so it isn't teleported every frame)
+  const groundMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(VIEW * 2, VIEW * 2),
+    new THREE.MeshStandardMaterial({ color: 0x4a7c3a })
   );
-  terrain.receiveShadow = true;
-  scene.add(terrain);
+  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.receiveShadow = true;
+  scene.add(groundMesh);
 
+  const groundBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
+  physics.createCollider(RAPIER.ColliderDesc.cuboid(200, 0.5, 200), groundBody); // top surface at y = 0
+
+  // road: one long textured strip, snapped to multiples of the texture period so it never visibly slides
   const road = new THREE.Mesh(
-    buildRoadGeometry(centerZ),
+    new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, VIEW * 2),
     new THREE.MeshStandardMaterial({
       map: makeRoadTexture(),
       roughness: 0.95,
@@ -113,21 +56,10 @@ export function createWorld(scene, physics, RAPIER) {
       polygonOffsetUnits: -2,
     })
   );
+  road.rotation.x = -Math.PI / 2;
+  road.position.y = 0.04;
   road.receiveShadow = true;
   scene.add(road);
-
-  const terrainBody = physics.createRigidBody(
-    RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)
-  );
-  let terrainCollider = physics.createCollider(
-    RAPIER.ColliderDesc.heightfield(
-      TERRAIN_SEGMENTS + 1,
-      TERRAIN_SEGMENTS + 1,
-      buildTerrainHeights(centerZ),
-      { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
-    ).setFriction(0.8),
-    terrainBody
-  );
 
   // trees (instanced visuals + one fixed collider each)
   const perSide = (VIEW * 2) / 5;
@@ -150,8 +82,7 @@ export function createWorld(scene, physics, RAPIER) {
 
   function writeTree(i) {
     const t = trees[i];
-    const groundY = terrainHeight(t.x, t.z);
-    dummy.position.set(t.x, groundY + 0.6 * t.s, t.z);
+    dummy.position.set(t.x, 0.6 * t.s, t.z);
     dummy.scale.setScalar(t.s);
     dummy.updateMatrix();
     trunkMesh.setMatrixAt(i, dummy.matrix);
@@ -168,7 +99,7 @@ export function createWorld(scene, physics, RAPIER) {
         s: 0.7 + Math.random() * 0.6,
       };
       trees.push(t);
-      const body = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(t.x, terrainHeight(t.x, t.z) + t.s, t.z));
+      const body = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(t.x, t.s, t.z));
       physics.createCollider(
         RAPIER.ColliderDesc.cylinder(t.s, 0.35 * t.s).setFriction(0.2).setRestitution(0.1),
         body
@@ -180,31 +111,10 @@ export function createWorld(scene, physics, RAPIER) {
   trunkMesh.instanceMatrix.needsUpdate = true;
   leavesMesh.instanceMatrix.needsUpdate = true;
 
-  function rebuildTerrain(newCenterZ) {
-    centerZ = Math.round(newCenterZ / TERRAIN_REPEAT) * TERRAIN_REPEAT;
-    terrain.geometry.dispose();
-    terrain.geometry = buildTerrainGeometry(centerZ);
-    road.geometry.dispose();
-    road.geometry = buildRoadGeometry(centerZ);
-
-    physics.removeCollider(terrainCollider, true);
-    terrainCollider = physics.createCollider(
-      RAPIER.ColliderDesc.heightfield(
-        TERRAIN_SEGMENTS + 1,
-        TERRAIN_SEGMENTS + 1,
-        buildTerrainHeights(centerZ),
-        { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
-      ).setFriction(0.8),
-      terrainBody
-    );
-    terrainBody.setTranslation({ x: 0, y: 0, z: centerZ }, true);
-  }
-
   function update(x, z) {
-    const nextCenter = Math.round(z / TERRAIN_REPEAT) * TERRAIN_REPEAT;
-    if (nextCenter !== centerZ) rebuildTerrain(nextCenter);
-
+    groundMesh.position.set(x, 0, z);
     groundBody.setTranslation({ x: Math.round(x / 50) * 50, y: -0.5, z: Math.round(z / 50) * 50 }, true);
+    road.position.z = Math.round(z / ROAD_PERIOD) * ROAD_PERIOD;
 
     let dirty = false;
     for (let i = 0; i < trees.length; i++) {
@@ -213,7 +123,7 @@ export function createWorld(scene, physics, RAPIER) {
       else if (t.z > z + VIEW) t.z -= VIEW * 2;
       else continue;
       writeTree(i);
-      treeBodies[i].setTranslation({ x: t.x, y: terrainHeight(t.x, t.z) + t.s, z: t.z }, false);
+      treeBodies[i].setTranslation({ x: t.x, y: t.s, z: t.z }, false);
       dirty = true;
     }
     if (dirty) {

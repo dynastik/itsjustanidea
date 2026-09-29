@@ -57,7 +57,7 @@ Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 
 - [ ] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
 - [ ] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
 - [ ] `render.js` module: renderer + `EffectComposer` set up as a passthrough (RenderPass + SMAA + OutputPass) so Phase 2's look can be added pass by pass. Replaces `antialias: true`; cap pixel ratio at 2
-- [x] Camera module: chase cam, free-look, speed-based FOV, **cab (first-person) view toggle (V)**, structured as named **camera profiles** (see Open Decision 12)
+- [ ] Camera module: chase cam, free-look, speed-based FOV, **cab (first-person) view toggle (V)**, structured as named **camera profiles** (see Open Decision 12)
 - [ ] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
 - [ ] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
 - [ ] Tree/prop colliders with collision response (speed loss + bump)
