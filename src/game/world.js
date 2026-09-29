@@ -37,6 +37,20 @@ function buildTerrainGeometry(centerZ) {
   return g;
 }
 
+function buildTerrainHeights(centerZ) {
+  const n = TERRAIN_SEGMENTS + 1;
+  const heights = new Float32Array(n * n);
+  for (let x = 0; x < n; x++) {
+    const localX = (x / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
+    for (let z = 0; z < n; z++) {
+      const localZ = (z / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
+      // Rapier stores 3D heightfields column-major: x column, then z row.
+      heights[x * n + z] = terrainHeight(localX, centerZ + localZ);
+    }
+  }
+  return heights;
+}
+
 function buildRoadGeometry(centerZ) {
   const g = new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, TERRAIN_SIZE, 1, TERRAIN_SEGMENTS);
   const p = g.attributes.position;
@@ -102,8 +116,18 @@ export function createWorld(scene, physics, RAPIER) {
   road.receiveShadow = true;
   scene.add(road);
 
-  const groundBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
-  physics.createCollider(RAPIER.ColliderDesc.cuboid(200, 0.5, 200), groundBody);
+  const terrainBody = physics.createRigidBody(
+    RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)
+  );
+  let terrainCollider = physics.createCollider(
+    RAPIER.ColliderDesc.heightfield(
+      TERRAIN_SEGMENTS + 1,
+      TERRAIN_SEGMENTS + 1,
+      buildTerrainHeights(centerZ),
+      { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
+    ).setFriction(0.8),
+    terrainBody
+  );
 
   // trees (instanced visuals + one fixed collider each)
   const perSide = (VIEW * 2) / 5;
@@ -162,6 +186,18 @@ export function createWorld(scene, physics, RAPIER) {
     terrain.geometry = buildTerrainGeometry(centerZ);
     road.geometry.dispose();
     road.geometry = buildRoadGeometry(centerZ);
+
+    physics.removeCollider(terrainCollider, true);
+    terrainCollider = physics.createCollider(
+      RAPIER.ColliderDesc.heightfield(
+        TERRAIN_SEGMENTS + 1,
+        TERRAIN_SEGMENTS + 1,
+        buildTerrainHeights(centerZ),
+        { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
+      ).setFriction(0.8),
+      terrainBody
+    );
+    terrainBody.setTranslation({ x: 0, y: 0, z: centerZ }, true);
   }
 
   function update(x, z) {
