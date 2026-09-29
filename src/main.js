@@ -6,10 +6,11 @@ import { state, setMode, onModeChange } from './game/state.js';
 import { createRenderer } from './game/render.js';
 import { createLighting } from './game/lighting.js';
 import { createWorld } from './game/world.js';
-import { createVehicle } from './game/vehicle.js';
+import { createVehicle, FIXED_DT } from './game/vehicle.js';
 import { createCameraRig } from './game/camera.js';
+import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
-import { pickNewWord, handleTypingKey, resetTyping } from './game/typing.js';
+import { beginTypingSession, handleTypingKey } from './game/typing.js';
 import { createHud } from './ui/hud.js';
 
 const DAY_LENGTH_SECONDS = 180; // wall-clock for testing. TODO Phase 5: distance/story driven
@@ -17,10 +18,12 @@ const DAY_LENGTH_SECONDS = 180; // wall-clock for testing. TODO Phase 5: distanc
 // Placeholder zone switch. TODO Phase 2: on-ramp trigger volume.
 const HIGHWAY_ZONE_Z = 80;
 const ZONE_HYSTERESIS = 10;
+const MAX_STEPS_PER_FRAME = 5;
 
 async function main() {
   await RAPIER.init();
   const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  physics.timestep = FIXED_DT;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -30,14 +33,19 @@ async function main() {
   const world = createWorld(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
   const rig = createCameraRig(camera, gfx.domElement, vehicle);
+  const audio = createAudio();
   const hud = createHud();
   const driveInput = createDriveInput();
 
-  onModeChange((m) => { if (m === 'highway') pickNewWord(); });
+  let accumulator = 0;
+  let prevSpeed = 0;
+
+  onModeChange((m) => { if (m === 'highway') beginTypingSession(); });
 
   const input = createInput({
     typeKey: handleTypingKey,
     toggleCab: () => rig.toggleCab(),
+    toggleMute: () => audio.toggleMute(),
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
       state.debug = !state.debug;
@@ -50,17 +58,18 @@ async function main() {
     },
     reset: () => {
       vehicle.reset();
-      resetTyping();
+      beginTypingSession();
       input.clearHeld();
       state.worldTime = 0;
       state.zoneAuto = true;
+      prevSpeed = 0;
       setMode('city');
     },
   });
 
   function updateZoneMode() {
     if (!state.zoneAuto) return;
-    const z = vehicle.rearAxle.z;
+    const z = vehicle.center.z;
     if (state.mode === 'city' && z > HIGHWAY_ZONE_Z + ZONE_HYSTERESIS) setMode('highway');
     else if (state.mode === 'highway' && z < HIGHWAY_ZONE_Z - ZONE_HYSTERESIS) setMode('city');
   }
@@ -73,15 +82,41 @@ async function main() {
     last = now;
     if (state.paused) dt = 0; // everything below is dt-driven, so this freezes the sim
 
+    state.time += dt;
     state.worldTime = Math.min(state.worldTime + dt / DAY_LENGTH_SECONDS, 1);
     updateZoneMode();
 
+    const surface = world.surfaceAt(vehicle.center.x);
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
     else writeHighwayInput(driveInput, vehicle);
 
-    vehicle.update(dt, driveInput);
-    physics.step();
+    // fixed-timestep physics, render pose interpolated between steps
+    accumulator += dt;
+    let steps = 0;
+    while (accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
+      vehicle.step(FIXED_DT, driveInput, surface);
+      physics.step();
+      vehicle.capture();
+      accumulator -= FIXED_DT;
+      steps++;
+    }
+    if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
+    vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
+
+    // impact detection: a big one-frame speed loss that wasn't braking
+    if (dt > 0) {
+      const drop = prevSpeed - vehicle.speed;
+      if (prevSpeed > 4 && drop > 3) audio.bump(drop);
+    }
+    prevSpeed = vehicle.speed;
+
+    audio.update(dt, {
+      speed: vehicle.speed,
+      throttle: driveInput.throttle,
+      offRoad: surface.offRoad,
+      paused: state.paused,
+    });
 
     world.update(vehicle.center.x, vehicle.center.z);
     lighting.update(state.worldTime, vehicle.center);
