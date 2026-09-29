@@ -51,18 +51,35 @@ function buildTerrainGeometry(centerZ) {
   return g;
 }
 
-function buildTerrainHeights(centerZ) {
+function buildTerrainColliderMesh(centerZ) {
   const n = TERRAIN_SEGMENTS + 1;
-  const heights = new Float32Array(n * n);
+  const vertices = new Float32Array(n * n * 3);
+  const indices = new Uint32Array(TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6);
+
+  let v = 0;
   for (let x = 0; x < n; x++) {
     const localX = (x / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
     for (let z = 0; z < n; z++) {
       const localZ = (z / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
-      // Rapier stores 3D heightfields column-major: x column, then z row.
-      heights[x * n + z] = terrainHeight(localX, centerZ + localZ);
+      const i = (x * n + z) * 3;
+      vertices[i] = localX;
+      vertices[i + 1] = terrainHeight(localX, centerZ + localZ);
+      vertices[i + 2] = localZ;
     }
   }
-  return heights;
+
+  for (let x = 0; x < TERRAIN_SEGMENTS; x++) {
+    for (let z = 0; z < TERRAIN_SEGMENTS; z++) {
+      const a = x * n + z;
+      const b = (x + 1) * n + z;
+      const c = (x + 1) * n + (z + 1);
+      const d = x * n + (z + 1);
+      indices[v++] = a; indices[v++] = b; indices[v++] = d;
+      indices[v++] = b; indices[v++] = c; indices[v++] = d;
+    }
+  }
+
+  return { vertices, indices };
 }
 
 function buildRoadGeometry(centerZ) {
@@ -134,10 +151,10 @@ export function createWorld(scene, physics, RAPIER) {
     RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)
   );
   let terrainCollider = physics.createCollider(
-    RAPIER.ColliderDesc.heightfield(
-      buildTerrainHeights(centerZ),
-      { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
-    ).setFriction(0.8),
+    (() => {
+      const mesh = buildTerrainColliderMesh(centerZ);
+      return RAPIER.ColliderDesc.trimesh(mesh.vertices, mesh.indices).setFriction(0.8);
+    })(),
     terrainBody
   );
 
