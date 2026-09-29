@@ -51,19 +51,3 @@ body {
   letter-spacing: 8px;
   pointer-events: none;
 }
-
-
-#startup-error {
-  position: fixed;
-  inset: 16px;
-  z-index: 100;
-  margin: 0;
-  padding: 16px;
-  overflow: auto;
-  white-space: pre-wrap;
-  background: #160f12;
-  color: #ffb8b8;
-  border: 1px solid #8f4b4b;
-  font: 13px/1.45 monospace;
-  pointer-events: auto;
-}

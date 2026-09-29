@@ -7,33 +7,19 @@ const TERRAIN_SIZE = VIEW * 2;
 const TERRAIN_SEGMENTS = 64;
 const TERRAIN_REPEAT = 200;
 
-function roadCenterX(z) {
-  const t = (((z % TERRAIN_REPEAT) + TERRAIN_REPEAT) % TERRAIN_REPEAT) / TERRAIN_REPEAT * Math.PI * 2;
-  return 2.0 * Math.sin(t) + 0.8 * Math.sin(t * 2 + 0.4);
-}
-
 function roadHeight(z) {
   const t = (((z % TERRAIN_REPEAT) + TERRAIN_REPEAT) % TERRAIN_REPEAT) / TERRAIN_REPEAT * Math.PI * 2;
   return 0.35 * Math.sin(t) + 0.12 * Math.sin(t * 2 + 0.7);
 }
 
-export function getRoadFrame(z) {
-  const dz = 0.5;
-  const x = roadCenterX(z);
-  const dx = (roadCenterX(z + dz) - roadCenterX(z - dz)) / (2 * dz);
-  return { x, heading: Math.atan2(dx, 1), y: roadHeight(z) };
-}
-
 export function terrainHeight(x, z) {
-  const frame = getRoadFrame(z);
-  const road = frame.y;
-  const distanceFromRoad = Math.abs(x - frame.x);
+  const road = roadHeight(z);
   const natural =
     0.9 * Math.sin(z * Math.PI * 2 / 140) +
     0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 90) +
     0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 32);
   const roadBlend = THREE.MathUtils.smoothstep(
-    distanceFromRoad, ROAD_HALF_WIDTH + 0.5, ROAD_HALF_WIDTH + 5
+    Math.abs(x), ROAD_HALF_WIDTH + 0.5, ROAD_HALF_WIDTH + 5
   );
   return THREE.MathUtils.lerp(road, natural, roadBlend);
 }
@@ -51,44 +37,27 @@ function buildTerrainGeometry(centerZ) {
   return g;
 }
 
-function buildTerrainColliderMesh(centerZ) {
+function buildTerrainHeights(centerZ) {
   const n = TERRAIN_SEGMENTS + 1;
-  const vertices = new Float32Array(n * n * 3);
-  const indices = new Uint32Array(TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6);
-
-  let v = 0;
+  const heights = new Float32Array(n * n);
   for (let x = 0; x < n; x++) {
     const localX = (x / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
     for (let z = 0; z < n; z++) {
       const localZ = (z / TERRAIN_SEGMENTS - 0.5) * TERRAIN_SIZE;
-      const i = (x * n + z) * 3;
-      vertices[i] = localX;
-      vertices[i + 1] = terrainHeight(localX, centerZ + localZ);
-      vertices[i + 2] = localZ;
+      // Rapier stores 3D heightfields column-major: x column, then z row.
+      heights[x * n + z] = terrainHeight(localX, centerZ + localZ);
     }
   }
-
-  for (let x = 0; x < TERRAIN_SEGMENTS; x++) {
-    for (let z = 0; z < TERRAIN_SEGMENTS; z++) {
-      const a = x * n + z;
-      const b = (x + 1) * n + z;
-      const c = (x + 1) * n + (z + 1);
-      const d = x * n + (z + 1);
-      indices[v++] = a; indices[v++] = b; indices[v++] = d;
-      indices[v++] = b; indices[v++] = c; indices[v++] = d;
-    }
-  }
-
-  return { vertices, indices };
+  return heights;
 }
 
 function buildRoadGeometry(centerZ) {
   const g = new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, TERRAIN_SIZE, 1, TERRAIN_SEGMENTS);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
-    const localX = p.getX(i);
+    const x = p.getX(i);
     const z = centerZ + p.getY(i);
-    p.setXYZ(i, roadCenterX(z) + localX, roadHeight(z) + 0.035, z - centerZ);
+    p.setXYZ(i, x, roadHeight(z) + 0.035, z - centerZ);
   }
   p.needsUpdate = true;
   g.computeVertexNormals();
@@ -151,10 +120,12 @@ export function createWorld(scene, physics, RAPIER) {
     RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)
   );
   let terrainCollider = physics.createCollider(
-    (() => {
-      const mesh = buildTerrainColliderMesh(centerZ);
-      return RAPIER.ColliderDesc.trimesh(mesh.vertices, mesh.indices).setFriction(0.8);
-    })(),
+    RAPIER.ColliderDesc.heightfield(
+      TERRAIN_SEGMENTS + 1,
+      TERRAIN_SEGMENTS + 1,
+      buildTerrainHeights(centerZ),
+      { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
+    ).setFriction(0.8),
     terrainBody
   );
 
@@ -233,6 +204,8 @@ export function createWorld(scene, physics, RAPIER) {
     const nextCenter = Math.round(z / TERRAIN_REPEAT) * TERRAIN_REPEAT;
     if (nextCenter !== centerZ) rebuildTerrain(nextCenter);
 
+    groundBody.setTranslation({ x: Math.round(x / 50) * 50, y: -0.5, z: Math.round(z / 50) * 50 }, true);
+
     let dirty = false;
     for (let i = 0; i < trees.length; i++) {
       const t = trees[i];
@@ -250,10 +223,9 @@ export function createWorld(scene, physics, RAPIER) {
   }
 
   // What is under the vehicle? Feeds grip/speed penalties (and later, audio + tire tracks).
-  function surfaceAt(x, z) {
-    const road = getRoadFrame(z);
-    return { offRoad: Math.abs(x - road.x) > ROAD_HALF_WIDTH + 0.3 };
+  function surfaceAt(x) {
+    return { offRoad: Math.abs(x) > ROAD_HALF_WIDTH + 0.3 };
   }
 
-  return { update, surfaceAt, getRoadFrame };
+  return { update, surfaceAt };
 }
