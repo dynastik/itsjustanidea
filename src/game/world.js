@@ -7,19 +7,33 @@ const TERRAIN_SIZE = VIEW * 2;
 const TERRAIN_SEGMENTS = 64;
 const TERRAIN_REPEAT = 200;
 
+function roadCenterX(z) {
+  const t = (((z % TERRAIN_REPEAT) + TERRAIN_REPEAT) % TERRAIN_REPEAT) / TERRAIN_REPEAT * Math.PI * 2;
+  return 2.0 * Math.sin(t) + 0.8 * Math.sin(t * 2 + 0.4);
+}
+
 function roadHeight(z) {
   const t = (((z % TERRAIN_REPEAT) + TERRAIN_REPEAT) % TERRAIN_REPEAT) / TERRAIN_REPEAT * Math.PI * 2;
   return 0.35 * Math.sin(t) + 0.12 * Math.sin(t * 2 + 0.7);
 }
 
+export function getRoadFrame(z) {
+  const dz = 0.5;
+  const x = roadCenterX(z);
+  const dx = (roadCenterX(z + dz) - roadCenterX(z - dz)) / (2 * dz);
+  return { x, heading: Math.atan2(dx, 1), y: roadHeight(z) };
+}
+
 export function terrainHeight(x, z) {
-  const road = roadHeight(z);
+  const frame = getRoadFrame(z);
+  const road = frame.y;
+  const distanceFromRoad = Math.abs(x - frame.x);
   const natural =
     0.9 * Math.sin(z * Math.PI * 2 / 140) +
     0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 90) +
     0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 32);
   const roadBlend = THREE.MathUtils.smoothstep(
-    Math.abs(x), ROAD_HALF_WIDTH + 0.5, ROAD_HALF_WIDTH + 5
+    distanceFromRoad, ROAD_HALF_WIDTH + 0.5, ROAD_HALF_WIDTH + 5
   );
   return THREE.MathUtils.lerp(road, natural, roadBlend);
 }
@@ -55,9 +69,9 @@ function buildRoadGeometry(centerZ) {
   const g = new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, TERRAIN_SIZE, 1, TERRAIN_SEGMENTS);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
+    const localX = p.getX(i);
     const z = centerZ + p.getY(i);
-    p.setXYZ(i, x, roadHeight(z) + 0.035, z - centerZ);
+    p.setXYZ(i, roadCenterX(z) + localX, roadHeight(z) + 0.035, z - centerZ);
   }
   p.needsUpdate = true;
   g.computeVertexNormals();
@@ -204,8 +218,6 @@ export function createWorld(scene, physics, RAPIER) {
     const nextCenter = Math.round(z / TERRAIN_REPEAT) * TERRAIN_REPEAT;
     if (nextCenter !== centerZ) rebuildTerrain(nextCenter);
 
-    groundBody.setTranslation({ x: Math.round(x / 50) * 50, y: -0.5, z: Math.round(z / 50) * 50 }, true);
-
     let dirty = false;
     for (let i = 0; i < trees.length; i++) {
       const t = trees[i];
@@ -223,9 +235,10 @@ export function createWorld(scene, physics, RAPIER) {
   }
 
   // What is under the vehicle? Feeds grip/speed penalties (and later, audio + tire tracks).
-  function surfaceAt(x) {
-    return { offRoad: Math.abs(x) > ROAD_HALF_WIDTH + 0.3 };
+  function surfaceAt(x, z) {
+    const road = getRoadFrame(z);
+    return { offRoad: Math.abs(x - road.x) > ROAD_HALF_WIDTH + 0.3 };
   }
 
-  return { update, surfaceAt };
+  return { update, surfaceAt, getRoadFrame };
 }
