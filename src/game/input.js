@@ -78,7 +78,7 @@ export function createInput(actions) {
 }
 
 // Highway: hands-off. Lane-follow steering + throttle chasing a WPM x accuracy target speed.
-export function writeHighwayInput(d, vehicle) {
+export function writeHighwayInput(d, vehicle, road = null) {
   const c = HIGHWAY_CONFIG;
   const wpmFactor = clamp(getWpm() / c.wpmForMaxSpeed, 0, 1);
   const target = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy();
@@ -89,7 +89,14 @@ export function writeHighwayInput(d, vehicle) {
 
   // Desired heading points back at x=0; invert the bicycle model so loop gain stays
   // constant at any speed. Uses the vehicle's speed-sensitive max steer.
-  const desiredHeading = clamp(-vehicle.center.x * c.centeringGain, -c.maxAutoHeading, c.maxAutoHeading);
+  const frame = road?.getRoadFrame(vehicle.center.z) ?? { x: 0, heading: 0 };
+  const lateral = vehicle.center.x - frame.x;
+  const headingError = frame.heading - vehicle.heading;
+  const desiredHeading = clamp(
+    frame.heading - lateral * c.centeringGain,
+    vehicle.heading - c.maxAutoHeading,
+    vehicle.heading + c.maxAutoHeading
+  );
   const wDes = c.headingResponse * (desiredHeading - vehicle.heading);
   const v = Math.abs(vehicle.speed);
   const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(v, 2));
