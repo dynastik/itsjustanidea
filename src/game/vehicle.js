@@ -3,34 +3,27 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export const FIXED_DT = 1 / 60;
 
-// Every model/vehicle-specific number lives here. Swapping the van = editing this object.
-// TUNING GUIDE (all numbers are first guesses, expect a tuning pass):
-//  - car bounces/wallows      -> suspension.stiffness / compression / relaxation
-//  - too much body roll       -> body.comOffsetY more negative (lower centre of mass)
-//  - understeer / oversteer   -> tires.frictionSlipFront vs frictionSlipRear
-//  - too slow / too twitchy   -> handling.engineForce, steerFalloffSpeed
-//  - model floats or sinks    -> modelYOffset
 export const VEHICLE_CONFIG = {
   modelUrl: `${import.meta.env.BASE_URL}models/truck.glb`,
   modelYOffset: -0.72,
-  spawnHeight: 1.2,
+  spawnHeight: 1.0,  // lowered from 1.2
   wheelbase: 1.8,
   trackWidth: 1.2,
   colliderHalfExtents: { x: 0.6, y: 0.6, z: 1.2 },
   wheelAnimSpeedScale: 0.6,
-  cabCameraOffset: { x: 0.3, y: 0.8, z: 0.3 },  // PLACEHOLDER: driver's head, local to chassis centre
-  mirrorOffset: { x: 0, y: 1.2, z: 0.7 },       // PLACEHOLDER: rear-view mirror (Phase 5)
+  cabCameraOffset: { x: 0.3, y: 0.8, z: 0.3 },
+  mirrorOffset: { x: 0, y: 1.2, z: 0.7 },
   body: {
     mass: 1200,
-    comOffsetY: -0.35,     // low centre of mass = arcade-stable
+    comOffsetY: -0.35,
     linearDamping: 0.05,
     angularDamping: 0.8,
   },
   suspension: {
     restLength: 0.35,
     wheelRadius: 0.3,
-    connectionY: -0.44,    // chosen so the chassis rests ~1.0 above ground
-    stiffness: 28,         // Rapier/Bullet stiffness is per unit mass; ~24-30 gives ~9cm sag on 1200kg
+    connectionY: -0.44,
+    stiffness: 28,
     compression: 4.5,
     relaxation: 3.5,
     maxTravel: 0.3,
@@ -38,23 +31,20 @@ export const VEHICLE_CONFIG = {
   },
   tires: {
     frictionSlipFront: 9,
-    frictionSlipRear: 8,   // slightly lower rear grip = mild, forgiving oversteer
+    frictionSlipRear: 8,
     sideFrictionStiffness: 1.0,
   },
   handling: {
-    engineForce: 16000,    // total N, split across 4 wheels (AWD for forgiveness)
+    engineForce: 16000,
     brakeForce: 22000,
     reverseForce: 7000,
-    coastForce: 1800,      // engine braking / rolling resistance when off the pedals
+    coastForce: 1800,
     maxSpeed: 30,
     reverseMaxSpeed: 6,
     maxSteerAngle: 0.55,
-    steerFalloffSpeed: 20, // steering lock halves at this speed
+    steerFalloffSpeed: 20,
     steerLerpSpeed: 5,
     offRoad: { gripFactor: 0.55, speedFactor: 0.5, dragForce: 4000 },
-    // Rapier's sign conventions are easy to get backwards. With autoCalibrate on, the vehicle
-    // checks the first throttle press and the first real turn, flips these if needed and logs
-    // a console warning telling you what to hardcode here.
     engineSign: 1,
     steerSign: 1,
     autoCalibrate: true,
@@ -70,14 +60,15 @@ export function createVehicle(scene, physics, RAPIER) {
   const tr = cfg.tires;
   const b = cfg.body;
 
-  // ---------- visuals ----------
+  // visuals
   const visual = new THREE.Group();
   scene.add(visual);
-  const exterior = new THREE.Group(); // hidden in cab view so nothing clips
+  const exterior = new THREE.Group();
   visual.add(exterior);
 
   let mixer = null;
   let wheelAction = null;
+  let frontWheels = []; // for steering animation
 
   new GLTFLoader().load(
     cfg.modelUrl,
@@ -88,6 +79,14 @@ export function createVehicle(scene, physics, RAPIER) {
         if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
       });
       exterior.add(model);
+
+      // Find front wheels in the model hierarchy for steering animation
+      model.traverse((node) => {
+        if (node.name && (node.name.includes('wheel') || node.name.includes('Wheel')) && 
+            (node.name.includes('front') || node.name.includes('Front'))) {
+          frontWheels.push(node);
+        }
+      });
 
       if (gltf.animations && gltf.animations.length > 0) {
         mixer = new THREE.AnimationMixer(model);
@@ -108,7 +107,7 @@ export function createVehicle(scene, physics, RAPIER) {
     }
   );
 
-  // ---------- chassis (dynamic body) ----------
+  // chassis (dynamic body)
   const half = cfg.colliderHalfExtents;
   const bw = half.x * 2, bh = half.y * 2, bd = half.z * 2;
   const inertia = {
@@ -129,7 +128,7 @@ export function createVehicle(scene, physics, RAPIER) {
     body
   );
 
-  // ---------- raycast vehicle controller ----------
+  // raycast vehicle controller
   const ctrl = physics.createVehicleController(body);
   const hx = cfg.trackWidth / 2;
   const hz = cfg.wheelbase / 2;
@@ -141,8 +140,8 @@ export function createVehicle(scene, physics, RAPIER) {
   wheelPos.forEach((p, i) => {
     ctrl.addWheel(
       { x: p.x, y: s.connectionY, z: p.z },
-      { x: 0, y: -1, z: 0 },   // suspension direction
-      { x: -1, y: 0, z: 0 },   // axle
+      { x: 0, y: -1, z: 0 },
+      { x: -1, y: 0, z: 0 },
       s.restLength,
       s.wheelRadius
     );
@@ -163,7 +162,7 @@ export function createVehicle(scene, physics, RAPIER) {
   debugBox.visible = false;
   scene.add(debugBox);
 
-  // ---------- state ----------
+  // state
   const prevPos = new THREE.Vector3();
   const curPos = new THREE.Vector3();
   const prevQuat = new THREE.Quaternion();
@@ -172,10 +171,10 @@ export function createVehicle(scene, physics, RAPIER) {
   const self = {
     cfg,
     visual,
-    center: new THREE.Vector3(0, cfg.spawnHeight, 0), // interpolated render pose
+    center: new THREE.Vector3(0, cfg.spawnHeight, 0),
     quaternion: new THREE.Quaternion(),
-    heading: 0,       // yaw, radians (0 = +z, positive turns toward +x)
-    speed: 0,         // forward speed, m/s (negative = reversing)
+    heading: 0,
+    speed: 0,
     steerAngle: 0,
     step,
     capture,
@@ -253,12 +252,10 @@ export function createVehicle(scene, physics, RAPIER) {
     }
   }
 
-  // One fixed physics step's worth of driving. Call BEFORE physics.step().
   function step(dt, input, surface) {
     const v = forwardSpeed();
     const off = surface.offRoad;
 
-    // surface grip
     const grip = off ? h.offRoad.gripFactor : 1;
     if (grip !== lastGrip) {
       lastGrip = grip;
@@ -267,17 +264,14 @@ export function createVehicle(scene, physics, RAPIER) {
       }
     }
 
-    // steering (speed-sensitive lock, smoothed)
     const target = input.steer * maxSteerAtSpeed(Math.abs(v));
     self.steerAngle += (target - self.steerAngle) * Math.min(h.steerLerpSpeed * dt, 1);
     ctrl.setWheelSteering(0, self.steerAngle * cal.steerSign);
     ctrl.setWheelSteering(1, self.steerAngle * cal.steerSign);
 
-    // longitudinal force in newtons, + = forward. Braking is done with reversed engine force
-    // so every force uses the same (true newton) units.
     const cap = Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed) * (off ? h.offRoad.speedFactor : 1);
     const t = input.throttle;
-    const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v); // fades to 0 at standstill, no jitter
+    const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
     let F = 0;
 
     if (t > 0) {
@@ -296,7 +290,6 @@ export function createVehicle(scene, physics, RAPIER) {
 
     calibrate(dt, input, v);
 
-    // roll-over recovery: upside down for 1.5s -> set upright
     const q = body.rotation();
     const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
     if (upY < 0.35) {
@@ -317,7 +310,6 @@ export function createVehicle(scene, physics, RAPIER) {
     ctrl.updateVehicle(dt);
   }
 
-  // Call AFTER physics.step(): remember previous/current pose for render interpolation.
   function capture() {
     prevPos.copy(curPos);
     prevQuat.copy(curQuat);
@@ -328,7 +320,6 @@ export function createVehicle(scene, physics, RAPIER) {
     self.speed = forwardSpeed();
   }
 
-  // Call once per rendered frame. alpha = leftover accumulator / FIXED_DT.
   function updateVisual(alpha, dt) {
     self.center.lerpVectors(prevPos, curPos, alpha);
     self.quaternion.slerpQuaternions(prevQuat, curQuat, alpha);
@@ -338,6 +329,13 @@ export function createVehicle(scene, physics, RAPIER) {
     visual.quaternion.copy(self.quaternion);
     debugBox.position.copy(self.center);
     debugBox.quaternion.copy(self.quaternion);
+
+    // Animate front wheels steering
+    if (frontWheels.length > 0) {
+      for (const wheel of frontWheels) {
+        wheel.rotation.y = self.steerAngle * cal.steerSign;
+      }
+    }
 
     if (mixer && wheelAction) {
       wheelAction.timeScale = Math.abs(self.speed) * cfg.wheelAnimSpeedScale;

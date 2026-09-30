@@ -1,13 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// Named camera profiles (Open Decision 12). Phase 2 adds the narrow-FOV "toy car" look
-// by tuning the chase profile; the cab profile stays wide with no tilt-shift.
 export const CAMERA_PROFILES = {
   chase: {
     fov: 70, fovSpeedGain: 0.25, fovSpeedRef: 30,
     distance: 7, height: 3.5, lookHeight: 0.5,
-    followSmoothing: 0.001, // smaller = snappier
+    followSmoothing: 0.001,
     exteriorVisible: true,
   },
   cab: {
@@ -16,14 +14,14 @@ export const CAMERA_PROFILES = {
   },
 };
 
-export function createCameraRig(camera, domElement, vehicle) {
+export function createCameraRig(camera, domElement, vehicle, cabInterior) {
   const orbit = new OrbitControls(camera, domElement);
   orbit.enabled = false;
 
   let profileName = 'chase';
   let debug = false;
   let dragging = false;
-  let yaw = 0;   // free-look offsets, spring back to 0 on release
+  let yaw = 0;
   let pitch = 0;
 
   const pos = new THREE.Vector3(0, 3, 8);
@@ -51,7 +49,6 @@ export function createCameraRig(camera, domElement, vehicle) {
       pitch *= k;
     }
 
-    // speed-based FOV
     const targetFov = prof.fov + Math.min(Math.abs(vehicle.speed), prof.fovSpeedRef) * prof.fovSpeedGain;
     const nf = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-4 * dt));
     if (Math.abs(nf - camera.fov) > 0.001) {
@@ -62,11 +59,10 @@ export function createCameraRig(camera, domElement, vehicle) {
     const c = vehicle.center;
 
     if (profileName === 'cab') {
-      // Full chassis orientation, so body pitch/roll from the suspension shows up in the cab.
       const o = vehicle.cfg.cabCameraOffset;
       pos.set(o.x, o.y, o.z).applyQuaternion(vehicle.quaternion).add(c);
       dir.set(0, 0, 1).applyQuaternion(vehicle.quaternion).applyAxisAngle(up, yaw);
-      dir.y -= pitch * 0.8; // drag down = look down
+      dir.y -= pitch * 0.8;
       dir.normalize();
       lookDesired.copy(pos).addScaledVector(dir, 10);
       look.copy(lookDesired);
@@ -75,7 +71,6 @@ export function createCameraRig(camera, domElement, vehicle) {
       return;
     }
 
-    // chase (yaw only, so the camera doesn't wobble with the suspension)
     const a = vehicle.heading + yaw;
     const d = prof.distance;
     desired.set(
@@ -98,6 +93,7 @@ export function createCameraRig(camera, domElement, vehicle) {
     toggleCab() {
       profileName = profileName === 'chase' ? 'cab' : 'chase';
       vehicle.setExteriorVisible(CAMERA_PROFILES[profileName].exteriorVisible);
+      if (cabInterior) cabInterior.root.visible = (profileName === 'cab');
     },
     setDebug(on) {
       debug = on;

@@ -1,39 +1,33 @@
 import { state } from './state.js';
+import { pickWord } from './story.js';
 
 // Highway tuning lives here so typing feel is tweaked in one place.
 export const HIGHWAY_CONFIG = {
-  minSpeed: 4,          // coasting speed at 0 WPM
-  maxSpeed: 26,         // reached at wpmForMaxSpeed
+  minSpeed: 4,
+  maxSpeed: 26,
   wpmForMaxSpeed: 60,
-  throttleGain: 0.5,    // how hard throttle/brake chase the target speed
-  centeringGain: 0.04,  // lane-follow: how strongly x offset turns into desired heading
+  throttleGain: 0.5,
+  centeringGain: 0.04,
   maxAutoHeading: 0.4,
-  headingResponse: 3,   // rad/s of turn per rad of heading error
+  headingResponse: 3,
 };
 
 // Rolling windows: city time and old mistakes stop dragging the numbers down.
 // These same two numbers are what the Phase 6 tension estimator will consume.
 const WPM_WINDOW_S = 20;
-const WPM_MIN_SPAN_S = 5;   // avoids a huge WPM spike from the very first word
-const ACCURACY_WINDOW = 50; // last N keystrokes
+const WPM_MIN_SPAN_S = 5;
+const ACCURACY_WINDOW = 50;
 
-let completions = [];  // game-clock timestamps of finished words
-let keystrokes = [];   // true/false, most recent last
+let completions = [];
+let keystrokes = [];
 let sessionStart = null;
-
-const WORD_BANK = [
-  'sunset', 'highway', 'engine', 'gravel', 'horizon',
-  'static', 'exhaust', 'asphalt', 'flicker', 'signal', 'distance',
-  'headlight', 'shoulder', 'wander', 'silence', 'radio',
-];
 
 export function pickNewWord() {
   const t = state.typing;
-  t.target = WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+  t.target = pickWord();
   t.buffer = '';
 }
 
-// Call when entering the highway (and on reset): fresh stats, fresh word.
 export function beginTypingSession() {
   completions = [];
   keystrokes = [];
@@ -43,7 +37,6 @@ export function beginTypingSession() {
   pickNewWord();
 }
 
-// key: a single lowercase a-z character. Phase 3 expands this (punctuation, caps, backspace).
 export function handleTypingKey(key) {
   const t = state.typing;
   if (sessionStart === null) sessionStart = state.time;
