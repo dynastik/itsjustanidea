@@ -12,7 +12,6 @@ export function createCabInterior(scene) {
     new THREE.TorusGeometry(0.3, 0.04, 16, 100),
     new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
   );
-  wheelRim.rotation.y = Math.PI / 2;
   wheelRim.position.set(0.3, 0.7, 0.5);
   wheelRim.castShadow = true;
   cabin.add(wheelRim);
@@ -21,7 +20,7 @@ export function createCabInterior(scene) {
     new THREE.CylinderGeometry(0.05, 0.05, 0.1, 16),
     new THREE.MeshStandardMaterial({ color: 0x333333 })
   );
-  wheelHub.rotation.z = Math.PI / 2;
+  wheelHub.rotation.x = Math.PI / 2;
   wheelHub.position.set(0.3, 0.7, 0.5);
   wheelHub.castShadow = true;
   cabin.add(wheelHub);
@@ -61,7 +60,7 @@ export function createCabInterior(scene) {
     root: cabin,
     wheelRim,
     setSteeringAngle: (angle) => {
-      wheelRim.rotation.y = Math.PI / 2 + angle;
+      wheelRim.rotation.z = -angle * 6; // left turn = counter-clockwise for the driver
     },
   };
 }

@@ -43,8 +43,8 @@ function buildTerrainGeometry(centerZ) {
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i);
-    const z = centerZ + p.getY(i);
-    p.setXYZ(i, x, terrainHeight(x, z), z - centerZ);
+    const lz = -p.getY(i); // -Y keeps the triangle winding facing up
+    p.setXYZ(i, x, terrainHeight(x, centerZ + lz), lz);
   }
   p.needsUpdate = true;
   g.computeVertexNormals();
@@ -70,8 +70,9 @@ function buildRoadGeometry(centerZ) {
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const localX = p.getX(i);
-    const z = centerZ + p.getY(i);
-    p.setXYZ(i, roadCenterX(z) + localX, roadHeight(z) + 0.035, z - centerZ);
+    const lz = -p.getY(i);
+    const z = centerZ + lz;
+    p.setXYZ(i, roadCenterX(z) + localX, roadHeight(z) + 0.035, lz);
   }
   p.needsUpdate = true;
   g.computeVertexNormals();
@@ -131,8 +132,8 @@ export function createWorld(scene, physics, RAPIER) {
   );
   let terrainCollider = physics.createCollider(
     RAPIER.ColliderDesc.heightfield(
-      TERRAIN_SEGMENTS + 1,
-      TERRAIN_SEGMENTS + 1,
+      TERRAIN_SEGMENTS,
+      TERRAIN_SEGMENTS,
       buildTerrainHeights(centerZ),
       { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
     ).setFriction(0.8),
@@ -145,12 +146,14 @@ export function createWorld(scene, physics, RAPIER) {
     terrain.geometry = buildTerrainGeometry(centerZ);
     road.geometry.dispose();
     road.geometry = buildRoadGeometry(centerZ);
+    terrain.position.z = centerZ; // meshes are built in local space around centerZ
+    road.position.z = centerZ;
 
     physics.removeCollider(terrainCollider, true);
     terrainCollider = physics.createCollider(
       RAPIER.ColliderDesc.heightfield(
-        TERRAIN_SEGMENTS + 1,
-        TERRAIN_SEGMENTS + 1,
+        TERRAIN_SEGMENTS,
+        TERRAIN_SEGMENTS,
         buildTerrainHeights(centerZ),
         { x: TERRAIN_SIZE, y: 1, z: TERRAIN_SIZE }
       ).setFriction(0.8),
