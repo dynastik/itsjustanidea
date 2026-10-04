@@ -50,8 +50,8 @@ export function createLighting(scene) {
   sky.frustumCulled = false;
   scene.add(sky);
 
-  const fogDay = new THREE.Color(0xbfd9ea), fogDusk = new THREE.Color(0x3a2b4d);
-  const topDay = new THREE.Color(0x5fa3e0), topDusk = new THREE.Color(0x14102a);
+  const fogDay = new THREE.Color(0xbfd9ea), fogDusk = new THREE.Color(0x151827);
+  const topDay = new THREE.Color(0x5fa3e0), topDusk = new THREE.Color(0x090d19);
   const sunColorDay = new THREE.Color(0xffe7c2), sunColorDusk = new THREE.Color(0x9aa0c8);
   const hemiSkyDay = new THREE.Color(0x9ec6ff), hemiSkyDusk = new THREE.Color(0x4a3c6e);
   const hemiGroundDay = new THREE.Color(0x6f8f4f), hemiGroundDusk = new THREE.Color(0x2a2a30);
