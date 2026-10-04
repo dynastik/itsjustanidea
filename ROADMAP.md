@@ -18,22 +18,22 @@ WASD in the city, typing on the highway. The same typing system that teaches you
 - Don't start a later phase until the current phase's "Done when" is true (audio prototyping is the one exception).
 - **Cut order if time runs short:** Phase 6 (neural nets) -> tire-track/smoke shaders -> traffic -> extra zone variety -> Semantris mode. Never cut audio or the horror pivot.
 - **Model-agnostic:** the vehicle is currently a van file named `truck.glb` and may be swapped later. Keep model-specific numbers (Y offset, wheelbase, collider size, cab camera position, mirror position) in one `VEHICLE_CONFIG` object so a swap is a config change, not a rewrite.
+- **Performance target:** the primary development/test laptop is a Dell Latitude 3490. Treat it as the baseline machine for performance decisions. The goal is a stable ~60 FPS at 1080p on a typical integrated-GPU configuration; lower FPS on weaker configurations is acceptable if the game remains playable. Do not optimize blindly: measure frame time/FPS on the baseline laptop.
 
 ---
 
-## Current state (what `main.js` actually does today)
-Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 0.21 (`rapier3d-compat`), Vite 8. Post-processing (EffectComposer, SMAA, tilt-shift shaders) ships inside `three/addons`, so no new dependencies are needed. Worth knowing before Phase 1:
-- Flat 400x400 ground plane with dashed center stripes. No real road, no hills.
-- Truck is a **kinematic** body pinned at y=1 (no terrain following, no pitch/roll, no weight transfer, no suspension). This is being replaced by "slightly realistic" physics (Phase 1, Open Decision 9).
-- Single `WebGLRenderer` with MeshStandard materials and a linear `Fog`. No post-processing.
-- City: WASD bicycle-model steering. Highway: **auto-steers to x=0, speed chases WPM x accuracy.** (Open Decision 1 is effectively implemented.)
-- Zone switch is a **placeholder**: crossing z=80 (with hysteresis) flips city/highway automatically. Tab is a dev override.
-- Typing accepts only `a-z`, single words from a 16-word bank, wrong keys are counted but ignored.
-- Debug: backtick toggles orbit cam + collider box (roadmap previously said C; C is now free for typing/other use).
-- `worldTime` (day -> dusk) runs on a **wall-clock timer (180s)**, not distance. Fine for testing, must be decoupled before the horror pivot (see Phase 5).
-- Truck already loads from local `public/models/truck.glb` using `BASE_URL` (no hotlink).
-- Not present in current `main.js`: free-look camera, speed-based FOV (Phase 0 said done, see note below).
-- `index.html` hint text still says "Press M to switch mode" (stale, Tab is the dev key).
+## Current state (what the code actually does today)
+The code is now split into modules under `src/game` rather than being kept as one giant `main.js`. Current relevant systems include state, renderer, lighting, world, vehicle, camera, cab interior, audio, input, typing, HUD and horror director modules.
+
+Important current facts before continuing Phase 1/2:
+- Three.js 0.186, Rapier 0.21 (`rapier3d-compat`), Vite 8.
+- `render.js` uses `EffectComposer` with RenderPass + SMAA + OutputPass and caps pixel ratio at 2.
+- `lighting.js` currently uses a directional sun with a **2048x2048 shadow map**, an ambient light, day->dusk sky colors, and linear fog. This is a temporary baseline; the target shadow policy is documented below.
+- `main.js` already wires `cabin.js` and `director.js`, has automatic city/highway switching, day->dusk world time, pause/reset/debug/mute controls, and the shared `driveInput`.
+- The cab interior exists and is hidden until cab view is toggled.
+- The exact current implementation is authoritative; do not assume old roadmap descriptions still match the code. Re-read the relevant source files before modifying them.
+- Truck model is local at `public/models/truck.glb`; do not hotlink assets.
+- Free-look/speed-FOV and other Phase 0 camera items must be verified against the current camera module before marking them complete.
 
 ---
 
@@ -47,18 +47,18 @@ Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 
 - [x] Shadow follows truck, debug orbit cam (`) + collider box
 - [x] Day -> dusk lighting/fog system (`worldTime`)
 - [x] Roadside trees (instanced)
-- [ ] Free-look camera + speed-based FOV (**regression:** was marked done but is not in the current `main.js`; re-add inside the Phase 1 camera module)
+- [ ] Free-look camera + speed-based FOV (**regression:** verify/re-add inside the Phase 1 camera module if still absent)
 
 ## Phase 1: Structure and driving feel
 **Done when:** driving for 2 minutes feels good and the code is split into modules.
-- [ ] Split `main.js` into modules (vehicle, camera, world, typing, lighting, ui, input)
+- [ ] Split `main.js` into modules (vehicle, camera, world, typing, lighting, ui, input) — continue only if anything is still left to split
 - [ ] Central game state object (mode, worldTime, speed, typing stats)
 - [ ] `VEHICLE_CONFIG` object (model swap-friendly, see Rules)
 - [ ] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
 - [ ] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
-- [ ] `render.js` module: renderer + `EffectComposer` set up as a passthrough (RenderPass + SMAA + OutputPass) so Phase 2's look can be added pass by pass. Replaces `antialias: true`; cap pixel ratio at 2
-- [ ] Camera module: chase cam, free-look, speed-based FOV, **cab (first-person) view toggle (V)**, structured as named **camera profiles** (see Open Decision 12)
-- [ ] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
+- [x] `render.js` module: renderer + `EffectComposer` passthrough (RenderPass + SMAA + OutputPass), replacing `antialias: true`; pixel ratio capped at 2
+- [ ] Camera module: chase cam, free-look, speed-based FOV, **cab (first-person) view toggle (V)**, structured as named **camera profiles**
+- [x] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
 - [ ] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
 - [ ] Tree/prop colliders with collision response (speed loss + bump)
 - [ ] HUD: speedometer, cleaner mode label, fix stale key hints in `index.html`
@@ -68,6 +68,24 @@ Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 
 
 ## Phase 2: World
 **Done when:** you can drive from the city, up the on-ramp, onto a hilly scenic highway with no visible seams, and the mode switches by itself.
+
+### World generation and visibility strategy
+The game is a controlled driving experience, not an open-world free-roam game. Exploit that constraint.
+
+- [ ] Terrain/world is generated only within a bounded active area around the player's road position; do not create a huge fully populated world.
+- [ ] Recycle road/world segments ahead and behind the vehicle so the playable world can feel endless without keeping everything alive.
+- [ ] Use **camera frustum culling + distance tests** as the primary render visibility checks. Do not run an expensive per-object "perfect cone intersection" calculation every frame.
+- [ ] Use **distance-based LOD rings** for scenery. Starting target, to be tuned by profiling:
+  - near: full-detail meshes
+  - medium: simplified meshes/materials
+  - far: very simple silhouettes/cheap meshes
+  - very far: fog/background only
+- [ ] Keep generation/streaming separate from render visibility. A nearby road/world chunk may exist in memory while most of its objects are culled or represented by a cheaper LOD.
+- [ ] Use instancing for repeated scenery (trees, rocks, fence posts, grass clusters, etc.) to reduce draw calls.
+- [ ] Preserve important art-directed silhouettes even when strict mathematical visibility would allow culling; visibility optimization must not ruin composition.
+- [ ] Prefer road-relative active areas/corridors where useful. The player follows a controlled route, so there is no need for general-purpose open-world streaming logic.
+
+### Terrain, road and zones
 - [ ] Terrain: hilly heightfield (noise or authored heightmap), the road is carved/laid along it with smooth grades
 - [ ] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
 - [ ] Road generator: segments recycled ahead/behind so the road is endless; gentle curves **and elevation**
@@ -76,15 +94,33 @@ Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 
 - [ ] **Scenic set pieces:** ridge-top vista, valley with a lake or river, distant mountains, a tunnel or overpass, a rest stop (all reused later for horror loops)
 - [ ] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
 - [ ] Prop sets per zone, swappable per "act" (needed for the horror pivot later)
+
+### Art direction
+**Target look:** a miniature/diorama driving game with an Art of Rally-inspired environmental design language, but with restrained toon/cel-style shading and hand-painted color choices. Do **not** interpret this as full anime/cartoon cel shading. The goal is a coherent low-poly miniature world with simple, deliberate light bands, a tight palette, strong silhouettes, fog and a toy-like camera.
+
 - [ ] **Art pass 1a, camera look:** "toy-car" chase profile: camera high and far, narrow FOV (about 15-25 degrees), lerped follow with slight lag. Raise the camera enough that hills do not block the view of the truck
-- [ ] **Art pass 1b, tilt-shift:** screen-space tilt-shift on the composer (three's `HorizontalTiltShiftShader` / `VerticalTiltShiftShader`) so top and bottom of the frame blur and a horizontal strip stays sharp. Preferred over depth-based `BokehPass`, which blurs by distance and will not give a clean strip, and it is cheaper
+- [ ] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
 - [ ] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
-- [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Flat shading on custom meshes (verify `flatShading` is honored on toon in r186; if not, use non-indexed geometry with face normals)
-- [ ] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime` instead of the current near/far values. Palette-limited sky (gradient or HDRI), golden-hour lighting
-- [ ] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful; tight shadow frustum around the truck for crisp shadows (confirm the chosen shadow map type still exists in the installed Three version)
-- [ ] Trees/props at scale: instanced low-poly cones/cylinders across the terrain, chunked with the road segments
-- [ ] Simple traffic (city only, cars following lanes)
+- [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
+- [ ] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime`. Palette-limited sky (gradient or HDRI), golden-hour lighting
+- [ ] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
+- [ ] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
+- [ ] **Trees:** use stylized low-poly trees made from a trunk/branch structure plus **multiple solid foliage clusters**, not one leaf blob. Aim for roughly 5-15 meaningful foliage masses per tree, with several reusable tree variants. Prefer opaque geometry over large amounts of transparent foliage. Instance repeated tree variants where possible.
+- [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.
+- [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
+- [ ] **Distant vegetation:** aggressively simplify with LOD and let fog/tilt-shift hide transitions.
 - [ ] **Art pass 2 (polish, cut early if short on time):** tire-track shader (solid dark marks behind the wheels; on hills use short ribbon decals rather than a flat canvas texture) and stylized particle smoke (`THREE.Points` + `ShaderMaterial`: solid squares/spheres that grow, drift back, shrink and snap-fade, no soft alpha textures)
+- [ ] Simple traffic (city only, cars following lanes)
+
+### Performance budget and profiling
+- [ ] Treat the Dell Latitude 3490 as the primary baseline test machine.
+- [ ] During visual development, measure FPS and frame time on the baseline laptop after major rendering changes.
+- [ ] Profile GPU-heavy candidates separately: shadow map size, tilt-shift, foliage overdraw, terrain detail, pixel ratio and post-processing.
+- [ ] Profile CPU-heavy candidates separately: object count, draw-call count, world generation/streaming, visibility tests and physics.
+- [ ] Keep the scene visually rich by spending geometry where it is noticeable: truck, road, major trees and set pieces. Spend less on grass, distant vegetation and tiny props.
+- [ ] Avoid adding post-processing passes just because they are available. Every pass must earn its GPU cost visually.
+- [ ] Keep repeated scenery instanced and materials reasonably shared.
+- [ ] Do not optimize by removing visually important silhouettes or making the world look empty.
 
 ## Phase 3: Highway typing v2
 **Done when:** a 5-minute highway stretch is fun on its own, before any horror.
@@ -138,7 +174,7 @@ Single ~470-line `main.js`. Stack (from `package.json`): Three.js 0.186, Rapier 
 - [ ] Main menu, settings, credits
 - [x] Truck loads from local `public/models` (hotlink already removed); just confirm license is logged in `CREDITS.md`
 - [ ] Bundle every other asset locally, never hotlink
-- [ ] Performance pass: pixel ratio cap, draw calls, shadow map size, instancing, terrain LOD/chunking
+- [ ] Performance pass: profile on Dell Latitude 3490; tune pixel ratio, draw calls, shadow map size, instancing, scenery LOD, visibility/generation radius, terrain detail and post-processing
 - [ ] Vite `base` config + GitHub Pages deploy (`BASE_URL` is already used for the model path)
 - [ ] Playtest with 3-5 people, tune calm -> horror timing
 - [ ] Tag v1.0
@@ -169,11 +205,16 @@ Guidelines: never name the entity, keep the story deniable ("maybe it's just tir
 | 5 | Pacing trigger: time, distance, or typing performance? | Distance-based, typing modulates later | Phase 5 |
 | 6 | Word content | **DECIDED:** story-driven, themed per act | Phase 3 |
 | 7 | Platform | Desktop keyboard only | Phase 7 |
-| 8 | Art direction | Art of Rally: flat-shaded low-poly, tight palette | Phase 2 |
+| 8 | Art direction | **DECIDED:** miniature/diorama driving style inspired by Art of Rally's low-poly environmental design, with restrained toon shading, a tight hand-painted palette, and tilt-shift in the chase camera. This is not a commitment to exact Art of Rally replication or heavy anime-style cel shading. | Phase 2 |
 | 9 | Physics realism | **DECIDED:** "slightly realistic". Rapier raycast vehicle (suspension, grip, weight transfer, roll) tuned arcade-friendly. Not a full sim: no gearbox, tire temperature or damage. Highway typing drives the same controller through `driveInput` | Phase 1 |
-| 10 | Terrain method | Noise/heightmap terrain with the road laid on top, chunked for endless feel. Simplest to loop for horror tricks | Phase 2 |
+| 10 | Terrain method | Noise/heightmap terrain with the road laid on top, generated/recycled around the active road corridor for endless feel. Simplest to loop for horror tricks | Phase 2 |
 | 11 | Vehicle model | Keep the current van for now, swap later via `VEHICLE_CONFIG` | Phase 7 |
-| 12 | Camera profiles vs the tilt-shift look | The toy-car look (far camera, narrow FOV, tilt-shift) is the **chase** profile only. The **cab** profile uses a normal wide FOV with tilt-shift off. Suggested horror use: calm = miniature diorama feel, then the camera drifts toward the cab and the blur collapses, so the world stops feeling like a toy. Confirm this after Art pass 1 | Phase 2 |
+| 12 | Camera profiles vs the miniature look | **DECIDED:** the toy-car/tilt-shift look is the chase profile only. The cab profile uses a normal wider FOV and normally disables tilt-shift. Calm should feel like a pleasant miniature diorama; horror can move toward the cab and remove the miniature illusion. | Phase 2 |
+| 13 | Visibility strategy | **DECIDED:** combine frustum culling + distance checks + distance-based LOD. World generation/streaming is separate and keeps only a bounded active road corridor. Avoid per-object perfect cone calculations every frame unless profiling later proves a specific need. | Phase 2 |
+| 14 | Shadow budget | **DECIDED:** start at 1024x1024 for the main sun shadow map. Restrict shadow casting to important nearby objects; distant/small scenery can use 512x512-style simplification if useful, or no shadows. Tune from Dell 3490 profiling. | Phase 2 |
+| 15 | Tree style | **DECIDED:** low-poly trunk/branch structure plus multiple solid foliage clusters. No single blob canopy. Reuse/instance variants and use LOD for distance. | Phase 2 |
+| 16 | Grass style | **DECIDED:** no realistic blade-by-blade grass. Use a stylized grass ground material/texture plus sparse cross-quad clusters in important areas; alpha-test rather than heavy translucent foliage where possible. | Phase 2 |
+| 17 | Performance baseline | **DECIDED:** Dell Latitude 3490 is the primary test machine. Measure FPS/frame time rather than guessing. Keep toon shading and stylization cheap; focus optimization on shadows, foliage overdraw, draw calls, post-processing, terrain and world population. | Phase 2/7 |
 
 ## Asset plan (everything free)
 - **Vehicles/city/nature:** Kenney.nl, Quaternius (CC0)
@@ -193,7 +234,7 @@ src/
   game/camera.js   (camera profiles: toy chase, free-look, cab)
   game/render.js   (renderer, EffectComposer, tilt-shift, grade, toon materials)
   game/fx.js       (tire tracks, smoke, Art pass 2)
-  game/world.js    (terrain, road, zones)
+  game/world.js    (terrain, road, zones, active-area generation/LOD)
   game/typing.js
   game/story.js    (act text, prompt sources)
   game/director.js (horror pacing)
