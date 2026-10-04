@@ -20,7 +20,7 @@ const GradeShader = {
   vertexShader: /* glsl */`
     varying vec2 vUv;
     void main() {
-      vUV = uv;
+      vUv = uv;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }`,
   fragmentShader: /* glsl */`
