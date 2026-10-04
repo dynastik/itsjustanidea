@@ -15,8 +15,8 @@ export const VEHICLE_CONFIG = {
   trackWidth: 1.2,
   colliderHalfExtents: { x: 0.6, y: 0.6, z: 1.2 },
   wheelAnimSpeedScale: 0.6,
+  wheelVisualSteer: 0.6,  // how far the front wheels VISUALLY turn, as a fraction of the real steering angle (0.55 rad looked like too much)
   cabEyeTrim: { x: 0, y: 0, z: 0 },             // nudge on top of the auto-placed driver's eye (cab view tuner in camera.js)
-  cabCameraOffset: { x: 0, y: 1.3, z: 0.4 },    // camera sits just inside the cab, slightly forward of the driver's eye
   mirrorOffset: { x: 0, y: 1.2, z: 0.7 },       // PLACEHOLDER: rear-view mirror (Phase 5)
   body: {
     mass: 1200,
@@ -307,7 +307,7 @@ export function createVehicle(scene, physics, RAPIER) {
       const bb = getLocalBounds();
       const t = cfg.cabEyeTrim;
       const w = bb.max.x - bb.min.x, hgt = bb.max.y - bb.min.y, len = bb.max.z - bb.min.z;
-      return eyeVec.set((bb.min.x + bb.max.x) / 2 + w * 0.25 + t.x, bb.min.y + hgt * 0.8 + t.y, bb.max.z - len * 0.36 + t.z);
+      return eyeVec.set((bb.min.x + bb.max.x) / 2 + w * 0.25 + t.x, bb.min.y + hgt * 0.68 + t.y, bb.max.z - len * 0.36 + t.z);
     },
     setExteriorVisible: (v) => { exterior.visible = v; },
     setDebugVisible: (v) => { debugBox.visible = v; },
@@ -493,7 +493,7 @@ export function createVehicle(scene, physics, RAPIER) {
     debugBox.quaternion.copy(self.quaternion);
 
     // visual steering: positive steerAngle = left = positive yaw
-    for (const p of steerPivots) p.pivot.quaternion.setFromAxisAngle(p.axis, self.steerAngle);
+    for (const p of steerPivots) p.pivot.quaternion.setFromAxisAngle(p.axis, self.steerAngle * cfg.wheelVisualSteer);
 
     if (mixer && wheelAction) {
       wheelAction.timeScale = self.speed * cfg.wheelAnimSpeedScale; // signed, so wheels spin backwards in reverse

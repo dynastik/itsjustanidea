@@ -12,6 +12,14 @@ export const CAMERA_PROFILES = {
     fov: 80, fovSpeedGain: 0.15, fovSpeedRef: 30,
     exteriorVisible: false,
   },
+  // "Toy car" diorama look: high, far, narrow FOV, a little follow lag, strong tilt-shift (tilt: 0..1).
+  toy: {
+    fov: 22, fovSpeedGain: 0.05, fovSpeedRef: 30,
+    distance: 45, height: 22, lookHeight: 0.5,
+    followSmoothing: 0.02,
+    exteriorVisible: true,
+    tilt: 1,
+  },
 };
 
 export function createCameraRig(camera, domElement, vehicle, cabInterior) {
@@ -19,6 +27,7 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
   orbit.enabled = false;
 
   let profileName = 'chase';
+  let exteriorProfile = 'chase'; // which exterior look F2 returns to after cab view
   let debug = false;
   let dragging = false;
   let yaw = 0;
@@ -37,6 +46,34 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     if (!dragging || debug) return;
     yaw -= e.movementX * 0.005;
     pitch = THREE.MathUtils.clamp(pitch + e.movementY * 0.005, -0.4, 0.9);
+  });
+
+  // DEV TUNER (cab view only): arrows move the eye (x = left/right, z = forward/back), PageUp/PageDown raise/lower it,
+  // Home shows/hides the van body. Paste the logged cabEyeTrim into VEHICLE_CONFIG when it feels right.
+  window.addEventListener('keydown', (e) => {
+    if (profileName !== 'cab' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = vehicle.cfg.cabEyeTrim;
+    const step = 0.05;
+    let moved = true;
+    switch (e.key) {
+      case 'ArrowLeft': t.x += step; break;   // +x is the van's left
+      case 'ArrowRight': t.x -= step; break;
+      case 'ArrowUp': t.z += step; break;
+      case 'ArrowDown': t.z -= step; break;
+      case 'PageUp': t.y += step; break;
+      case 'PageDown': t.y -= step; break;
+      case 'Home':
+        e.preventDefault();
+        CAMERA_PROFILES.cab.exteriorVisible = !CAMERA_PROFILES.cab.exteriorVisible;
+        vehicle.setExteriorVisible(CAMERA_PROFILES.cab.exteriorVisible);
+        console.info('[cab] van body visible:', CAMERA_PROFILES.cab.exteriorVisible);
+        return;
+      default: moved = false;
+    }
+    if (!moved) return;
+    e.preventDefault();
+    if (cabInterior) cabInterior.layout(vehicle.getLocalBounds());
+    console.info(`[cab] cabEyeTrim: { x: ${t.x.toFixed(2)}, y: ${t.y.toFixed(2)}, z: ${t.z.toFixed(2)} }`);
   });
 
   function update(dt) {
@@ -59,8 +96,7 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     const c = vehicle.center;
 
     if (profileName === 'cab') {
-      const cameraOffset = vehicle.cfg?.cabCameraOffset ?? { x: 0, y: 1.3, z: 0.4 };
-      pos.set(cameraOffset.x, cameraOffset.y, cameraOffset.z).applyQuaternion(vehicle.quaternion).add(c);
+      pos.copy(vehicle.cabEye).applyQuaternion(vehicle.quaternion).add(c);
       dir.set(0, 0, 1).applyQuaternion(vehicle.quaternion).applyAxisAngle(up, yaw);
       dir.y -= pitch * 0.8;
       dir.normalize();
@@ -91,10 +127,18 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     update,
     get profile() { return profileName; },
     toggleCab() {
-      profileName = profileName === 'chase' ? 'cab' : 'chase';
+      if (profileName === 'cab') profileName = exteriorProfile;
+      else { exteriorProfile = profileName; profileName = 'cab'; }
       vehicle.setExteriorVisible(CAMERA_PROFILES[profileName].exteriorVisible);
       if (cabInterior) cabInterior.root.visible = (profileName === 'cab');
     },
+    // F3: chase <-> toy-car look (ignored in cab view)
+    cycleLook() {
+      if (profileName === 'cab') return;
+      profileName = exteriorProfile = profileName === 'chase' ? 'toy' : 'chase';
+    },
+    // how much tilt-shift the current profile wants (0 = none)
+    get tilt() { return CAMERA_PROFILES[profileName].tilt ?? 0; },
     setDebug(on) {
       debug = on;
       orbit.enabled = on;

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
 // Day -> dusk look, keyed entirely off worldTime (0..1).
+// Fog colour is locked to the sky's horizon colour, so distant terrain melts into the sky with no seam.
 export function createLighting(scene) {
-  const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+  const sun = new THREE.DirectionalLight(0xffe7c2, 1.6);
   sun.castShadow = true;
   sun.shadow.camera.left = -30;
   sun.shadow.camera.right = 30;
@@ -18,37 +19,70 @@ export function createLighting(scene) {
   scene.add(sunTarget);
   sun.target = sunTarget;
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-  scene.add(ambient);
+  // Coloured hemisphere fill (blue from above, green bounce from below) keeps shadows colourful, not grey.
+  const hemi = new THREE.HemisphereLight(0x9ec6ff, 0x6f8f4f, 0.75);
+  scene.add(hemi);
 
-  const skyDay = new THREE.Color(0x87ceeb);
-  const skyDusk = new THREE.Color(0x2b1f38);
-  const sunColorDay = new THREE.Color(0xffffff);
-  const sunColorDusk = new THREE.Color(0x9aa0c8);
-  const tmpSky = new THREE.Color(skyDay);
+  // Gradient sky dome, centred on the vehicle. Bottom colour == fog colour.
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(800, 24, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() } },
+      vertexShader: `
+        varying float vH;
+        void main() {
+          vH = normalize(position).y;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 top;
+        uniform vec3 bottom;
+        varying float vH;
+        void main() {
+          gl_FragColor = vec4(mix(bottom, top, smoothstep(-0.05, 0.6, vH)), 1.0);
+        }`,
+    })
+  );
+  sky.renderOrder = -1;
+  sky.frustumCulled = false;
+  scene.add(sky);
 
-  const SUN_DAY = 1.5, SUN_DUSK = 0.35;
-  const AMB_DAY = 0.4, AMB_DUSK = 0.12;
-  const FOG_NEAR_DAY = 120, FOG_FAR_DAY = 320;
-  const FOG_NEAR_DUSK = 15, FOG_FAR_DUSK = 70;
+  const fogDay = new THREE.Color(0xbfd9ea), fogDusk = new THREE.Color(0x3a2b4d);
+  const topDay = new THREE.Color(0x5fa3e0), topDusk = new THREE.Color(0x14102a);
+  const sunColorDay = new THREE.Color(0xffe7c2), sunColorDusk = new THREE.Color(0x9aa0c8);
+  const hemiSkyDay = new THREE.Color(0x9ec6ff), hemiSkyDusk = new THREE.Color(0x4a3c6e);
+  const hemiGroundDay = new THREE.Color(0x6f8f4f), hemiGroundDusk = new THREE.Color(0x2a2a30);
+  const fog = new THREE.Color(fogDay);
 
-  scene.background = tmpSky;
-  scene.fog = new THREE.Fog(skyDay.clone(), FOG_NEAR_DAY, FOG_FAR_DAY);
+  const SUN_DAY = 1.6, SUN_DUSK = 0.35;
+  const HEMI_DAY = 0.75, HEMI_DUSK = 0.25;
+  // FogExp2: factor = 1 - exp(-(density * distance)^2). Dense enough that the terrain edge (~300 m) is hidden.
+  const FOG_DAY = 0.0055, FOG_DUSK = 0.015;
+
+  scene.background = fog; // same object as the fog colour
+  scene.fog = new THREE.FogExp2(fog, FOG_DAY);
 
   const lerp = THREE.MathUtils.lerp;
 
   function update(worldTime, center) {
-    tmpSky.copy(skyDay).lerp(skyDusk, worldTime); // scene.background is this same object
-    scene.fog.color.copy(tmpSky);
-    scene.fog.near = lerp(FOG_NEAR_DAY, FOG_NEAR_DUSK, worldTime);
-    scene.fog.far = lerp(FOG_FAR_DAY, FOG_FAR_DUSK, worldTime);
+    fog.copy(fogDay).lerp(fogDusk, worldTime);
+    scene.fog.density = lerp(FOG_DAY, FOG_DUSK, worldTime);
+
+    sky.position.copy(center);
+    sky.material.uniforms.bottom.value.copy(fog);
+    sky.material.uniforms.top.value.copy(topDay).lerp(topDusk, worldTime);
 
     sun.color.copy(sunColorDay).lerp(sunColorDusk, worldTime);
     sun.intensity = lerp(SUN_DAY, SUN_DUSK, worldTime);
-    ambient.intensity = lerp(AMB_DAY, AMB_DUSK, worldTime);
+    hemi.color.copy(hemiSkyDay).lerp(hemiSkyDusk, worldTime);
+    hemi.groundColor.copy(hemiGroundDay).lerp(hemiGroundDusk, worldTime);
+    hemi.intensity = lerp(HEMI_DAY, HEMI_DUSK, worldTime);
 
-    // shadow frustum follows the vehicle
-    sun.position.set(center.x + 15, 21, center.z + 10);
+    // low, golden-hour sun; the shadow frustum follows the vehicle
+    sun.position.set(center.x + 20, 13, center.z + 11);
     sunTarget.position.set(center.x, 1, center.z);
   }
 
