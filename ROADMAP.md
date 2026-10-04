@@ -28,7 +28,7 @@ The code is now split into modules under `src/game` rather than being kept as on
 Important current facts before continuing Phase 1/2:
 - Three.js 0.186, Rapier 0.21 (`rapier3d-compat`), Vite 8.
 - `render.js` uses `EffectComposer` with RenderPass + SMAA + OutputPass and caps pixel ratio at 2.
-- `lighting.js` currently uses a directional sun with a **2048x2048 shadow map**, an ambient light, day->dusk sky colors, and linear fog. This is a temporary baseline; the target shadow policy is documented below.
+- `lighting.js` currently uses a directional sun with a **1024x1024 shadow map**, an ambient light, day->dusk sky colors, and exponential fog. The baseline shadow resolution follows the performance policy below.
 - `main.js` already wires `cabin.js` and `director.js`, has automatic city/highway switching, day->dusk world time, pause/reset/debug/mute controls, and the shared `driveInput`.
 - The cab interior exists and is hidden until cab view is toggled.
 - The exact current implementation is authoritative; do not assume old roadmap descriptions still match the code. Re-read the relevant source files before modifying them.
@@ -47,7 +47,7 @@ Important current facts before continuing Phase 1/2:
 - [x] Shadow follows truck, debug orbit cam (`) + collider box
 - [x] Day -> dusk lighting/fog system (`worldTime`)
 - [x] Roadside trees (instanced)
-- [ ] Free-look camera + speed-based FOV (**regression:** verify/re-add inside the Phase 1 camera module if still absent)
+- [x] Free-look camera + speed-based FOV (drag-look and speed-responsive FOV are implemented in `camera.js`)
 
 ## Phase 1: Structure and driving feel
 **Done when:** driving for 2 minutes feels good and the code is split into modules.
@@ -57,7 +57,7 @@ Important current facts before continuing Phase 1/2:
 - [ ] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
 - [ ] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
 - [x] `render.js` module: renderer + `EffectComposer` passthrough (RenderPass + SMAA + OutputPass), replacing `antialias: true`; pixel ratio capped at 2
-- [ ] Camera module: chase cam, free-look, speed-based FOV, **cab (first-person) view toggle (V)**, structured as named **camera profiles**
+- [x] Camera module: chase cam, drag-look, speed-based FOV, **cab (first-person) view toggle (F2)**, structured as named **camera profiles**
 - [x] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
 - [ ] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
 - [ ] Tree/prop colliders with collision response (speed loss + bump)
@@ -104,7 +104,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
 - [ ] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime`. Palette-limited sky (gradient or HDRI), golden-hour lighting
 - [ ] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
-- [ ] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
+- [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
 - [ ] **Trees:** use stylized low-poly trees made from a trunk/branch structure plus **multiple solid foliage clusters**, not one leaf blob. Aim for roughly 5-15 meaningful foliage masses per tree, with several reusable tree variants. Prefer opaque geometry over large amounts of transparent foliage. Instance repeated tree variants where possible.
 - [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.
 - [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.

@@ -11,7 +11,7 @@ export function createLighting(scene) {
   sun.shadow.camera.bottom = -30;
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 60;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.bias = -0.001;
   scene.add(sun);
 
