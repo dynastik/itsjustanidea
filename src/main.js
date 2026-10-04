@@ -33,7 +33,7 @@ async function main() {
   const lighting = createLighting(scene);
   const world = createWorld(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
-  const cabin = createCabInterior(scene);
+  const cabin = createCabInterior(vehicle);
   vehicle.visual.add(cabin.root); // follows the van
   cabin.root.visible = false; // hidden until cab view is toggled
   const rig = createCameraRig(camera, gfx.domElement, vehicle, cabin);

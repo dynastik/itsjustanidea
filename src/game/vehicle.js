@@ -1,18 +1,23 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { state } from './state.js';
 
 export const FIXED_DT = 1 / 60;
 
+// Every model/vehicle-specific number lives here. Swapping the van = editing this object.
 export const VEHICLE_CONFIG = {
   modelUrl: `${import.meta.env.BASE_URL}models/truck.glb`,
-  modelYOffset: -0.72,
-  spawnHeight: 1.0,  // lowered from 1.2
+  // The model is auto-fitted so its lowest point touches the ground. This is a manual nudge on top
+  // of that, in metres (+ = raise). Tune live in debug mode with PageUp / PageDown.
+  modelYTrim: 0,
+  spawnHeight: 1.0,
   wheelbase: 1.8,
   trackWidth: 1.2,
   colliderHalfExtents: { x: 0.6, y: 0.6, z: 1.2 },
   wheelAnimSpeedScale: 0.6,
-  cabCameraOffset: { x: 0.3, y: 0.8, z: 0.3 },
-  mirrorOffset: { x: 0, y: 1.2, z: 0.7 },
+  cabEyeTrim: { x: 0, y: 0, z: 0 },             // nudge on top of the auto-placed driver's eye (cab view tuner in camera.js)
+  cabCameraOffset: { x: 0, y: 1.3, z: 0.4 },    // camera sits just inside the cab, slightly forward of the driver's eye
+  mirrorOffset: { x: 0, y: 1.2, z: 0.7 },       // PLACEHOLDER: rear-view mirror (Phase 5)
   body: {
     mass: 1200,
     comOffsetY: -0.35,
@@ -60,33 +65,145 @@ export function createVehicle(scene, physics, RAPIER) {
   const tr = cfg.tires;
   const b = cfg.body;
 
-  // visuals
+  // ---------- visuals ----------
   const visual = new THREE.Group();
   scene.add(visual);
-  const exterior = new THREE.Group();
+  const exterior = new THREE.Group(); // hidden in cab view so nothing clips
   visual.add(exterior);
 
   let mixer = null;
   let wheelAction = null;
-  let frontWheels = []; // for steering animation
+  let modelRoot = null;
+  const steerPivots = []; // { pivot, axis } for each front wheel
+  // Model bounds in the model's own space (default = the collider box until the model loads).
+  const rawBox = new THREE.Box3(new THREE.Vector3(-0.6, -1.0, -1.2), new THREE.Vector3(0.6, 0.6, 1.2));
+  const readyCallbacks = [];
+  let ready = false;
+  const fireReady = () => { for (const cb of readyCallbacks) cb(); };
+  const eyeVec = new THREE.Vector3();
+
+  // Where the chassis centre sits above the ground at rest. Starts as a formula, then gets
+  // replaced by a real measurement once the van has settled (see measureRide).
+  const fit = {
+    rideHeight: s.wheelRadius + s.restLength - 9.81 / (4 * s.stiffness) - s.connectionY,
+    modelMinY: 0,
+    measured: false,
+  };
+
+  function applyModelOffset() {
+    if (!modelRoot) return;
+    modelRoot.position.y = -fit.rideHeight - fit.modelMinY + cfg.modelYTrim;
+  }
+
+  // Measure the model's lowest point (in its own space) so it can be dropped onto the ground.
+  function measureModel() {
+    const sp = visual.position.clone();
+    const sq = visual.quaternion.clone();
+    visual.position.set(0, 0, 0);
+    visual.quaternion.identity();
+    modelRoot.position.set(0, 0, 0);
+    visual.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(modelRoot);
+    visual.position.copy(sp);
+    visual.quaternion.copy(sq);
+    fit.modelMinY = box.min.y;
+    rawBox.copy(box);
+    const size = box.getSize(new THREE.Vector3());
+    console.info(
+      `[vehicle] model size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)} (w x h x l), lowest point y=${box.min.y.toFixed(2)}`
+    );
+    applyModelOffset();
+  }
+
+  // Front wheels can't be steered by rotating the wheel node itself: the wheel-spin animation
+  // overwrites its rotation every frame. So each front wheel gets a pivot parent that only
+  // carries the steering yaw. Wheel nodes are found from the animation tracks (whatever the
+  // nodes are called), then split front/rear by where they sit along the van.
+  function setupSteering(model, clips) {
+    const spinNames = new Set();
+    const movedNames = new Set();
+    for (const clip of clips) {
+      for (const track of clip.tracks) {
+        const dot = track.name.indexOf('.');
+        if (dot < 0) continue;
+        const node = track.name.slice(0, dot);
+        const prop = track.name.slice(dot + 1);
+        if (prop === 'quaternion' || prop.startsWith('rotation')) spinNames.add(node);
+        else if (prop === 'position') movedNames.add(node);
+      }
+    }
+
+    let nodes = [...spinNames].map((n) => model.getObjectByName(n)).filter(Boolean);
+    if (nodes.length < 2) { // fallback: guess from names
+      nodes = [];
+      const re = /wheel|tyre|tire/i;
+      model.traverse((o) => {
+        if (!re.test(o.name)) return;
+        for (let p = o.parent; p; p = p.parent) if (re.test(p.name)) return; // skip nested parts
+        nodes.push(o);
+      });
+    }
+    if (nodes.length < 2) {
+      console.warn('[vehicle] could not find wheel nodes; front wheels will not steer. See the node list above.');
+      return;
+    }
+
+    model.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    const items = nodes.map((n) => {
+      const c = new THREE.Box3().setFromObject(n).getCenter(new THREE.Vector3()).applyMatrix4(inv);
+      return { n, z: c.z };
+    });
+    const zs = items.map((i) => i.z);
+    const zMax = Math.max(...zs);
+    const zMin = Math.min(...zs);
+    if (zMax - zMin < 0.2) {
+      console.warn('[vehicle] wheel nodes all sit at the same z; cannot tell front from rear.');
+      return;
+    }
+    const mid = (zMax + zMin) / 2;
+    const mqInv = model.getWorldQuaternion(new THREE.Quaternion()).invert();
+
+    for (const { n, z } of items) {
+      if (z <= mid) continue; // rear wheel
+      if (movedNames.has(n.name)) {
+        console.warn('[vehicle] wheel node is position-animated, not steering it:', n.name);
+        continue;
+      }
+      const parent = n.parent;
+      const pivot = new THREE.Group();
+      pivot.name = `${n.name}_steer`;
+      pivot.position.copy(n.position);
+      parent.add(pivot);
+      pivot.add(n);
+      n.position.set(0, 0, 0);
+
+      // "up" expressed in the parent's local space, so steering is a yaw even if the model is rotated
+      const pq = parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(mqInv);
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(pq.invert());
+      steerPivots.push({ pivot, axis });
+    }
+    console.info(`[vehicle] steering ${steerPivots.length} front wheel(s) of ${items.length} found`);
+  }
 
   new GLTFLoader().load(
     cfg.modelUrl,
     (gltf) => {
       const model = gltf.scene;
-      model.position.y = cfg.modelYOffset;
       model.traverse((c) => {
         if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
       });
       exterior.add(model);
+      modelRoot = model;
 
-      // Find front wheels in the model hierarchy for steering animation
-      model.traverse((node) => {
-        if (node.name && (node.name.includes('wheel') || node.name.includes('Wheel')) && 
-            (node.name.includes('front') || node.name.includes('Front'))) {
-          frontWheels.push(node);
-        }
-      });
+      const names = [];
+      model.traverse((o) => { if (o.name) names.push(o.name); });
+      console.info('[vehicle] model nodes:', names.join(', '));
+
+      setupSteering(model, gltf.animations || []);
+      measureModel();
+      ready = true;
+      fireReady();
 
       if (gltf.animations && gltf.animations.length > 0) {
         mixer = new THREE.AnimationMixer(model);
@@ -107,7 +224,7 @@ export function createVehicle(scene, physics, RAPIER) {
     }
   );
 
-  // chassis (dynamic body)
+  // ---------- chassis (dynamic body) ----------
   const half = cfg.colliderHalfExtents;
   const bw = half.x * 2, bh = half.y * 2, bd = half.z * 2;
   const inertia = {
@@ -128,7 +245,7 @@ export function createVehicle(scene, physics, RAPIER) {
     body
   );
 
-  // raycast vehicle controller
+  // ---------- raycast vehicle controller ----------
   const ctrl = physics.createVehicleController(body);
   const hx = cfg.trackWidth / 2;
   const hz = cfg.wheelbase / 2;
@@ -162,7 +279,7 @@ export function createVehicle(scene, physics, RAPIER) {
   debugBox.visible = false;
   scene.add(debugBox);
 
-  // state
+  // ---------- state ----------
   const prevPos = new THREE.Vector3();
   const curPos = new THREE.Vector3();
   const prevQuat = new THREE.Quaternion();
@@ -181,6 +298,17 @@ export function createVehicle(scene, physics, RAPIER) {
     updateVisual,
     reset,
     maxSteerAtSpeed,
+    nudgeModel(dy) { cfg.modelYTrim += dy; applyModelOffset(); return cfg.modelYTrim; },
+    getLocalBounds,
+    onModelReady(cb) { readyCallbacks.push(cb); if (ready) cb(); },
+    // Driver's eye in chassis space: left-hand drive, high in the cab, set back from the front. Placed from
+    // the model's size so any model gets a sane default; cabEyeTrim nudges it.
+    get cabEye() {
+      const bb = getLocalBounds();
+      const t = cfg.cabEyeTrim;
+      const w = bb.max.x - bb.min.x, hgt = bb.max.y - bb.min.y, len = bb.max.z - bb.min.z;
+      return eyeVec.set((bb.min.x + bb.max.x) / 2 + w * 0.25 + t.x, bb.min.y + hgt * 0.8 + t.y, bb.max.z - len * 0.36 + t.z);
+    },
     setExteriorVisible: (v) => { exterior.visible = v; },
     setDebugVisible: (v) => { debugBox.visible = v; },
   };
@@ -194,6 +322,14 @@ export function createVehicle(scene, physics, RAPIER) {
     steerTimer: 0,
   };
   let flipTimer = 0;
+  let settleTimer = 0;
+
+  // Model bounds in chassis-local space (after the ground-fit offset), as a Box3.
+  function getLocalBounds() {
+    const bb = rawBox.clone();
+    if (modelRoot) bb.translate(new THREE.Vector3(0, modelRoot.position.y, 0));
+    return bb;
+  }
 
   function maxSteerAtSpeed(speed) {
     const r = speed / h.steerFalloffSpeed;
@@ -217,6 +353,26 @@ export function createVehicle(scene, physics, RAPIER) {
     let n = 0;
     for (let i = 0; i < 4; i++) if (ctrl.wheelIsInContact(i)) n++;
     return n;
+  }
+
+  // Once the van has settled, measure how high the chassis really sits and drop the model onto the ground.
+  function measureRide() {
+    fit.measured = true;
+    try {
+      let sum = 0, n = 0;
+      for (let i = 0; i < 4; i++) {
+        const p = ctrl.wheelContactPoint(i);
+        if (p) { sum += p.y; n++; }
+      }
+      if (n === 4) {
+        fit.rideHeight = body.translation().y - sum / 4;
+        applyModelOffset();
+        console.info(`[vehicle] measured ride height ${fit.rideHeight.toFixed(3)} m`);
+        fireReady();
+      }
+    } catch (e) {
+      console.info('[vehicle] ride height measurement unavailable, using formula', fit.rideHeight.toFixed(3));
+    }
   }
 
   function calibrate(dt, input, v) {
@@ -255,6 +411,12 @@ export function createVehicle(scene, physics, RAPIER) {
   function step(dt, input, surface) {
     const v = forwardSpeed();
     const off = surface.offRoad;
+
+    if (!fit.measured) {
+      if (contactCount() === 4 && Math.abs(v) < 0.2) settleTimer += dt;
+      else settleTimer = 0;
+      if (settleTimer > 1.0) measureRide();
+    }
 
     const grip = off ? h.offRoad.gripFactor : 1;
     if (grip !== lastGrip) {
@@ -330,22 +492,18 @@ export function createVehicle(scene, physics, RAPIER) {
     debugBox.position.copy(self.center);
     debugBox.quaternion.copy(self.quaternion);
 
-    // Animate front wheels steering
-    if (frontWheels.length > 0) {
-      for (const wheel of frontWheels) {
-        wheel.rotation.y = self.steerAngle * cal.steerSign;
-      }
-    }
+    // visual steering: positive steerAngle = left = positive yaw
+    for (const p of steerPivots) p.pivot.quaternion.setFromAxisAngle(p.axis, self.steerAngle);
 
     if (mixer && wheelAction) {
-      wheelAction.timeScale = Math.abs(self.speed) * cfg.wheelAnimSpeedScale;
+      wheelAction.timeScale = self.speed * cfg.wheelAnimSpeedScale; // signed, so wheels spin backwards in reverse
       mixer.update(dt);
     }
   }
 
-  function reset() {
-    body.setTranslation({ x: 0, y: cfg.spawnHeight, z: 0 }, true);
-    body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+  function reset(y = cfg.spawnHeight, heading = 0) {
+    body.setTranslation({ x: 0, y, z: 0 }, true);
+    body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     self.steerAngle = 0;
@@ -354,6 +512,13 @@ export function createVehicle(scene, physics, RAPIER) {
     capture();
     updateVisual(1, 0);
   }
+
+  // debug-mode tuning: ] raises the van model, [ lowers it (prints the value to paste into VEHICLE_CONFIG)
+  window.addEventListener('keydown', (e) => {
+    if (!state.debug || (e.key !== '[' && e.key !== ']')) return;
+    const t = self.nudgeModel(e.key === ']' ? 0.05 : -0.05);
+    console.info(`[vehicle] modelYTrim: ${t.toFixed(2)}  (paste into VEHICLE_CONFIG)`);
+  });
 
   capture();
   capture();

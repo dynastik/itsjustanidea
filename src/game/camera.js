@@ -59,8 +59,8 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     const c = vehicle.center;
 
     if (profileName === 'cab') {
-      const o = vehicle.cfg.cabCameraOffset;
-      pos.set(o.x, o.y, o.z).applyQuaternion(vehicle.quaternion).add(c);
+      const cameraOffset = vehicle.cfg?.cabCameraOffset ?? { x: 0, y: 1.3, z: 0.4 };
+      pos.set(cameraOffset.x, cameraOffset.y, cameraOffset.z).applyQuaternion(vehicle.quaternion).add(c);
       dir.set(0, 0, 1).applyQuaternion(vehicle.quaternion).applyAxisAngle(up, yaw);
       dir.y -= pitch * 0.8;
       dir.normalize();
