@@ -33,7 +33,7 @@ Important current facts before continuing Phase 1/2:
 - The cab interior exists and is hidden until cab view is toggled.
 - The exact current implementation is authoritative; do not assume old roadmap descriptions still match the code. Re-read the relevant source files before modifying them.
 - Truck model is local at `public/models/truck.glb`; do not hotlink assets.
-- Free-look/speed-FOV and other Phase 0 camera items must be verified against the current camera module before marking them complete.
+- Camera controls and other roadmap items must be verified against current source before marking them complete.
 
 ---
 
@@ -46,25 +46,25 @@ Important current facts before continuing Phase 1/2:
 - [x] Highway auto-steer + WPM/accuracy-driven speed
 - [x] Shadow follows truck, debug orbit cam (`) + collider box
 - [x] Day -> dusk lighting/fog system (`worldTime`)
-- [x] Roadside trees (instanced)
+- [ ] Roadside trees (instanced; not currently implemented in source)
 - [x] Free-look camera + speed-based FOV (drag-look and speed-responsive FOV are implemented in `camera.js`)
 
 ## Phase 1: Structure and driving feel
 **Done when:** driving for 2 minutes feels good and the code is split into modules.
-- [ ] Split `main.js` into modules (vehicle, camera, world, typing, lighting, ui, input) — continue only if anything is still left to split
-- [ ] Central game state object (mode, worldTime, speed, typing stats)
-- [ ] `VEHICLE_CONFIG` object (model swap-friendly, see Rules)
-- [ ] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
-- [ ] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
+- [x] Split `main.js` into modules (vehicle, camera, world, typing, lighting, ui, input); `main.js` now wires these systems together
+- [x] Central game state object (mode, worldTime, speed, typing stats)
+- [x] `VEHICLE_CONFIG` object (model swap-friendly, see Rules)
+- [x] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
+- [x] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
 - [x] `render.js` module: renderer + `EffectComposer` passthrough (RenderPass + SMAA + OutputPass), replacing `antialias: true`; pixel ratio capped at 2
 - [x] Camera module: chase cam, drag-look, speed-based FOV, **cab (first-person) view toggle (F2)**, structured as named **camera profiles**
 - [x] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
-- [ ] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
+- [x] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
 - [ ] Tree/prop colliders with collision response (speed loss + bump)
-- [ ] HUD: speedometer, cleaner mode label, fix stale key hints in `index.html`
-- [ ] Reset (R) and pause (Esc)
-- [ ] Web Audio manager + synthesized engine sound (pitch follows speed, no downloads needed)
-- [ ] Debug box hidden by default (still toggled with `)
+- [x] HUD: speedometer, cleaner mode label, fix stale key hints in `index.html`
+- [x] Reset (R in city; F4 in either mode) and pause (Esc)
+- [x] Web Audio manager + synthesized engine sound (pitch follows speed, no downloads needed)
+- [x] Debug box hidden by default (still toggled with `)
 
 ## Phase 2: World
 **Done when:** you can drive from the city, up the on-ramp, onto a hilly scenic highway with no visible seams, and the mode switches by itself.
@@ -72,7 +72,7 @@ Important current facts before continuing Phase 1/2:
 ### World generation and visibility strategy
 The game is a controlled driving experience, not an open-world free-roam game. Exploit that constraint.
 
-- [ ] Terrain/world is generated only within a bounded active area around the player's road position; do not create a huge fully populated world.
+- [x] Terrain/world is generated only within a bounded active area around the player's road position; do not create a huge fully populated world.
 - [ ] Recycle road/world segments ahead and behind the vehicle so the playable world can feel endless without keeping everything alive.
 - [ ] Use **camera frustum culling + distance tests** as the primary render visibility checks. Do not run an expensive per-object "perfect cone intersection" calculation every frame.
 - [ ] Use **distance-based LOD rings** for scenery. Starting target, to be tuned by profiling:
@@ -81,7 +81,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
   - far: very simple silhouettes/cheap meshes
   - very far: fog/background only
 - [ ] Keep generation/streaming separate from render visibility. A nearby road/world chunk may exist in memory while most of its objects are culled or represented by a cheaper LOD.
-- [ ] Use instancing for repeated scenery (trees, rocks, fence posts, grass clusters, etc.) to reduce draw calls.
+- [x] Use instancing for repeated scenery (current highway rails, posts, and signs use `InstancedMesh`; extend to trees/rocks/grass when added).
 - [ ] Preserve important art-directed silhouettes even when strict mathematical visibility would allow culling; visibility optimization must not ruin composition.
 - [ ] Prefer road-relative active areas/corridors where useful. The player follows a controlled route, so there is no need for general-purpose open-world streaming logic.
 
@@ -98,12 +98,12 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 ### Art direction
 **Target look:** a miniature/diorama driving game with an Art of Rally-inspired environmental design language, but with restrained toon/cel-style shading and hand-painted color choices. Do **not** interpret this as full anime/cartoon cel shading. The goal is a coherent low-poly miniature world with simple, deliberate light bands, a tight palette, strong silhouettes, fog and a toy-like camera.
 
-- [ ] **Art pass 1a, camera look:** "toy-car" chase profile: camera high and far, narrow FOV (about 15-25 degrees), lerped follow with slight lag. Raise the camera enough that hills do not block the view of the truck
-- [ ] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
-- [ ] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
+- [x] **Art pass 1a, camera look:** "toy-car" chase profile: camera high and far, narrow FOV (about 15-25 degrees), lerped follow with slight lag. Raise the camera enough that hills do not block the view of the truck
+- [x] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
+- [x] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
 - [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
-- [ ] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime`. Palette-limited sky (gradient or HDRI), golden-hour lighting
-- [ ] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
+- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime`. Palette-limited sky (gradient or HDRI), golden-hour lighting
+- [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
 - [ ] **Trees:** use stylized low-poly trees made from a trunk/branch structure plus **multiple solid foliage clusters**, not one leaf blob. Aim for roughly 5-15 meaningful foliage masses per tree, with several reusable tree variants. Prefer opaque geometry over large amounts of transparent foliage. Instance repeated tree variants where possible.
 - [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.

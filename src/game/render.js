@@ -45,7 +45,7 @@ const TILT_BLUR = 2.5;       // blur strength at full tilt-shift
 const TILT_FOCUS_Y = 0.5;    // the sharp horizontal strip (0 = bottom, 1 = top); the van sits mid-screen
 
 const GRADE_DAY = { saturation: 1.25, lift: 0.008, vignette: 0.25, tint: new THREE.Color(1.04, 1.0, 0.93) };
-const GRADE_DUSK = { saturation: 0.8, lift: 0.025, vignette: 0.5, tint: new THREE.Color(0.9, 0.92, 1.06) };
+const GRADE_DUSK = { saturation: 0.8, lift: 0.025, vignette: 0.5, tint: new THREE.Color(0.96, 0.92, 0.87) };
 
 // Composer: Render -> SMAA -> tilt-shift (H, V) -> colour grade -> Output.
 export function createRenderer(scene, camera) {

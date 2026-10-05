@@ -38,6 +38,12 @@ export function createInput(actions) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
 
+    if (key === 'r' && state.mode === 'city') {
+      e.preventDefault();
+      if (!e.repeat) actions.reset();
+      return;
+    }
+
     if (key in hotkeys) {
       e.preventDefault();
       if (!e.repeat) hotkeys[key]();
