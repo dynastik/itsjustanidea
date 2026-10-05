@@ -50,36 +50,38 @@ export function createLighting(scene) {
   sky.frustumCulled = false;
   scene.add(sky);
 
-  const fogDay = new THREE.Color(0xbfd9ea), fogDusk = new THREE.Color(0x191617);
+  const horizonDay = new THREE.Color(0xbfd9ea), horizonDusk = new THREE.Color(0x191617);
   const topDay = new THREE.Color(0x5fa3e0), topDusk = new THREE.Color(0x0d0c0d);
   const sunColorDay = new THREE.Color(0xffe7c2), sunColorDusk = new THREE.Color(0xb6a08c);
   const hemiSkyDay = new THREE.Color(0x9ec6ff), hemiSkyDusk = new THREE.Color(0x47424a);
   const hemiGroundDay = new THREE.Color(0x6f8f4f), hemiGroundDusk = new THREE.Color(0x322c27);
-  const fog = new THREE.Color(fogDay);
+  const horizon = new THREE.Color(horizonDay);
 
   const SUN_DAY = 1.6, SUN_DUSK = 0.35;
   const HEMI_DAY = 0.75, HEMI_DUSK = 0.25;
   // FogExp2: factor = 1 - exp(-(density * distance)^2). Dense enough that the terrain edge (~300 m) is hidden.
   const FOG_DAY = 0.0055, FOG_DUSK = 0.015;
 
-  scene.background = fog; // same object as the fog colour
-  scene.fog = new THREE.FogExp2(fog, FOG_DAY);
+  scene.background = horizon;
+  scene.fog = new THREE.FogExp2(horizon, FOG_DAY);
 
   const lerp = THREE.MathUtils.lerp;
 
   function update(worldTime, center) {
-    fog.copy(fogDay).lerp(fogDusk, worldTime);
-    scene.fog.density = lerp(FOG_DAY, FOG_DUSK, worldTime);
+    const dusk = Math.pow(THREE.MathUtils.clamp(worldTime, 0, 1), 0.7);
+    horizon.copy(horizonDay).lerp(horizonDusk, dusk);
+    scene.fog.color.copy(horizon);
+    scene.fog.density = lerp(FOG_DAY, FOG_DUSK, dusk);
 
     sky.position.copy(center);
-    sky.material.uniforms.bottom.value.copy(fog);
-    sky.material.uniforms.top.value.copy(topDay).lerp(topDusk, worldTime);
+    sky.material.uniforms.bottom.value.copy(horizon);
+    sky.material.uniforms.top.value.copy(topDay).lerp(topDusk, dusk);
 
-    sun.color.copy(sunColorDay).lerp(sunColorDusk, worldTime);
-    sun.intensity = lerp(SUN_DAY, SUN_DUSK, worldTime);
-    hemi.color.copy(hemiSkyDay).lerp(hemiSkyDusk, worldTime);
-    hemi.groundColor.copy(hemiGroundDay).lerp(hemiGroundDusk, worldTime);
-    hemi.intensity = lerp(HEMI_DAY, HEMI_DUSK, worldTime);
+    sun.color.copy(sunColorDay).lerp(sunColorDusk, dusk);
+    sun.intensity = lerp(SUN_DAY, SUN_DUSK, dusk);
+    hemi.color.copy(hemiSkyDay).lerp(hemiSkyDusk, dusk);
+    hemi.groundColor.copy(hemiGroundDay).lerp(hemiGroundDusk, dusk);
+    hemi.intensity = lerp(HEMI_DAY, HEMI_DUSK, dusk);
 
     // low, golden-hour sun; the shadow frustum follows the vehicle
     sun.position.set(center.x + 20, 13, center.z + 11);
