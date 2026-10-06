@@ -7,7 +7,7 @@ function setCycleColor(target, morning, evening, night, eveningBlend, nightBlend
   target.copy(morning).lerp(evening, eveningBlend).lerp(night, nightBlend);
 }
 
-function createGlowingSquare(color) {
+function createGlowingSquare(color, haloColor) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -15,6 +15,7 @@ function createGlowingSquare(color) {
     toneMapped: false,
     uniforms: {
       color: { value: new THREE.Color(color) },
+      haloColor: { value: new THREE.Color(haloColor) },
       opacity: { value: 0 },
     },
     vertexShader: `
@@ -25,6 +26,7 @@ function createGlowingSquare(color) {
       }`,
     fragmentShader: `
       uniform vec3 color;
+      uniform vec3 haloColor;
       uniform float opacity;
       varying vec2 vUv;
       void main() {
@@ -32,7 +34,7 @@ function createGlowingSquare(color) {
         float edge = max(abs(p.x), abs(p.y));
         float square = 1.0 - smoothstep(0.88, 0.96, edge);
         float halo = exp(-dot(p, p) * 5.0) * 0.22;
-        gl_FragColor = vec4(color * (square + halo), max(square, halo * 0.7) * opacity);
+        gl_FragColor = vec4(color * square + haloColor * halo, max(square, halo * 0.7) * opacity);
       }`,
   });
 }
@@ -76,7 +78,7 @@ export function createLighting(scene) {
   const skyUniforms = {
     top: { value: new THREE.Color() },
     bottom: { value: new THREE.Color() },
-    oppositeHorizon: { value: new THREE.Color(0x7864b0) },
+    oppositeHorizon: { value: new THREE.Color(0x966084) },
     sunsetSide: { value: 1 },
     sunsetAmount: { value: 0 },
   };
@@ -119,24 +121,24 @@ export function createLighting(scene) {
 
   const sunDisc = new THREE.Mesh(
     new THREE.PlaneGeometry(30, 30),
-    createGlowingSquare(0xffedc4)
+    createGlowingSquare(0xffffff, 0xff8a36)
   );
   const moonDisc = new THREE.Mesh(
     new THREE.PlaneGeometry(26, 26),
-    createGlowingSquare(0xf0f2ff)
+    createGlowingSquare(0xf0f2ff, 0x8999d8)
   );
   sunDisc.renderOrder = 1;
   moonDisc.renderOrder = 1;
   scene.add(sunDisc, moonDisc);
 
   const horizonMorning = new THREE.Color(0xb7d7f2);
-  const horizonEvening = new THREE.Color(0xf0a06b);
+  const horizonEvening = new THREE.Color(0xff762b);
   const horizonNight = new THREE.Color(0x21182f);
   const topMorning = new THREE.Color(0x4b91d0);
-  const topEvening = new THREE.Color(0x547fb7);
+  const topEvening = new THREE.Color(0x70517f);
   const topNight = new THREE.Color(0x090713);
   const sunMorning = new THREE.Color(0xffedc4);
-  const sunEvening = new THREE.Color(0xff9d4d);
+  const sunEvening = new THREE.Color(0xff4f00);
   const sunNight = new THREE.Color(0x271a38);
   const hemiSkyMorning = new THREE.Color(0xa8cefa);
   const hemiSkyEvening = new THREE.Color(0x8ea4d6);
@@ -164,7 +166,7 @@ export function createLighting(scene) {
   scene.fog = new THREE.FogExp2(horizon, FOG_DAY);
 
   const lerp = THREE.MathUtils.lerp;
-  function update(worldTime, center) {
+  function update(worldTime, center, fogScale = 1) {
     const time = clamp01(worldTime);
     const evening = smooth(DUSK_START, DUSK_END, time);
     const night = smooth(NIGHT_START, NIGHT_END, time);
@@ -175,7 +177,7 @@ export function createLighting(scene) {
 
     setCycleColor(horizon, horizonMorning, horizonEvening, horizonNight, evening, night);
     scene.fog.color.copy(horizon);
-    scene.fog.density = lerp(lerp(FOG_DAY, FOG_EVENING, evening), FOG_NIGHT, night);
+    scene.fog.density = lerp(lerp(FOG_DAY, FOG_EVENING, evening), FOG_NIGHT, night) * fogScale;
 
     setCycleColor(skyTop, topMorning, topEvening, topNight, evening, night);
     sky.position.copy(center);
@@ -203,7 +205,8 @@ export function createLighting(scene) {
     sunDisc.position.copy(center).addScaledVector(sunDirection, SKY_BODY_DISTANCE);
     sunDisc.lookAt(center);
       sunDisc.scale.setScalar(1 + evening * 0.8);
-      sunDisc.material.uniforms.color.value.copy(sunMorning).lerp(sunEvening, evening);
+      sunDisc.material.uniforms.color.value.set(0xffffff);
+      sunDisc.material.uniforms.haloColor.value.copy(sunMorning).lerp(sunEvening, evening);
       sunDisc.material.uniforms.opacity.value = sunVisibility;
       sunDisc.visible = sunVisibility > 0.001;
 
@@ -224,5 +227,9 @@ export function createLighting(scene) {
     moonDisc.visible = moonDisc.material.uniforms.opacity.value > 0.001;
   }
 
-  return { update };
+  function getKeyLightDirection(target) {
+    return target.copy(moon.intensity > sun.intensity ? moonDirection : sunDirection);
+  }
+
+  return { update, getKeyLightDirection };
 }

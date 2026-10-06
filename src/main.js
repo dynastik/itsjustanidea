@@ -33,7 +33,7 @@ async function main() {
   const lighting = createLighting(scene);
   const world = createWorld(scene, physics, RAPIER);
   const props = createProps(scene, physics, RAPIER);
-  const trees = createTrees(scene, physics, RAPIER);
+  const trees = await createTrees(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
@@ -50,6 +50,7 @@ async function main() {
 
   let accumulator = 0;
   let prevSpeed = 0;
+  const treeLightDirection = new THREE.Vector3();
 
   // Spawn on the road, pointing along it.
   function spawn() {
@@ -155,7 +156,8 @@ async function main() {
       paused: state.paused,
     });
 
-    lighting.update(state.worldTime, vehicle.center);
+    lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1);
+    trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     rig.update(dt);
     hud.update();
     gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });

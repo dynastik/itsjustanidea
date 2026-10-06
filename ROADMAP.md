@@ -105,10 +105,10 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition through morning, orange sunset with a purple opposite horizon, and purple night.
 - [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
-- [x] **Trees:** use stylized low-poly trees made from a trunk plus multiple solid foliage clusters, with two reusable instanced variants and opaque geometry.
-- [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.
+- [x] **Trees:** use nearby layered foliage clusters with a leaf-cutout canopy texture and canopy-centered light gradients; simplify distant trees to silhouettes. Combine each LOD into a single instanced batch.
+- [x] **Grass:** use sparse, low-poly grass clumps in a single instanced batch; avoid transparent textures, per-blade objects, and costly animation.
 - [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
-- [ ] **Distant vegetation:** aggressively simplify with LOD and let fog/tilt-shift hide transitions.
+- [x] **Distant vegetation:** simplify trees to low-poly silhouettes and let fog/tilt-shift soften the transition.
 - [ ] **Art pass 2 (polish, cut early if short on time):** tire-track shader (solid dark marks behind the wheels; on hills use short ribbon decals rather than a flat canvas texture) and stylized particle smoke (`THREE.Points` + `ShaderMaterial`: solid squares/spheres that grow, drift back, shrink and snap-fade, no soft alpha textures)
 - [ ] Simple traffic (city only, cars following lanes)
 
