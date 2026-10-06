@@ -136,7 +136,7 @@ export function createCabInterior(vehicle) {
     root.position.copy(vehicle.cabEye); // follows the eye tuner
     setSteeringAngle(v.steerAngle);
     if (parts.freshener) {
-      const target = clamp(v.steerAngle * v.speed * 0.04, -0.7, 0.7);
+      const target = clamp(-v.steerAngle * v.speed * 0.08, -1.0, 1.0);
       parts.freshener.rotation.z += (target - parts.freshener.rotation.z) * (1 - Math.exp(-5 * dt));
     }
   }
