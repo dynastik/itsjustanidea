@@ -8,6 +8,10 @@ const SLOTS = 40;
 const COLLISION_RANGE = 60;
 const MIN_OFFSET = ROAD_HALF_WIDTH + 8;
 const MAX_OFFSET = ROAD_HALF_WIDTH + 25;
+const GRASS_SPACING = 10;
+const GRASS_SLOTS = 80;
+const GRASS_MIN_OFFSET = ROAD_HALF_WIDTH + 3;
+const GRASS_MAX_OFFSET = ROAD_HALF_WIDTH + 20;
 
 function hash(n, salt) {
   const value = Math.sin(n * 127.1 + salt * 311.7) * 43758.5453;
@@ -52,6 +56,37 @@ function makeTreeGeometry(variant) {
   return geometry;
 }
 
+function makeGrassGeometry() {
+  const positions = [];
+  const colors = [];
+  const base = new THREE.Color(0x357a3e);
+  const tip = new THREE.Color(0x83b94c);
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI + hash(i, 59) * 0.45;
+    const width = 0.16 + hash(i, 61) * 0.1;
+    const height = 0.65 + hash(i, 67) * 0.7;
+    const lean = 0.16 + hash(i, 71) * 0.2;
+    const dx = Math.cos(angle), dz = Math.sin(angle);
+    const px = -dz * width, pz = dx * width;
+    const verts = [
+      [-px, 0, -pz], [px, 0, pz],
+      [dx * lean - px * 0.5, height * 0.65, dz * lean - pz * 0.5],
+      [px, 0, pz], [dx * lean - px * 0.5, height * 0.65, dz * lean - pz * 0.5],
+      [dx * lean, height, dz * lean],
+    ];
+    for (const [x, y, z] of verts) {
+      positions.push(x, y, z);
+      const color = base.clone().lerp(tip, THREE.MathUtils.clamp(y / height, 0, 1) * 0.75);
+      colors.push(color.r, color.g, color.b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function roadSidePose(z, side, offset) {
   const frame = getRoadFrame(z);
   return {
@@ -78,6 +113,16 @@ export function createTrees(scene, physics, RAPIER) {
     }
     return { trunk, foliage };
   });
+
+  const grass = new THREE.InstancedMesh(
+    makeGrassGeometry(),
+    new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradientMap, side: THREE.DoubleSide }),
+    GRASS_SLOTS * 2
+  );
+  grass.frustumCulled = false;
+  grass.castShadow = false;
+  grass.receiveShadow = false;
+  scene.add(grass);
 
   const dummy = new THREE.Object3D();
   const matricesDirty = new Set();
@@ -125,6 +170,14 @@ export function createTrees(scene, physics, RAPIER) {
     }
   }
 
+  function writeGrass(k, side, slot) {
+    const z = (k + 0.5 + (hash(k, side + 13) - 0.5) * 0.55) * GRASS_SPACING;
+    const offset = THREE.MathUtils.lerp(GRASS_MIN_OFFSET, GRASS_MAX_OFFSET, hash(k, side + 17));
+    const pose = roadSidePose(z, side, offset);
+    const y = terrainHeight(pose.x, pose.z);
+    setInstance(grass, slot, pose.x, y, pose.z, pose.heading + hash(k, side + 23) * Math.PI, 0.75 + hash(k, side + 19) * 0.7, 1);
+  }
+
   function addTreeCollider(k, side) {
     if (Math.floor(hash(k, side + 1) * 7) === 0) return null;
     const z = (k + 0.5 + (hash(k, side + 2) - 0.5) * 0.35) * SPACING;
@@ -153,8 +206,18 @@ export function createTrees(scene, physics, RAPIER) {
         slotKeys[slot] = key;
       }
     }
+    const grassCenter = Math.floor(vehicleZ / GRASS_SPACING);
+    for (let n = -GRASS_SLOTS / 2; n < GRASS_SLOTS / 2; n++) {
+      const k = grassCenter + n;
+      for (const side of [-1, 1]) {
+        const slot = ((n + GRASS_SLOTS / 2) * 2) + (side < 0 ? 0 : 1);
+        writeGrass(k, side, slot);
+      }
+    }
+
     for (const mesh of matricesDirty) mesh.instanceMatrix.needsUpdate = true;
     matricesDirty.clear();
+    grass.instanceMatrix.needsUpdate = true;
 
     const min = center - Math.ceil(COLLISION_RANGE / SPACING);
     const max = center + Math.ceil(COLLISION_RANGE / SPACING);
