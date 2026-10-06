@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
+import { toonGradientMap } from './toon.js';
 
 // Highway-zone roadside props. Instanced visuals recycled around the vehicle; guardrails also get
 // real colliders, but only for the stretch near the vehicle.
@@ -21,9 +22,9 @@ function sidePose(z, side, offset) {
 }
 
 export function createProps(scene, physics, RAPIER) {
-  const railMat = new THREE.MeshStandardMaterial({ color: 0xb9bec5, metalness: 0.5, roughness: 0.45 });
-  const postMat = new THREE.MeshStandardMaterial({ color: 0x6b6f75, roughness: 0.8 });
-  const signMat = new THREE.MeshStandardMaterial({ color: 0x1f7a3a, roughness: 0.6 });
+  const railMat = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
+  const postMat = new THREE.MeshToonMaterial({ color: 0x6b6f75, gradientMap: toonGradientMap });
+  const signMat = new THREE.MeshToonMaterial({ color: 0x1f7a3a, gradientMap: toonGradientMap });
 
   const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.3, SEG), railMat, SLOTS * 2);
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), postMat, SLOTS * 2);
