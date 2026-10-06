@@ -86,13 +86,13 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [ ] Prefer road-relative active areas/corridors where useful. The player follows a controlled route, so there is no need for general-purpose open-world streaming logic.
 
 ### Terrain, road and zones
-- [x] Terrain: bounded hilly heightfield, with a smooth road corridor and a separate, gentle road grade
-- [ ] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
+- [x] Terrain: bounded, taller and broader hilly heightfield; the road corridor stays flat across its width with its own gentle elevation changes
+- [x] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
 - [ ] Road generator: segments recycled ahead/behind so the road is endless; gentle curves **and elevation**
-- [ ] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
-- [ ] Highway zone: guardrails, signs, mile markers
+- [x] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
+- [x] Highway zone: guardrails, signs, mile markers
 - [ ] **Scenic set pieces:** ridge-top vista, valley with a lake or river, distant mountains, a tunnel or overpass, a rest stop (all reused later for horror loops)
-- [ ] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
+- [x] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
 - [ ] Prop sets per zone, swappable per "act" (needed for the horror pivot later)
 
 ### Art direction
@@ -101,14 +101,14 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] **Art pass 1a, camera look:** "toy-car" chase profile: camera high and far, narrow FOV (about 15-25 degrees), lerped follow with slight lag. Raise the camera enough that hills do not block the view of the truck
 - [x] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
 - [x] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
-- [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
-- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition the palette and fog density through morning, orange sunset, and purple night.
+- [x] **Art pass 1d, toon materials:** `MeshToonMaterial` with a shared custom 3-tone gradient map on terrain and roadside props; convert the truck GLB's materials on load while preserving color and maps. Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
+- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition through morning, orange sunset with a purple opposite horizon, and purple night.
 - [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
-- [x] **Trees:** use stylized low-poly trees made from a trunk plus multiple solid foliage clusters, with two reusable instanced variants and opaque geometry.
-- [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.
+- [x] **Trees:** use nearby layered foliage clusters with a leaf-cutout canopy texture and canopy-centered light gradients; simplify distant trees to silhouettes. Combine each LOD into a single instanced batch.
+- [x] **Grass:** use sparse, low-poly grass clumps in a single instanced batch; avoid transparent textures, per-blade objects, and costly animation.
 - [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
-- [ ] **Distant vegetation:** aggressively simplify with LOD and let fog/tilt-shift hide transitions.
+- [x] **Distant vegetation:** simplify trees to low-poly silhouettes and let fog/tilt-shift soften the transition.
 - [ ] **Art pass 2 (polish, cut early if short on time):** tire-track shader (solid dark marks behind the wheels; on hills use short ribbon decals rather than a flat canvas texture) and stylized particle smoke (`THREE.Points` + `ShaderMaterial`: solid squares/spheres that grow, drift back, shrink and snap-fade, no soft alpha textures)
 - [ ] Simple traffic (city only, cars following lanes)
 
