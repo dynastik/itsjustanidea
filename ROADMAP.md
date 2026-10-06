@@ -28,8 +28,8 @@ The code is now split into modules under `src/game` rather than being kept as on
 Important current facts before continuing Phase 1/2:
 - Three.js 0.186, Rapier 0.21 (`rapier3d-compat`), Vite 8.
 - `render.js` uses `EffectComposer` with RenderPass + SMAA + OutputPass and caps pixel ratio at 2.
-- `lighting.js` currently uses a directional sun with a **1024x1024 shadow map**, an ambient light, day->dusk sky colors, and exponential fog. The baseline shadow resolution follows the performance policy below.
-- `main.js` already wires `cabin.js` and `director.js`, has automatic city/highway switching, day->dusk world time, pause/reset/debug/mute controls, and the shared `driveInput`.
+- `lighting.js` uses a directional sun with a **1024x1024 shadow map**, moonlight, a moving square sun/moon, and a morning->sunset->night sky/fog palette. The baseline shadow resolution follows the performance policy below.
+- `main.js` already wires `cabin.js` and `director.js`, has automatic city/highway switching, morning->sunset->night world time, pause/reset/debug/mute controls, and the shared `driveInput`.
 - The cab interior exists and is hidden until cab view is toggled.
 - The exact current implementation is authoritative; do not assume old roadmap descriptions still match the code. Re-read the relevant source files before modifying them.
 - Truck model is local at `public/models/truck.glb`; do not hotlink assets.
@@ -45,7 +45,7 @@ Important current facts before continuing Phase 1/2:
 - [x] Auto zone switch (placeholder z-threshold with hysteresis)
 - [x] Highway auto-steer + WPM/accuracy-driven speed
 - [x] Shadow follows truck, debug orbit cam (`) + collider box
-- [x] Day -> dusk lighting/fog system (`worldTime`)
+- [x] Morning -> sunset -> night lighting/fog system (`worldTime`)
 - [ ] Roadside trees (instanced; not currently implemented in source)
 - [x] Free-look camera + speed-based FOV (drag-look and speed-responsive FOV are implemented in `camera.js`)
 
@@ -86,7 +86,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [ ] Prefer road-relative active areas/corridors where useful. The player follows a controlled route, so there is no need for general-purpose open-world streaming logic.
 
 ### Terrain, road and zones
-- [ ] Terrain: hilly heightfield (noise or authored heightmap), the road is carved/laid along it with smooth grades
+- [x] Terrain: bounded hilly heightfield, with a smooth road corridor and a separate, gentle road grade
 - [ ] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
 - [ ] Road generator: segments recycled ahead/behind so the road is endless; gentle curves **and elevation**
 - [ ] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
@@ -102,7 +102,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
 - [x] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
 - [ ] **Art pass 1d, toon materials:** `MeshToonMaterial` with a custom 3-tone gradient map on terrain and props; convert the truck GLB's materials on load (keep color/map, swap material). Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
-- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky color; lerp fog density with `worldTime`. Palette-limited sky (gradient or HDRI), golden-hour lighting
+- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition the palette and fog density through morning, orange sunset, and purple night.
 - [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
 - [ ] **Trees:** use stylized low-poly trees made from a trunk/branch structure plus **multiple solid foliage clusters**, not one leaf blob. Aim for roughly 5-15 meaningful foliage masses per tree, with several reusable tree variants. Prefer opaque geometry over large amounts of transparent foliage. Instance repeated tree variants where possible.
@@ -113,8 +113,8 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [ ] Simple traffic (city only, cars following lanes)
 
 ### Performance budget and profiling
-- [ ] Treat the Dell Latitude 3490 as the primary baseline test machine.
-- [ ] During visual development, measure FPS and frame time on the baseline laptop after major rendering changes.
+- [x] Treat the Dell Latitude 3490 as the primary baseline test machine.
+- [x] During visual development, measure FPS and frame time on the baseline laptop after major rendering changes (user reports a steady 60 FPS with occasional brief 58 FPS dips across all modes).
 - [ ] Profile GPU-heavy candidates separately: shadow map size, tilt-shift, foliage overdraw, terrain detail, pixel ratio and post-processing.
 - [ ] Profile CPU-heavy candidates separately: object count, draw-call count, world generation/streaming, visibility tests and physics.
 - [ ] Keep the scene visually rich by spending geometry where it is noticeable: truck, road, major trees and set pieces. Spend less on grass, distant vegetation and tiny props.
@@ -175,7 +175,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] Truck loads from local `public/models` (hotlink already removed); just confirm license is logged in `CREDITS.md`
 - [ ] Bundle every other asset locally, never hotlink
 - [ ] Performance pass: profile on Dell Latitude 3490; tune pixel ratio, draw calls, shadow map size, instancing, scenery LOD, visibility/generation radius, terrain detail and post-processing
-- [ ] Vite `base` config + GitHub Pages deploy (`BASE_URL` is already used for the model path)
+- [x] Vite `base` config + GitHub Pages deploy (`BASE_URL` is already used for the model path)
 - [ ] Playtest with 3-5 people, tune calm -> horror timing
 - [ ] Tag v1.0
 

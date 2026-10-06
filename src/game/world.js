@@ -15,7 +15,7 @@ const RECENTER_DIST = 120;        // hysteresis: only rebuild once this far from
 const ROAD_PERIOD = 10;           // metres per repeat of the road texture
 const FLAT_DIST = ROAD_HALF_WIDTH + 2.5;  // terrain is exactly road-height out to here (guardrails sit inside it)
 const SLOPE_DIST = 9;             // then rises to the hills over this distance
-const HILL = 1.5;                 // hill height multiplier
+const HILL = 2.25;                // taller scenery while the road keeps its separate, gentle grade
 
 const GRASS = new THREE.Color(0x4a7c3a);
 const DIRT = new THREE.Color(0x8a7d5c);

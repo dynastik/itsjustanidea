@@ -13,6 +13,7 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     saturation: { value: 1.2 },
+    contrast: { value: 1.12 },
     tint: { value: new THREE.Color(1, 1, 1) },
     lift: { value: 0.01 },
     vignette: { value: 0.3 },
@@ -26,6 +27,7 @@ const GradeShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float saturation;
+    uniform float contrast;
     uniform vec3 tint;
     uniform float lift;
     uniform float vignette;
@@ -34,6 +36,7 @@ const GradeShader = {
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
       vec3 col = mix(vec3(l), c.rgb, saturation) * tint;
+      col = (col - 0.5) * contrast + 0.5;
       col = col * (1.0 - lift) + vec3(lift);                 // lifted blacks
       float d = distance(vUv, vec2(0.5));
       col *= mix(1.0, smoothstep(0.85, 0.25, d), vignette);  // vignette
@@ -44,8 +47,9 @@ const GradeShader = {
 const TILT_BLUR = 2.5;       // blur strength at full tilt-shift
 const TILT_FOCUS_Y = 0.5;    // the sharp horizontal strip (0 = bottom, 1 = top); the van sits mid-screen
 
-const GRADE_DAY = { saturation: 1.25, lift: 0.008, vignette: 0.25, tint: new THREE.Color(1.04, 1.0, 0.93) };
-const GRADE_DUSK = { saturation: 0.8, lift: 0.025, vignette: 0.5, tint: new THREE.Color(0.96, 0.92, 0.87) };
+const GRADE_MORNING = { saturation: 1.2, contrast: 1.12, lift: 0.004, vignette: 0.2, tint: new THREE.Color(1.02, 1.01, 1.0) };
+const GRADE_EVENING = { saturation: 1.18, contrast: 1.16, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.91, 0.8) };
+const GRADE_NIGHT = { saturation: 1.12, contrast: 1.16, lift: 0.003, vignette: 0.28, tint: new THREE.Color(0.88, 0.84, 1.08) };
 
 // Composer: Render -> SMAA -> tilt-shift (H, V) -> colour grade -> Output.
 export function createRenderer(scene, camera) {
@@ -82,7 +86,7 @@ export function createRenderer(scene, camera) {
   let tiltAmount = 0;
   const lerp = THREE.MathUtils.lerp;
 
-  // tilt: 0..1 target (from the camera profile; fades in/out smoothly). worldTime: 0 = day, 1 = dusk.
+  // tilt: 0..1 target (from the camera profile; fades in/out smoothly). worldTime: 0 = morning, 1 = night.
   function setLook({ tilt = 0, worldTime = 0, dt = 0 }) {
     tiltAmount += (tilt - tiltAmount) * (1 - Math.exp(-4 * dt));
     const on = tiltAmount > 0.01;
@@ -92,11 +96,15 @@ export function createRenderer(scene, camera) {
       vblur.uniforms.v.value = (TILT_BLUR * tiltAmount) / window.innerHeight;
     }
 
+    const time = THREE.MathUtils.clamp(worldTime, 0, 1);
+    const evening = THREE.MathUtils.smoothstep(time, 0.2, 0.62);
+    const night = THREE.MathUtils.smoothstep(time, 0.62, 0.94);
     const u = grade.uniforms;
-    u.saturation.value = lerp(GRADE_DAY.saturation, GRADE_DUSK.saturation, worldTime);
-    u.lift.value = lerp(GRADE_DAY.lift, GRADE_DUSK.lift, worldTime);
-    u.vignette.value = lerp(GRADE_DAY.vignette, GRADE_DUSK.vignette, worldTime);
-    u.tint.value.copy(GRADE_DAY.tint).lerp(GRADE_DUSK.tint, worldTime);
+    u.saturation.value = lerp(lerp(GRADE_MORNING.saturation, GRADE_EVENING.saturation, evening), GRADE_NIGHT.saturation, night);
+    u.contrast.value = lerp(lerp(GRADE_MORNING.contrast, GRADE_EVENING.contrast, evening), GRADE_NIGHT.contrast, night);
+    u.lift.value = lerp(lerp(GRADE_MORNING.lift, GRADE_EVENING.lift, evening), GRADE_NIGHT.lift, night);
+    u.vignette.value = lerp(lerp(GRADE_MORNING.vignette, GRADE_EVENING.vignette, evening), GRADE_NIGHT.vignette, night);
+    u.tint.value.copy(GRADE_MORNING.tint).lerp(GRADE_EVENING.tint, evening).lerp(GRADE_NIGHT.tint, night);
   }
 
   return {
