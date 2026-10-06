@@ -13,7 +13,7 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     saturation: { value: 1.2 },
-    contrast: { value: 1.12 },
+    contrast: { value: 1 },
     tint: { value: new THREE.Color(1, 1, 1) },
     lift: { value: 0.01 },
     vignette: { value: 0.3 },
@@ -44,12 +44,11 @@ const GradeShader = {
     }`,
 };
 
-const TILT_BLUR = 2.5;       // blur strength at full tilt-shift
 const TILT_FOCUS_Y = 0.5;    // the sharp horizontal strip (0 = bottom, 1 = top); the van sits mid-screen
 
-const GRADE_MORNING = { saturation: 1.2, contrast: 1.12, lift: 0.004, vignette: 0.2, tint: new THREE.Color(1.02, 1.01, 1.0) };
-const GRADE_EVENING = { saturation: 1.18, contrast: 1.16, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.91, 0.8) };
-const GRADE_NIGHT = { saturation: 1.12, contrast: 1.16, lift: 0.003, vignette: 0.28, tint: new THREE.Color(0.88, 0.84, 1.08) };
+const GRADE_MORNING = { saturation: 1.2, contrast: 1, lift: 0.004, vignette: 0.2, tint: new THREE.Color(1.02, 1.01, 1.0) };
+const GRADE_EVENING = { saturation: 1.18, contrast: 1, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.95, 0.86) };
+const GRADE_NIGHT = { saturation: 0.8, contrast: 1, lift: 0.003, vignette: 0.28, tint: new THREE.Color(0.94, 0.92, 1.04) };
 
 // Composer: Render -> SMAA -> tilt-shift (H, V) -> colour grade -> Output.
 export function createRenderer(scene, camera) {
@@ -86,14 +85,15 @@ export function createRenderer(scene, camera) {
   let tiltAmount = 0;
   const lerp = THREE.MathUtils.lerp;
 
-  // tilt: 0..1 target (from the camera profile; fades in/out smoothly). worldTime: 0 = morning, 1 = night.
+  // tilt is the target blur radius in CSS pixels (from the camera profile; fades in/out smoothly).
+  // worldTime: 0 = morning, 1 = night.
   function setLook({ tilt = 0, worldTime = 0, dt = 0 }) {
     tiltAmount += (tilt - tiltAmount) * (1 - Math.exp(-4 * dt));
     const on = tiltAmount > 0.01;
     hblur.enabled = vblur.enabled = on;
     if (on) {
-      hblur.uniforms.h.value = (TILT_BLUR * tiltAmount) / window.innerWidth;
-      vblur.uniforms.v.value = (TILT_BLUR * tiltAmount) / window.innerHeight;
+      hblur.uniforms.h.value = tiltAmount / window.innerWidth;
+      vblur.uniforms.v.value = tiltAmount / window.innerHeight;
     }
 
     const time = THREE.MathUtils.clamp(worldTime, 0, 1);
