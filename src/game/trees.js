@@ -238,16 +238,26 @@ function roadSidePose(z, side, offset) {
 }
 
 export async function createTrees(scene, physics, RAPIER) {
-  const { geometry: detailedTreeGeometry, leafMask } = await loadDetailedTreeAssets();
-  const canopy = makeCanopyMaterial(leafMask);
+  let detailedTreeGeometry;
+  let leafMask;
+  let useDetailedAssets = true;
+  try {
+    ({ geometry: detailedTreeGeometry, leafMask } = await loadDetailedTreeAssets());
+  } catch (error) {
+    console.warn('Detailed tree assets unavailable; using procedural trees.', error);
+    useDetailedAssets = false;
+  }
   const treeMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradientMap });
+  const canopy = useDetailedAssets ? makeCanopyMaterial(leafMask) : null;
   const detailedTrees = new THREE.InstancedMesh(
-    detailedTreeGeometry,
-    canopy.material,
+    useDetailedAssets ? detailedTreeGeometry : makeDistantTreeGeometry(),
+    useDetailedAssets ? canopy.material : treeMaterial,
     TREE_DETAIL_SLOTS
   );
-  detailedTrees.customDepthMaterial = makeLeafMaskDepthMaterial(leafMask);
-  detailedTrees.customDistanceMaterial = makeLeafMaskDepthMaterial(leafMask);
+  if (useDetailedAssets) {
+    detailedTrees.customDepthMaterial = makeLeafMaskDepthMaterial(leafMask);
+    detailedTrees.customDistanceMaterial = makeLeafMaskDepthMaterial(leafMask);
+  }
   const distantTrees = new THREE.InstancedMesh(
     makeDistantTreeGeometry(),
     treeMaterial,
