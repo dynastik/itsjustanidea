@@ -7,7 +7,7 @@ export const CAMERA_PROFILES = {
     distance: 7, height: 3.5, lookHeight: 0.5,
     followSmoothing: 0.001,
     exteriorVisible: true,
-    tilt: 2.2,
+    tilt: 1.0,
   },
   cab: {
     fov: 80, fovSpeedGain: 0.15, fovSpeedRef: 30,
