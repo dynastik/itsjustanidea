@@ -60,7 +60,7 @@ Important current facts before continuing Phase 1/2:
 - [x] Camera module: chase cam, drag-look, speed-based FOV, **cab (first-person) view toggle (F2)**, structured as named **camera profiles**
 - [x] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
 - [x] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
-- [ ] Tree/prop colliders with collision response (speed loss + bump)
+- [x] Tree/prop colliders with collision response (tree trunks and highway guardrails have localized physics colliders; vehicle impact audio responds to abrupt speed loss)
 - [x] HUD: speedometer, cleaner mode label, fix stale key hints in `index.html`
 - [x] Reset (R in city; F4 in either mode) and pause (Esc)
 - [x] Web Audio manager + synthesized engine sound (pitch follows speed, no downloads needed)
@@ -105,7 +105,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition the palette and fog density through morning, orange sunset, and purple night.
 - [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
-- [ ] **Trees:** use stylized low-poly trees made from a trunk/branch structure plus **multiple solid foliage clusters**, not one leaf blob. Aim for roughly 5-15 meaningful foliage masses per tree, with several reusable tree variants. Prefer opaque geometry over large amounts of transparent foliage. Instance repeated tree variants where possible.
+- [x] **Trees:** use stylized low-poly trees made from a trunk plus multiple solid foliage clusters, with two reusable instanced variants and opaque geometry.
 - [ ] **Grass:** do **not** build realistic blade-by-blade grass. The default approach is a stylized grass ground material/texture plus sparse cross-quad grass clusters in visually important areas. Cross-quad clusters may use alpha-tested textures and `InstancedMesh`. Avoid thousands of individually animated blades. If grass motion is added, keep it subtle and GPU-cheap.
 - [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
 - [ ] **Distant vegetation:** aggressively simplify with LOD and let fog/tilt-shift hide transitions.
