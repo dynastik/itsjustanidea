@@ -19,7 +19,7 @@ export const CAMERA_PROFILES = {
     distance: 45, height: 22, lookHeight: 0.5,
     followSmoothing: 0.02,
     exteriorVisible: true,
-    tilt: 2.5,
+    tilt: 3.5,
   },
 };
 
