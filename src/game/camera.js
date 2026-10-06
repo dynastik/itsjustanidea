@@ -7,18 +7,19 @@ export const CAMERA_PROFILES = {
     distance: 7, height: 3.5, lookHeight: 0.5,
     followSmoothing: 0.001,
     exteriorVisible: true,
+    tilt: 2.2,
   },
   cab: {
     fov: 80, fovSpeedGain: 0.15, fovSpeedRef: 30,
     exteriorVisible: false,
   },
-  // "Toy car" diorama look: high, far, narrow FOV, a little follow lag, strong tilt-shift (tilt: 0..1).
+  // "Toy car" diorama look: high, far, narrow FOV, a little follow lag, softer tilt-shift.
   toy: {
     fov: 22, fovSpeedGain: 0.05, fovSpeedRef: 30,
     distance: 45, height: 22, lookHeight: 0.5,
     followSmoothing: 0.02,
     exteriorVisible: true,
-    tilt: 1,
+    tilt: 2.5,
   },
 };
 
