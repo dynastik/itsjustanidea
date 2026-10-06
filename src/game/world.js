@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './zones.js';
+import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS, CITY_Z_MIN, CITY_Z_MAX, CITY_BAY_WIDTH, CITY_WALK_WIDTH } from './zones.js';
 import { toonGradientMap } from './toon.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
@@ -38,8 +38,15 @@ export function getRoadFrame(z) {
   return { x, heading: Math.atan2(dx, 1), y: roadHeight(z) };
 }
 
+// The city is flat; the hills grow in on either side of it instead of starting at its doorstep.
+function hillFactor(z) {
+  const ahead = THREE.MathUtils.smoothstep(z, CITY_Z_MAX, CITY_Z_MAX + 120);
+  const behind = THREE.MathUtils.smoothstep(-z, -CITY_Z_MIN, -CITY_Z_MIN + 120);
+  return Math.max(ahead, behind);
+}
+
 function naturalHeight(x, z) {
-  return HILL * (
+  return hillFactor(z) * HILL * (
     0.9 * Math.sin(z * Math.PI * 2 / 260) +
     0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 190) +
     0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 60)
@@ -265,7 +272,9 @@ export function createWorld(scene, physics, RAPIER) {
   // What is under the vehicle? Feeds grip/speed penalties (and later, audio + tire tracks).
   function surfaceAt(x, z) {
     const f = getRoadFrame(z);
-    return { offRoad: Math.abs(x - f.x) > ROAD_HALF_WIDTH + 0.3 };
+    // inside the city the parking bays and sidewalks are paved, so only leaving them counts as off-road
+    const paved = z > CITY_Z_MIN && z < CITY_Z_MAX ? ROAD_HALF_WIDTH + CITY_BAY_WIDTH + CITY_WALK_WIDTH : ROAD_HALF_WIDTH;
+    return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
   }
 
   return { update, surfaceAt, getRoadFrame };
