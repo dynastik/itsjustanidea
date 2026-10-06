@@ -7,6 +7,36 @@ function setCycleColor(target, morning, evening, night, eveningBlend, nightBlend
   target.copy(morning).lerp(evening, eveningBlend).lerp(night, nightBlend);
 }
 
+function createGlowingSquare(color) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    fog: false,
+    toneMapped: false,
+    uniforms: {
+      color: { value: new THREE.Color(color) },
+      opacity: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 color;
+      uniform float opacity;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = (vUv - 0.5) * 2.0;
+        float edge = max(abs(p.x), abs(p.y));
+        float square = 1.0 - smoothstep(0.88, 0.96, edge);
+        float halo = exp(-dot(p, p) * 5.0) * 0.22;
+        gl_FragColor = vec4(color * (square + halo), max(square, halo * 0.7) * opacity);
+      }`,
+  });
+}
+
 // A three-stage morning -> sunset -> night cycle. Sky horizon and fog always share one color.
 export function createLighting(scene) {
   const sun = new THREE.DirectionalLight(0xffe7c2, 1.6);
@@ -25,7 +55,7 @@ export function createLighting(scene) {
   scene.add(sunTarget);
   sun.target = sunTarget;
 
-  const moon = new THREE.DirectionalLight(0xc9c3ff, 0);
+  const moon = new THREE.DirectionalLight(0xf0f2ff, 0);
   scene.add(moon);
   const moonTarget = new THREE.Object3D();
   scene.add(moonTarget);
@@ -37,6 +67,9 @@ export function createLighting(scene) {
   const skyUniforms = {
     top: { value: new THREE.Color() },
     bottom: { value: new THREE.Color() },
+    oppositeHorizon: { value: new THREE.Color(0x7864b0) },
+    sunsetSide: { value: 1 },
+    sunsetAmount: { value: 0 },
   };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(800, 24, 16),
@@ -45,18 +78,29 @@ export function createLighting(scene) {
       depthWrite: false,
       fog: false,
       uniforms: skyUniforms,
-      vertexShader: `
-        varying float vH;
-        void main() {
-          vH = normalize(position).y;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
       fragmentShader: `
         uniform vec3 top;
         uniform vec3 bottom;
+        uniform vec3 oppositeHorizon;
+        uniform float sunsetSide;
+        uniform float sunsetAmount;
         varying float vH;
+        varying float vX;
         void main() {
-          gl_FragColor = vec4(mix(bottom, top, smoothstep(-0.05, 0.6, vH)), 1.0);
+          vec3 skyColor = mix(bottom, top, smoothstep(-0.05, 0.6, vH));
+          float oppositeSide = smoothstep(0.0, 0.75, -vX * sunsetSide);
+          float horizonBand = 1.0 - smoothstep(0.02, 0.48, abs(vH));
+          float purpleAmount = oppositeSide * horizonBand * sunsetAmount * 0.3;
+          gl_FragColor = vec4(mix(skyColor, oppositeHorizon, purpleAmount), 1.0);
+        }`,
+      vertexShader: `
+        varying float vH;
+        varying float vX;
+        void main() {
+          vec3 direction = normalize(position);
+          vH = direction.y;
+          vX = direction.x;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
     })
   );
@@ -65,12 +109,12 @@ export function createLighting(scene) {
   scene.add(sky);
 
   const sunDisc = new THREE.Mesh(
-    new THREE.PlaneGeometry(16, 16),
-    new THREE.MeshBasicMaterial({ color: 0xffd283, transparent: true, depthWrite: false, fog: false, toneMapped: false })
+    new THREE.PlaneGeometry(30, 30),
+    createGlowingSquare(0xffedc4)
   );
   const moonDisc = new THREE.Mesh(
-    new THREE.PlaneGeometry(12, 12),
-    new THREE.MeshBasicMaterial({ color: 0xe0d9ff, transparent: true, depthWrite: false, fog: false, toneMapped: false })
+    new THREE.PlaneGeometry(26, 26),
+    createGlowingSquare(0xf0f2ff)
   );
   sunDisc.renderOrder = 1;
   moonDisc.renderOrder = 1;
@@ -80,16 +124,16 @@ export function createLighting(scene) {
   const horizonEvening = new THREE.Color(0xf0a06b);
   const horizonNight = new THREE.Color(0x21182f);
   const topMorning = new THREE.Color(0x4b91d0);
-  const topEvening = new THREE.Color(0x663b70);
+  const topEvening = new THREE.Color(0x547fb7);
   const topNight = new THREE.Color(0x090713);
   const sunMorning = new THREE.Color(0xffedc4);
   const sunEvening = new THREE.Color(0xff9d4d);
   const sunNight = new THREE.Color(0x271a38);
   const hemiSkyMorning = new THREE.Color(0xa8cefa);
-  const hemiSkyEvening = new THREE.Color(0xf2a47a);
+  const hemiSkyEvening = new THREE.Color(0x8ea4d6);
   const hemiSkyNight = new THREE.Color(0x524978);
   const hemiGroundMorning = new THREE.Color(0x728b63);
-  const hemiGroundEvening = new THREE.Color(0x87614f);
+  const hemiGroundEvening = new THREE.Color(0x66577a);
   const hemiGroundNight = new THREE.Color(0x352b49);
   const horizon = new THREE.Color();
   const skyTop = new THREE.Color();
@@ -101,7 +145,7 @@ export function createLighting(scene) {
 
   const SUN_DAY = 1.65, SUN_EVENING = 0.85;
   const HEMI_DAY = 0.8, HEMI_EVENING = 0.55, HEMI_NIGHT = 0.42;
-  const MOON_NIGHT = 0.3;
+  const MOON_NIGHT = 0.62;
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
   const DUSK_START = 0.2, DUSK_END = 0.62;
@@ -115,7 +159,10 @@ export function createLighting(scene) {
     const time = clamp01(worldTime);
     const evening = smooth(DUSK_START, DUSK_END, time);
     const night = smooth(NIGHT_START, NIGHT_END, time);
-    const sunVisibility = 1 - smooth(0.65, 0.79, time);
+    const sunProgress = clamp01(time / 0.78);
+    const sunAzimuth = lerp(-0.3, 0.3, sunProgress);
+    const sunElevation = 0.72 - sunProgress * 0.9;
+    const sunVisibility = smooth(-0.08, 0.12, sunElevation);
 
     setCycleColor(horizon, horizonMorning, horizonEvening, horizonNight, evening, night);
     scene.fog.color.copy(horizon);
@@ -125,6 +172,7 @@ export function createLighting(scene) {
     sky.position.copy(center);
     skyUniforms.bottom.value.copy(horizon);
     skyUniforms.top.value.copy(skyTop);
+    skyUniforms.sunsetAmount.value = evening * (1 - night);
 
     setCycleColor(sunColor, sunMorning, sunEvening, sunNight, evening, night);
     sun.color.copy(sunColor);
@@ -134,9 +182,6 @@ export function createLighting(scene) {
     hemi.groundColor.copy(hemiGroundMorning).lerp(hemiGroundEvening, evening).lerp(hemiGroundNight, night);
     hemi.intensity = lerp(lerp(HEMI_DAY, HEMI_EVENING, evening), HEMI_NIGHT, night);
 
-    const sunProgress = clamp01(time / 0.68);
-    const sunAzimuth = lerp(-0.3, 0.3, sunProgress);
-    const sunElevation = 0.12 + Math.sin(Math.PI * sunProgress) * 0.88;
     sunDirection.set(
       Math.sin(sunAzimuth) * Math.cos(sunElevation),
       Math.sin(sunElevation),
@@ -144,10 +189,13 @@ export function createLighting(scene) {
     ).normalize();
     sun.position.copy(center).addScaledVector(sunDirection, 40);
     sunTarget.position.copy(center);
+    skyUniforms.sunsetSide.value = sunDirection.x < 0 ? -1 : 1;
     sunDisc.position.copy(center).addScaledVector(sunDirection, SKY_BODY_DISTANCE);
     sunDisc.lookAt(center);
-    sunDisc.material.opacity = sunVisibility;
-    sunDisc.visible = sunVisibility > 0.001;
+      sunDisc.scale.setScalar(1 + evening * 0.8);
+      sunDisc.material.uniforms.color.value.copy(sunMorning).lerp(sunEvening, evening);
+      sunDisc.material.uniforms.opacity.value = sunVisibility;
+      sunDisc.visible = sunVisibility > 0.001;
 
     const moonProgress = clamp01((time - 0.65) / 0.35);
     const moonAzimuth = lerp(-0.3, -0.05, moonProgress);
@@ -162,8 +210,8 @@ export function createLighting(scene) {
     moon.intensity = MOON_NIGHT * smooth(0.67, 0.88, time);
     moonDisc.position.copy(center).addScaledVector(moonDirection, SKY_BODY_DISTANCE);
     moonDisc.lookAt(center);
-    moonDisc.material.opacity = smooth(0.67, 0.84, time);
-    moonDisc.visible = moonDisc.material.opacity > 0.001;
+    moonDisc.material.uniforms.opacity.value = smooth(0.67, 0.84, time);
+    moonDisc.visible = moonDisc.material.uniforms.opacity.value > 0.001;
   }
 
   return { update };

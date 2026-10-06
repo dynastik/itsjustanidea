@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { state } from './state.js';
+import { toToonMaterial } from './toon.js';
 
 export const FIXED_DT = 1 / 60;
 
@@ -191,7 +192,12 @@ export function createVehicle(scene, physics, RAPIER) {
     (gltf) => {
       const model = gltf.scene;
       model.traverse((c) => {
-        if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+        if (!c.isMesh) return;
+        c.castShadow = true;
+        c.receiveShadow = true;
+        c.material = Array.isArray(c.material)
+          ? c.material.map(toToonMaterial)
+          : toToonMaterial(c.material);
       });
       exterior.add(model);
       modelRoot = model;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './zones.js';
+import { toonGradientMap } from './toon.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
 
@@ -14,8 +15,8 @@ const REPEAT = 200;               // road curves/grades repeat every 200 m; terr
 const RECENTER_DIST = 120;        // hysteresis: only rebuild once this far from the centre
 const ROAD_PERIOD = 10;           // metres per repeat of the road texture
 const FLAT_DIST = ROAD_HALF_WIDTH + 2.5;  // terrain is exactly road-height out to here (guardrails sit inside it)
-const SLOPE_DIST = 9;             // then rises to the hills over this distance
-const HILL = 2.25;                // taller scenery while the road keeps its separate, gentle grade
+const SLOPE_DIST = 20;            // broad transition from the flat road corridor into the hills
+const HILL = 4.5;                  // broad, tall scenery while the road keeps a separate gentle grade
 
 const GRASS = new THREE.Color(0x4a7c3a);
 const DIRT = new THREE.Color(0x8a7d5c);
@@ -26,8 +27,8 @@ function roadCenterX(z) {
 }
 
 function roadHeight(z) {
-  const t = (((z % REPEAT) + REPEAT) % REPEAT) / REPEAT * Math.PI * 2;
-  return 0.35 * Math.sin(t) + 0.12 * Math.sin(t * 2 + 0.7);
+  return 1.9 * Math.sin(z * Math.PI * 2 / 360) +
+    0.8 * Math.sin(z * Math.PI * 2 / 220 + 0.6);
 }
 
 export function getRoadFrame(z) {
@@ -39,9 +40,9 @@ export function getRoadFrame(z) {
 
 function naturalHeight(x, z) {
   return HILL * (
-    0.9 * Math.sin(z * Math.PI * 2 / 140) +
-    0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 90) +
-    0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 32)
+    0.9 * Math.sin(z * Math.PI * 2 / 260) +
+    0.45 * Math.sin((x * 0.8 + z * 0.35) * Math.PI * 2 / 190) +
+    0.18 * Math.sin((x - z * 0.15) * Math.PI * 2 / 60)
   );
 }
 
@@ -68,7 +69,7 @@ function buildTerrainData(centerZ) {
       const i = zi * N + xi;
       heights[i] = hgt;
 
-      const shade = 0.8 + 0.25 * THREE.MathUtils.clamp((hgt + 1.5) / 4, 0, 1);
+      const shade = 0.8 + 0.25 * THREE.MathUtils.clamp((hgt + 5) / 10, 0, 1);
       const dirt = 1 - THREE.MathUtils.smoothstep(d, ROAD_HALF_WIDTH + 0.2, ROAD_HALF_WIDTH + 3.5);
       c.copy(GRASS).lerp(DIRT, dirt).multiplyScalar(shade);
       colors[i * 3] = c.r;
@@ -192,7 +193,7 @@ export function createWorld(scene, physics, RAPIER) {
   const data0 = buildTerrainData(centerZ);
   const terrain = new THREE.Mesh(
     buildTerrainGeometry(data0),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+    new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradientMap })
   );
   terrain.receiveShadow = true;
   scene.add(terrain);
