@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
 import { toonGradientMap } from './toon.js';
+import { CITY_Z_MIN, CITY_Z_MAX } from './zones.js';
 
 const TREE_SPACING = 20;
 const TREE_SLOTS = 40;
@@ -292,6 +293,7 @@ export async function createTrees(scene, physics, RAPIER) {
   function treeData(k, side) {
     if (Math.floor(hash(k, side + 1) * 7) === 0) return null;
     const z = (k + 0.5 + (hash(k, side + 2) - 0.5) * 0.35) * TREE_SPACING;
+    if (z > CITY_Z_MIN - 20 && z < CITY_Z_MAX + 20) return null; // the city has its own scenery
     const offset = THREE.MathUtils.lerp(TREE_MIN_OFFSET, TREE_MAX_OFFSET, hash(k, side + 3));
     const pose = roadSidePose(z, side, offset);
     return {
@@ -337,6 +339,7 @@ export async function createTrees(scene, physics, RAPIER) {
 
   function writeGrass(k, side, slot) {
     const z = (k + 0.5 + (hash(k, side + 13) - 0.5) * 0.55) * GRASS_SPACING;
+    if (z > CITY_Z_MIN - 6 && z < CITY_Z_MAX + 6) { hideInstance(grass, slot); return; }
     const offset = THREE.MathUtils.lerp(GRASS_MIN_OFFSET, GRASS_MAX_OFFSET, hash(k, side + 17));
     const pose = roadSidePose(z, side, offset);
     const y = terrainHeight(pose.x, pose.z);

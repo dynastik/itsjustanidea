@@ -8,6 +8,7 @@ import { createLighting } from './game/lighting.js';
 import { createWorld } from './game/world.js';
 import { createProps } from './game/props.js';
 import { createTrees } from './game/trees.js';
+import { createCity } from './game/city.js';
 import { createVehicle, FIXED_DT } from './game/vehicle.js';
 import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
@@ -34,6 +35,7 @@ async function main() {
   const world = createWorld(scene, physics, RAPIER);
   const props = createProps(scene, physics, RAPIER);
   const trees = await createTrees(scene, physics, RAPIER);
+  const city = createCity(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
@@ -156,6 +158,7 @@ async function main() {
       paused: state.paused,
     });
 
+    city.update(state.worldTime);
     lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1);
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     rig.update(dt);

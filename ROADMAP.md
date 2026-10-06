@@ -87,12 +87,12 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 
 ### Terrain, road and zones
 - [x] Terrain: bounded, taller and broader hilly heightfield; the road corridor stays flat across its width with its own gentle elevation changes
-- [ ] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
+- [x] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
 - [ ] Road generator: segments recycled ahead/behind so the road is endless; gentle curves **and elevation**
-- [ ] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
-- [ ] Highway zone: guardrails, signs, mile markers
+- [x] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
+- [x] Highway zone: guardrails, signs, mile markers
 - [ ] **Scenic set pieces:** ridge-top vista, valley with a lake or river, distant mountains, a tunnel or overpass, a rest stop (all reused later for horror loops)
-- [ ] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
+- [x] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
 - [ ] Prop sets per zone, swappable per "act" (needed for the horror pivot later)
 
 ### Art direction
