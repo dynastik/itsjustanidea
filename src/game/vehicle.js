@@ -46,7 +46,7 @@ export const VEHICLE_CONFIG = {
     reverseForce: 7000,
     coastForce: 1800,
     maxSpeed: 30,
-    reverseMaxSpeed: 6,
+    reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
     steerFalloffSpeed: 20,
     steerLerpSpeed: 5,
@@ -324,7 +324,8 @@ export function createVehicle(scene, physics, RAPIER) {
     steerSign: h.steerSign,
     engineDone: !h.autoCalibrate,
     steerDone: !h.autoCalibrate,
-    armed: false,
+    engineTestStartSpeed: null,
+    engineTestTimer: 0,
     steerTimer: 0,
   };
   let flipTimer = 0;
@@ -385,14 +386,21 @@ export function createVehicle(scene, physics, RAPIER) {
     if (contactCount() < 3) return;
 
     if (!cal.engineDone) {
-      if (input.throttle < 0.1 && Math.abs(v) < 0.5) cal.armed = true;
-      if (cal.armed && input.throttle > 0.5) {
-        if (v > 1.5) {
-          cal.engineDone = true;
-        } else if (v < -1.5) {
-          cal.engineSign *= -1;
-          cal.engineDone = true;
-          console.warn('[vehicle] engine force sign was backwards. Set VEHICLE_CONFIG.handling.engineSign =', cal.engineSign);
+      if (input.throttle <= 0.5) {
+        cal.engineTestStartSpeed = null;
+        cal.engineTestTimer = 0;
+      } else {
+        if (cal.engineTestStartSpeed === null) cal.engineTestStartSpeed = v;
+        cal.engineTestTimer += dt;
+        const acceleration = v - cal.engineTestStartSpeed;
+        if (cal.engineTestTimer > 0.3) {
+          if (acceleration > 1.5) {
+            cal.engineDone = true;
+          } else if (acceleration < -1.5) {
+            cal.engineSign *= -1;
+            cal.engineDone = true;
+            console.warn('[vehicle] engine force sign was backwards. Set VEHICLE_CONFIG.handling.engineSign =', cal.engineSign);
+          }
         }
       }
       return;

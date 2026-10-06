@@ -30,7 +30,8 @@ export function createHud() {
     // typing panel fades in over the handoff instead of popping on
     const fade = Math.min(1, (state.time - state.highwayEnteredAt) / HANDOFF_UI_FADE_S);
     set(typingPanel.style, 'fade', Math.round(fade * 20) / 20, 'opacity');
-    set(speedoEl, 'speed', `${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
+    const reverse = state.speed < -0.3;
+    set(speedoEl, 'speed', `${reverse ? 'R ' : ''}${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 
     if (highway) {

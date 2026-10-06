@@ -48,6 +48,7 @@ export function createInput(actions) {
 
     if (key in hotkeys) {
       e.preventDefault();
+      if (key === KEYS.cabView) clearHeld();
       if (!e.repeat) hotkeys[key]();
       return;
     }
