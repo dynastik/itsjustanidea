@@ -1,6 +1,7 @@
 import { state } from '../game/state.js';
 import { getWpm, getAccuracy } from '../game/typing.js';
 import * as director from '../game/director.js';
+import { HANDOFF_UI_FADE_S } from '../game/zones.js';
 
 export function createHud() {
   const $ = (id) => document.getElementById(id);
@@ -26,6 +27,9 @@ export function createHud() {
     const directorState = highway ? ` [${director.getDirectorState().toUpperCase()}]` : '';
     set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState);
     set(typingPanel.style, 'panel', highway ? 'block' : 'none', 'display');
+    // typing panel fades in over the handoff instead of popping on
+    const fade = Math.min(1, (state.time - state.highwayEnteredAt) / HANDOFF_UI_FADE_S);
+    set(typingPanel.style, 'fade', Math.round(fade * 20) / 20, 'opacity');
     set(speedoEl, 'speed', `${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 

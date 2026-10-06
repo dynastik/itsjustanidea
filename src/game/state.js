@@ -7,6 +7,8 @@ export const state = {
   paused: false,
   debug: false,
   speed: 0,            // forward speed mirrored from the vehicle (HUD, audio, camera read this)
+  highwayEnteredAt: -Infinity, // game-clock time of the last city -> highway handoff (speed ease + typing UI fade key off this)
+  highwayEntrySpeed: 0,        // forward speed at that moment (m/s)
   typing: {
     target: '',
     buffer: '',

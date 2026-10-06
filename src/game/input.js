@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { HIGHWAY_CONFIG, getWpm, getAccuracy } from './typing.js';
+import { HANDOFF_SPEED_S } from './zones.js';
 
 // Non-letter keys on purpose: the highway uses the whole alphabet for typing.
 export const KEYS = {
@@ -33,6 +34,7 @@ export function createInput(actions) {
     [KEYS.mute]: actions.toggleMute,
     [KEYS.pause]: actions.togglePause,
   };
+  for (const k in hotkeys) if (!hotkeys[k]) delete hotkeys[k]; // e.g. the dev mode switch isn't registered in release builds
 
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -89,7 +91,12 @@ export function createInput(actions) {
 export function writeHighwayInput(d, vehicle, road = null) {
   const c = HIGHWAY_CONFIG;
   const wpmFactor = clamp(getWpm() / c.wpmForMaxSpeed, 0, 1);
-  const target = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy();
+  const typedTarget = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy();
+  // Handoff from the city: carry the speed you arrived with, easing it down to what your typing earns.
+  // (Type to keep your speed: tutorial by osmosis.)
+  const ease = clamp((state.time - state.highwayEnteredAt) / HANDOFF_SPEED_S, 0, 1);
+  const carry = state.highwayEntrySpeed * (1 - ease * ease * (3 - 2 * ease));
+  const target = Math.max(typedTarget, carry);
   const err = target - vehicle.speed;
   d.throttle = clamp(err * c.throttleGain, 0, 1);
   d.brake = clamp(-err * c.throttleGain, 0, 1);

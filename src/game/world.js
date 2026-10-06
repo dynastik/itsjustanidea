@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './zones.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
 
@@ -208,6 +209,25 @@ export function createWorld(scene, physics, RAPIER) {
   );
   road.receiveShadow = true;
   scene.add(road);
+
+  // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
+  // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
+  const gateZ = HIGHWAY_ZONE_Z + ZONE_HYSTERESIS;
+  const gateFrame = getRoadFrame(gateZ);
+  const gate = new THREE.Group();
+  gate.position.set(gateFrame.x, gateFrame.y + 0.05, gateZ);
+  gate.rotation.y = gateFrame.heading;
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2 - 0.6, 0.9),
+    new THREE.MeshStandardMaterial({
+      color: 0xf4f4f4, roughness: 0.9,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    })
+  );
+  stripe.rotation.x = -Math.PI / 2;
+  stripe.receiveShadow = true;
+  gate.add(stripe);
+  scene.add(gate);
 
   const terrainBody = physics.createRigidBody(
     RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, centerZ)

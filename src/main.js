@@ -58,7 +58,12 @@ async function main() {
   }
   spawn();
 
-  onModeChange((m) => { if (m === 'highway') beginTypingSession(); });
+  onModeChange((m) => {
+    if (m !== 'highway') return;
+    state.highwayEnteredAt = state.time;
+    state.highwayEntrySpeed = Math.max(vehicle.speed, 0);
+    beginTypingSession();
+  });
 
   const input = createInput({
     typeKey: handleTypingKey,
@@ -71,16 +76,18 @@ async function main() {
       rig.setDebug(state.debug);
       vehicle.setDebugVisible(state.debug);
     },
-    devSwitchMode: () => {
+    // Dev-only: Tab jumps between zones. Not registered in release builds (Vite sets DEV=false there).
+    devSwitchMode: import.meta.env.DEV ? () => {
       state.zoneAuto = false; // otherwise the zone logic flips you straight back
       setMode(state.mode === 'city' ? 'highway' : 'city');
-    },
+    } : undefined,
     reset: () => {
       spawn();
       beginTypingSession();
       input.clearHeld();
       state.worldTime = 0;
       state.zoneAuto = true;
+      state.highwayEnteredAt = -Infinity;
       prevSpeed = 0;
       director.reset();
       setMode('city');
