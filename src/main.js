@@ -7,6 +7,7 @@ import { createRenderer } from './game/render.js';
 import { createLighting } from './game/lighting.js';
 import { createWorld } from './game/world.js';
 import { createProps } from './game/props.js';
+import { createTrees } from './game/trees.js';
 import { createVehicle, FIXED_DT } from './game/vehicle.js';
 import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
@@ -32,6 +33,7 @@ async function main() {
   const lighting = createLighting(scene);
   const world = createWorld(scene, physics, RAPIER);
   const props = createProps(scene, physics, RAPIER);
+  const trees = createTrees(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
@@ -55,6 +57,7 @@ async function main() {
     vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
     world.update(0, 0);
     props.update(0);
+    trees.update(0);
   }
   spawn();
 
@@ -117,6 +120,7 @@ async function main() {
     // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);
     props.update(vehicle.center.z);
+    trees.update(vehicle.center.z);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);

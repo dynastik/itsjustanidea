@@ -56,6 +56,15 @@ export function createLighting(scene) {
   sun.target = sunTarget;
 
   const moon = new THREE.DirectionalLight(0xf0f2ff, 0);
+  moon.castShadow = false;
+  moon.shadow.camera.left = -30;
+  moon.shadow.camera.right = 30;
+  moon.shadow.camera.top = 30;
+  moon.shadow.camera.bottom = -30;
+  moon.shadow.camera.near = 1;
+  moon.shadow.camera.far = 60;
+  moon.shadow.mapSize.set(512, 512);
+  moon.shadow.bias = -0.0015;
   scene.add(moon);
   const moonTarget = new THREE.Object3D();
   scene.add(moonTarget);
@@ -178,6 +187,7 @@ export function createLighting(scene) {
     sun.color.copy(sunColor);
     sun.intensity = lerp(SUN_DAY, SUN_EVENING, evening) * sunVisibility;
     sun.castShadow = sunVisibility > 0.05;
+    moon.castShadow = night > 0.5;
     hemi.color.copy(hemiSkyMorning).lerp(hemiSkyEvening, evening).lerp(hemiSkyNight, night);
     hemi.groundColor.copy(hemiGroundMorning).lerp(hemiGroundEvening, evening).lerp(hemiGroundNight, night);
     hemi.intensity = lerp(lerp(HEMI_DAY, HEMI_EVENING, evening), HEMI_NIGHT, night);
