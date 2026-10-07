@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { HIGHWAY_CONFIG, getWpm, getAccuracy } from './typing.js';
+import { HIGHWAY_CONFIG, getWpm, getAccuracy, getInstability, getWheelJerk } from './typing.js';
 import { HANDOFF_SPEED_S } from './zones.js';
 
 // Non-printable keys on purpose: the highway types letters, capitals, spaces and punctuation.
@@ -95,24 +95,42 @@ export function createInput(actions) {
 }
 
 // Highway: hands-off. Lane-follow steering + throttle chasing a WPM x accuracy target speed.
+// Speed model: WPM sustains speed (and holds it up hills), accuracy buys stability. Wrong keys yank the
+// wheel, sloppy typing makes the lane wander. The first seconds are forgiving (see learnerRampS).
 export function writeHighwayInput(d, vehicle, road = null) {
   const c = HIGHWAY_CONFIG;
   const wpmFactor = clamp(getWpm() / c.wpmForMaxSpeed, 0, 1);
-  const typedTarget = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy();
+  const sinceEntry = state.time - state.highwayEnteredAt;
+  const learn = 1 - clamp(sinceEntry / c.learnerRampS, 0, 1); // 1 on arrival -> 0 once settled in
+  const z = vehicle.center.z;
+  const frame = road?.getRoadFrame(z) ?? { x: 0, heading: 0, y: 0 };
+
+  // Uphill = engine strain: people who are not typing lose speed on climbs, fast typists hold it.
+  let strain = 0;
+  if (road) {
+    const grade = (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
+    strain = clamp(grade / c.hillGradeRef, 0, 1);
+  }
+  const strainPenalty = strain * (1 - wpmFactor) * c.hillStrainMax;
+  const typedTarget = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy() * (1 - strainPenalty);
+
   // Handoff from the city: carry the speed you arrived with, easing it down to what your typing earns.
-  // (Type to keep your speed: tutorial by osmosis.)
-  const ease = clamp((state.time - state.highwayEnteredAt) / HANDOFF_SPEED_S, 0, 1);
+  // (Type to keep your speed: tutorial by osmosis.) The learner floor keeps a beginner rolling a bit longer.
+  const ease = clamp(sinceEntry / HANDOFF_SPEED_S, 0, 1);
   const carry = state.highwayEntrySpeed * (1 - ease * ease * (3 - 2 * ease));
-  const target = Math.max(typedTarget, carry);
+  const target = Math.max(typedTarget, carry, c.learnerFloorSpeed * learn);
   const err = target - vehicle.speed;
   d.throttle = clamp(err * c.throttleGain, 0, 1);
   d.brake = clamp(-err * c.throttleGain, 0, 1);
   d.speedCap = c.maxSpeed;
 
-  // Desired heading points back at x=0; invert the bicycle model so loop gain stays
+  // Sloppy typing makes the lane wander (slow, smooth, never off the road at full instability).
+  const instability = getInstability() * (1 - 0.6 * learn);
+  const drift = instability * c.driftAmp * Math.sin(state.time * c.driftSpeed + 1.7 * Math.sin(state.time * 0.31));
+
+  // Desired heading points back at the lane centre; invert the bicycle model so loop gain stays
   // constant at any speed. Uses the vehicle's speed-sensitive max steer.
-  const frame = road?.getRoadFrame(vehicle.center.z) ?? { x: 0, heading: 0 };
-  const lateral = vehicle.center.x - frame.x;
+  const lateral = vehicle.center.x - (frame.x + drift);
   const desiredHeading = clamp(
     frame.heading - lateral * c.centeringGain,
     frame.heading - c.maxAutoHeading,
@@ -121,5 +139,7 @@ export function writeHighwayInput(d, vehicle, road = null) {
   const wDes = c.headingResponse * (desiredHeading - vehicle.heading);
   const v = Math.abs(vehicle.speed);
   const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(v, 2));
-  d.steer = clamp(angle / vehicle.maxSteerAtSpeed(v), -1, 1);
+  const steer = angle / vehicle.maxSteerAtSpeed(v);
+  // every wrong key yanks the wheel (halved while you are still learning)
+  d.steer = clamp(steer + getWheelJerk() * c.jerkSteer * (1 - 0.5 * learn), -1, 1);
 }

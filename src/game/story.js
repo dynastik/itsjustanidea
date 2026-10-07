@@ -86,9 +86,33 @@ const ACTS = {
   },
 };
 
+// Extra prompt sources, mixed in between story lines every few prompts. Same tier rules as the acts.
+// Add a new source by adding an entry here (and a label); nothing else needs to change.
+const SOURCES = {
+  sign: {
+    label: 'ROAD SIGN',
+    calm: ['speed limit sixty', 'next exit two miles', 'scenic view ahead', 'rest area one mile'],
+    uneasy: ['rest area one mile.', 'next exit two miles.', 'no services for forty miles.'],
+    wrong: ['Next Exit: Nowhere.', 'Rest Area: Occupied.', 'Speed Limit: As Fast As You Can Type.'],
+    horror: ['DO NOT STOP.', 'Next Exit: Behind You.', 'Rest Area: Waiting.'],
+  },
+  radio: {
+    label: 'RADIO',
+    calm: ['good morning drivers', 'clear skies all day long', 'here is a song for the road', 'traffic is light and sweet'],
+    uneasy: ['traffic is light, if you can call it that.', 'this one is for the driver in the van.', 'we are having some static.'],
+    wrong: ['This song is for the one in the van. And the one beside them.', 'Please stay tuned. Please stay.', 'Tonight the weather is you.'],
+    horror: ['We are still on the air because you are still typing.', 'Driver, we can see you.', 'Do not change the station.'],
+  },
+};
+const LABELS = { story: 'THOUGHT', sign: SOURCES.sign.label, radio: SOURCES.radio.label };
+export const getSourceLabel = (source) => LABELS[source] || LABELS.story;
+
 let currentAct = 'calm';
 let cursors = {};      // act -> index of the next story line
 let warmupLeft = [];   // shuffled warmup words not yet used
+let bags = {};         // "source:act" -> shuffled lines not yet used
+let sinceExtra = 0;    // story prompts since the last extra-source prompt
+let nextExtraAfter = 3;
 let lastPrompt = '';
 
 function shuffled(arr) {
@@ -103,7 +127,10 @@ function shuffled(arr) {
 export function resetStory() {
   currentAct = 'calm';
   cursors = {};
+  bags = {};
   warmupLeft = shuffled(ACTS.calm.warmup);
+  sinceExtra = 0;
+  nextExtraAfter = 3;
   lastPrompt = '';
 }
 resetStory();
@@ -113,26 +140,41 @@ function randomFiller(act) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Next thing for the player to type: warmup words (calm only), then story lines in order, then filler.
+function takeFromBag(source) {
+  const key = `${source}:${currentAct}`;
+  if (!bags[key] || !bags[key].length) bags[key] = shuffled(SOURCES[source][currentAct] || SOURCES[source].calm);
+  return bags[key].pop();
+}
+
+// Next thing for the player to type -> { text, source }.
+// Order: warmup words (calm only), then story lines in order with a sign/radio line mixed in every 3-5 prompts,
+// then filler once the act's story is used up.
 export function pickPrompt() {
   const act = ACTS[currentAct] || ACTS.calm;
-  let next;
+  let text;
+  let source = 'story';
+
   if (currentAct === 'calm' && warmupLeft.length) {
-    next = warmupLeft.pop();
+    text = warmupLeft.pop();
+  } else if (sinceExtra >= nextExtraAfter) {
+    const names = Object.keys(SOURCES);
+    source = names[Math.floor(Math.random() * names.length)];
+    text = takeFromBag(source);
+    sinceExtra = 0;
+    nextExtraAfter = 3 + Math.floor(Math.random() * 3);
   } else {
     const i = cursors[currentAct] || 0;
     if (i < act.lines.length) {
-      next = act.lines[i];
+      text = act.lines[i];
       cursors[currentAct] = i + 1;
     } else {
-      next = randomFiller(act);
+      text = randomFiller(act);
     }
+    sinceExtra++;
   }
-  lastPrompt = next;
-  return next;
+  lastPrompt = text;
+  return { text, source };
 }
-
-export const pickWord = pickPrompt; // old name, kept so nothing breaks
 
 export function setAct(act) {
   if (ACTS[act]) currentAct = act;

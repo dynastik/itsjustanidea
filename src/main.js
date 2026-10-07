@@ -14,7 +14,7 @@ import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
-import { beginTypingSession, handleTypingKey, handleTypingBackspace } from './game/typing.js';
+import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog } from './game/typing.js';
 import { setAct } from './game/story.js';
 import { DAY_CYCLE_SECONDS, wrapTime } from './game/daycycle.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
@@ -71,6 +71,11 @@ async function main() {
     state.highwayEntrySpeed = Math.max(vehicle.speed, 0);
     beginTypingSession();
   });
+
+  // Dev console: window.typingTelemetry.summary() / .log() / .logJson() for tuning pacing and the Phase 6 estimator.
+  if (import.meta.env.DEV) {
+    window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
+  }
 
   const input = createInput({
     typeKey: handleTypingKey,

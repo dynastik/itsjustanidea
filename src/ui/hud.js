@@ -1,5 +1,6 @@
 import { state } from '../game/state.js';
 import { getWpm, getAccuracy } from '../game/typing.js';
+import { getSourceLabel } from '../game/story.js';
 import * as director from '../game/director.js';
 import { HANDOFF_UI_FADE_S } from '../game/zones.js';
 
@@ -9,6 +10,7 @@ export function createHud() {
   const $ = (id) => document.getElementById(id);
   const modeLabel = $('mode-label');
   const typingPanel = $('typing-panel');
+  const sourceEl = $('prompt-source');
   const targetWordEl = $('target-word');
   const typedInputEl = $('typed-input');
   const statsEl = $('stats');
@@ -45,6 +47,7 @@ export function createHud() {
       const html = flash
         ? `<span class="t-err">${esc(t.target)}</span>`
         : `<span class="t-ok">${done}</span><span class="t-cur">${next}</span><span class="t-rest">${rest}</span>`;
+      set(sourceEl, 'source', getSourceLabel(t.source));
       set(targetWordEl, 'word', html, 'innerHTML');
       set(typedInputEl, 'typed', t.buffer);
       set(statsEl, 'stats', `WPM: ${Math.round(getWpm())} | Accuracy: ${Math.round(getAccuracy() * 100)}%`);

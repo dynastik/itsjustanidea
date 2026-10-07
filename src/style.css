@@ -25,6 +25,7 @@ body {
   box-sizing: border-box;
 }
 
+#prompt-source { font-size: 11px; letter-spacing: 3px; color: #9ab; margin-bottom: 2px; }
 #target-word { font-size: 22px; letter-spacing: 1px; margin-bottom: 4px; white-space: pre-wrap; min-height: 2.6em; }
 .t-ok { color: #4caf50; }
 .t-cur { color: #fff; background: rgba(255, 255, 255, 0.28); }

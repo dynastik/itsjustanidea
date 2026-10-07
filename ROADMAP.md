@@ -128,13 +128,13 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] Highway steering decision: auto lane-follow, typing controls speed (already prototyped)
 - [x] **Story as prompts (v1, placeholder writing):** highway text is a narrative delivered line by line (see "Story & typing content" below)
 - [x] Full keyboard support (v1: any printable char incl. space/caps/punctuation; Backspace steps back through correct letters, toggle `HIGHWAY_CONFIG.allowBackspace`; wrong keys never enter the buffer): spaces, punctuation, capitals, backspace policy, correct handling of wrong keys (currently only `a-z`, wrong keys ignored)
-- [ ] Pluggable prompt sources: story, radio, road signs, CB chatter, "thoughts"
+- [x] Pluggable prompt sources (v1: story + road signs + radio, mixed in every 3-5 prompts via `SOURCES` in `story.js`; CB chatter / thoughts are one entry each to add): story, radio, road signs, CB chatter, "thoughts"
 - [x] Words -> phrases -> sentences; tiers (tied to director act via `setAct`; WPM now counts characters/5) (lowercase -> punctuation -> capitals) as difficulty rises
-- [ ] Speed model: WPM sustains speed, accuracy affects stability (wheel jerk, lane drift, and on hills, engine strain uphill)
+- [x] Speed model (WPM sustains speed and holds it uphill, wrong keys jerk the wheel, low accuracy makes the lane wander; all in `HIGHWAY_CONFIG`): WPM sustains speed, accuracy affects stability (wheel jerk, lane drift, and on hills, engine strain uphill)
 - [ ] In-cab typing UI (radio/dashboard display instead of floating HTML), designed to work in both chase and cab views
 - [ ] Semantris-style association mode (v1: hand-written association lists)
-- [ ] Typing telemetry recorder (keystroke timings, error patterns), needed later for pacing
-- [ ] Difficulty ramp + tutorial-by-osmosis (no tutorial screens)
+- [x] Typing telemetry recorder (`getTelemetry()` rolling 30 s metrics + whole-run key log; dev console `window.typingTelemetry`): (keystroke timings, error patterns), needed later for pacing
+- [x] Difficulty ramp + tutorial-by-osmosis (warmup words, 45 s learner ramp: speed floor + halved jerk/drift; no tutorial screens): (no tutorial screens)
 
 ## Phase 4: Audio (prototype starts in Phase 1)
 **Done when:** you can play with your eyes closed and still tell speed, road type and mood.

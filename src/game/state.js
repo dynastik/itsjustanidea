@@ -11,6 +11,7 @@ export const state = {
   highwayEntrySpeed: 0,        // forward speed at that moment (m/s)
   typing: {
     target: '',
+    source: 'story',        // where the current prompt came from: story | sign | radio (HUD label)
     buffer: '',
     wordsCompleted: 0,
     lastErrorAt: -Infinity, // game-clock time of the last wrong key (HUD flash)
