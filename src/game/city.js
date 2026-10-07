@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame } from './world.js';
 import { toonGradientMap } from './toon.js';
 import { generateCityLayout } from './cityLayout.js';
+import { dayFactors } from './daycycle.js';
 
 const BUILDING_COLORS = [0xe8b4a0, 0xf0d9a0, 0xa7c7d9, 0xc9d8a6, 0xd9b5d4, 0xf2c9a1, 0x9fb7c9, 0xe2e0d4].map((c) => new THREE.Color(c));
 const CAR_COLORS = [0xd9534f, 0x4a90d9, 0xf0c040, 0x5fb878, 0xe8e8e8, 0x8a5fd0, 0x30343c].map((c) => new THREE.Color(c));
@@ -156,10 +157,11 @@ export function createCity(scene, physics, RAPIER) {
   L.flats.forEach((f, i) => setBox(flats, i, f.x, f.y, f.z, f.sx, f.sy, f.sz, f.heading, f.pitch, FLAT_COLORS[f.kind]));
   finish(flats);
 
-  // worldTime 0 = morning, 1 = night (same clock as render.js / lighting.js)
+  // worldTime is the looping day clock shared with render.js / lighting.js (see daycycle.js)
   function update(worldTime) {
-    nightUniform.value = THREE.MathUtils.smoothstep(worldTime, 0.5, 0.9);
-    lampMat.emissiveIntensity = THREE.MathUtils.lerp(0.08, 2.0, THREE.MathUtils.smoothstep(worldTime, 0.4, 0.8));
+    const { night, lamp } = dayFactors(worldTime);
+    nightUniform.value = night;
+    lampMat.emissiveIntensity = THREE.MathUtils.lerp(0.08, 2.0, lamp);
   }
 
   return { update };

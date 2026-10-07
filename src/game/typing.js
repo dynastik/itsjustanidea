@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { pickWord } from './story.js';
+import { pickPrompt, resetStory } from './story.js';
 
 // Highway tuning lives here so typing feel is tweaked in one place.
 export const HIGHWAY_CONFIG = {
@@ -10,6 +10,9 @@ export const HIGHWAY_CONFIG = {
   centeringGain: 0.04,
   maxAutoHeading: 0.4,
   headingResponse: 3,
+  // Wrong keys never enter the buffer, so backspace only steps back through letters you got right.
+  // Phase 5 can flip this off to take the "undo" away from the player.
+  allowBackspace: true,
 };
 
 // Rolling windows: city time and old mistakes stop dragging the numbers down.
@@ -17,26 +20,31 @@ export const HIGHWAY_CONFIG = {
 const WPM_WINDOW_S = 20;
 const WPM_MIN_SPAN_S = 5;
 const ACCURACY_WINDOW = 50;
+const CHARS_PER_WORD = 5; // standard WPM definition, so sentences and single words score fairly
 
-let completions = [];
-let keystrokes = [];
+let charTimes = [];   // game-clock time of each correct character
+let keystrokes = [];  // rolling window of right/wrong
 let sessionStart = null;
 
 export function pickNewWord() {
   const t = state.typing;
-  t.target = pickWord();
+  t.target = pickPrompt();
   t.buffer = '';
 }
 
-export function beginTypingSession() {
-  completions = [];
+// restartStory: true on a full game reset. Re-entering the highway from the city keeps your place in the story.
+export function beginTypingSession({ restartStory = false } = {}) {
+  charTimes = [];
   keystrokes = [];
   sessionStart = null;
   state.typing.wordsCompleted = 0;
   state.typing.lastErrorAt = -Infinity;
-  pickNewWord();
+  if (restartStory) resetStory();
+  if (restartStory || !state.typing.target) pickNewWord();
+  else state.typing.buffer = '';
 }
 
+// key is the literal character typed (case and punctuation preserved), one character long.
 export function handleTypingKey(key) {
   const t = state.typing;
   if (sessionStart === null) sessionStart = state.time;
@@ -45,22 +53,31 @@ export function handleTypingKey(key) {
   keystrokes.push(ok);
   if (keystrokes.length > ACCURACY_WINDOW) keystrokes.shift();
 
-  if (ok) t.buffer += key;
-  else t.lastErrorAt = state.time;
+  if (ok) {
+    t.buffer += key;
+    charTimes.push(state.time);
+  } else {
+    t.lastErrorAt = state.time;
+  }
 
   if (t.buffer === t.target) {
     t.wordsCompleted++;
-    completions.push(state.time);
     pickNewWord();
   }
+}
+
+export function handleTypingBackspace() {
+  const t = state.typing;
+  if (!HIGHWAY_CONFIG.allowBackspace || !t.buffer) return;
+  t.buffer = t.buffer.slice(0, -1);
 }
 
 export function getWpm() {
   if (sessionStart === null) return 0;
   const now = state.time;
-  while (completions.length && completions[0] < now - WPM_WINDOW_S) completions.shift();
+  while (charTimes.length && charTimes[0] < now - WPM_WINDOW_S) charTimes.shift();
   const span = Math.min(Math.max(now - sessionStart, WPM_MIN_SPAN_S), WPM_WINDOW_S);
-  return completions.length / (span / 60);
+  return (charTimes.length / CHARS_PER_WORD) / (span / 60);
 }
 
 export function getAccuracy() {

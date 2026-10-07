@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { dayFactors } from './daycycle.js';
 import { HorizontalTiltShiftShader } from 'three/addons/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 
@@ -86,7 +87,7 @@ export function createRenderer(scene, camera) {
   const lerp = THREE.MathUtils.lerp;
 
   // tilt is the target blur radius in CSS pixels (from the camera profile; fades in/out smoothly).
-  // worldTime: 0 = morning, 1 = night.
+  // worldTime: looping day clock, 0..1 = one full day (see daycycle.js).
   function setLook({ tilt = 0, worldTime = 0, dt = 0 }) {
     tiltAmount += (tilt - tiltAmount) * (1 - Math.exp(-4 * dt));
     const on = tiltAmount > 0.01;
@@ -96,9 +97,7 @@ export function createRenderer(scene, camera) {
       vblur.uniforms.v.value = tiltAmount / window.innerHeight;
     }
 
-    const time = THREE.MathUtils.clamp(worldTime, 0, 1);
-    const evening = THREE.MathUtils.smoothstep(time, 0.2, 0.62);
-    const night = THREE.MathUtils.smoothstep(time, 0.62, 0.94);
+    const { evening, night } = dayFactors(worldTime);
     const u = grade.uniforms;
     u.saturation.value = lerp(lerp(GRADE_MORNING.saturation, GRADE_EVENING.saturation, evening), GRADE_NIGHT.saturation, night);
     u.contrast.value = lerp(lerp(GRADE_MORNING.contrast, GRADE_EVENING.contrast, evening), GRADE_NIGHT.contrast, night);

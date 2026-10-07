@@ -2,13 +2,14 @@ import { state } from './state.js';
 import { HIGHWAY_CONFIG, getWpm, getAccuracy } from './typing.js';
 import { HANDOFF_SPEED_S } from './zones.js';
 
-// Non-letter keys on purpose: the highway uses the whole alphabet for typing.
+// Non-printable keys on purpose: the highway types letters, capitals, spaces and punctuation.
 export const KEYS = {
   debug: '`',
   devModeSwitch: 'tab',
   cabView: 'f2',
   look: 'f3',
   reset: 'f4',
+  skipTime: 'f6',
   mute: 'f9',
   pause: 'escape',
 };
@@ -31,6 +32,7 @@ export function createInput(actions) {
     [KEYS.cabView]: actions.toggleCab,
     [KEYS.look]: actions.cycleLook,
     [KEYS.reset]: actions.reset,
+    [KEYS.skipTime]: actions.skipTime,
     [KEYS.mute]: actions.toggleMute,
     [KEYS.pause]: actions.togglePause,
   };
@@ -57,8 +59,12 @@ export function createInput(actions) {
 
     if (state.mode === 'city') {
       if (key in held) held[key] = true;
-    } else if (key.length === 1 && /[a-z]/.test(key)) {
-      actions.typeKey(key);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      actions.typeBackspace?.();
+    } else if (e.key.length === 1) {
+      e.preventDefault(); // stops ' and / opening Firefox quick-find, space scrolling, etc.
+      actions.typeKey(e.key); // literal char: capitals, spaces and punctuation all count now
     }
   });
 

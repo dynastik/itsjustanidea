@@ -102,11 +102,12 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [x] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
 - [x] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
 - [x] **Art pass 1d, toon materials:** `MeshToonMaterial` with a shared custom 3-tone gradient map on terrain and roadside props; convert the truck GLB's materials on load while preserving color and maps. Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
+- [x] **Endless day cycle:** `worldTime` now loops (morning -> sunset -> night -> sunrise -> morning, 300 s per day, `daycycle.js` is the single source for all factors). Dev: F6 skips 1/8 day.
 - [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition through morning, orange sunset with a purple opposite horizon, and purple night.
 - [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
 - [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
 - [x] **Trees:** use nearby layered foliage clusters with a leaf-cutout canopy texture and canopy-centered light gradients; simplify distant trees to silhouettes. Combine each LOD into a single instanced batch.
-- [x] **Grass:** use sparse, low-poly grass clumps in a single instanced batch; avoid transparent textures, per-blade objects, and costly animation.
+- [x] ~~**Grass:**~~ REMOVED. Grass clumps cut from `trees.js` (not worth the draw cost/look). Ground colour comes from the terrain vertex colours only.
 - [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
 - [x] **Distant vegetation:** simplify trees to low-poly silhouettes and let fog/tilt-shift soften the transition.
 - [ ] **Art pass 2 (polish, cut early if short on time):** tire-track shader (solid dark marks behind the wheels; on hills use short ribbon decals rather than a flat canvas texture) and stylized particle smoke (`THREE.Points` + `ShaderMaterial`: solid squares/spheres that grow, drift back, shrink and snap-fade, no soft alpha textures)
@@ -125,10 +126,10 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 ## Phase 3: Highway typing v2
 **Done when:** a 5-minute highway stretch is fun on its own, before any horror.
 - [x] Highway steering decision: auto lane-follow, typing controls speed (already prototyped)
-- [ ] **Story as prompts:** highway text is a narrative delivered line by line (see "Story & typing content" below)
-- [ ] Full keyboard support: spaces, punctuation, capitals, backspace policy, correct handling of wrong keys (currently only `a-z`, wrong keys ignored)
+- [x] **Story as prompts (v1, placeholder writing):** highway text is a narrative delivered line by line (see "Story & typing content" below)
+- [x] Full keyboard support (v1: any printable char incl. space/caps/punctuation; Backspace steps back through correct letters, toggle `HIGHWAY_CONFIG.allowBackspace`; wrong keys never enter the buffer): spaces, punctuation, capitals, backspace policy, correct handling of wrong keys (currently only `a-z`, wrong keys ignored)
 - [ ] Pluggable prompt sources: story, radio, road signs, CB chatter, "thoughts"
-- [ ] Words -> phrases -> sentences; tiers (lowercase -> punctuation -> capitals) as difficulty rises
+- [x] Words -> phrases -> sentences; tiers (tied to director act via `setAct`; WPM now counts characters/5) (lowercase -> punctuation -> capitals) as difficulty rises
 - [ ] Speed model: WPM sustains speed, accuracy affects stability (wheel jerk, lane drift, and on hills, engine strain uphill)
 - [ ] In-cab typing UI (radio/dashboard display instead of floating HTML), designed to work in both chase and cab views
 - [ ] Semantris-style association mode (v1: hand-written association lists)
@@ -213,7 +214,7 @@ Guidelines: never name the entity, keep the story deniable ("maybe it's just tir
 | 13 | Visibility strategy | **DECIDED:** combine frustum culling + distance checks + distance-based LOD. World generation/streaming is separate and keeps only a bounded active road corridor. Avoid per-object perfect cone calculations every frame unless profiling later proves a specific need. | Phase 2 |
 | 14 | Shadow budget | **DECIDED:** start at 1024x1024 for the main sun shadow map. Restrict shadow casting to important nearby objects; distant/small scenery can use 512x512-style simplification if useful, or no shadows. Tune from Dell 3490 profiling. | Phase 2 |
 | 15 | Tree style | **DECIDED:** low-poly trunk/branch structure plus multiple solid foliage clusters. No single blob canopy. Reuse/instance variants and use LOD for distance. | Phase 2 |
-| 16 | Grass style | **DECIDED:** no realistic blade-by-blade grass. Use a stylized grass ground material/texture plus sparse cross-quad clusters in important areas; alpha-test rather than heavy translucent foliage where possible. | Phase 2 |
+| 16 | Grass style | **DECIDED:** no grass props at all. Terrain vertex colours carry the ground. Revisit only if the world looks empty after profiling. | Phase 2 |
 | 17 | Performance baseline | **DECIDED:** Dell Latitude 3490 is the primary test machine. Measure FPS/frame time rather than guessing. Keep toon shading and stylization cheap; focus optimization on shadows, foliage overdraw, draw calls, post-processing, terrain and world population. | Phase 2/7 |
 
 ## Asset plan (everything free)
@@ -247,4 +248,4 @@ ROADMAP.md
 ```
 
 ## Backlog (parked, does not serve the pillars)
-Multiple vehicles, multiplayer, full day/night cycle, weather, procedural story, mobile touch controls, level editor, fully realistic vehicle dynamics.
+Multiple vehicles, multiplayer, weather, procedural story, mobile touch controls, level editor, fully realistic vehicle dynamics.

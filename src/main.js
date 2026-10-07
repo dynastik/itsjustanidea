@@ -14,12 +14,13 @@ import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
-import { beginTypingSession, handleTypingKey } from './game/typing.js';
+import { beginTypingSession, handleTypingKey, handleTypingBackspace } from './game/typing.js';
+import { setAct } from './game/story.js';
+import { DAY_CYCLE_SECONDS, wrapTime } from './game/daycycle.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
 import * as director from './game/director.js';
 
-const DAY_LENGTH_SECONDS = 180; // wall-clock for testing. TODO Phase 5: distance/story driven
 const MAX_STEPS_PER_FRAME = 5;
 
 async function main() {
@@ -73,6 +74,7 @@ async function main() {
 
   const input = createInput({
     typeKey: handleTypingKey,
+    typeBackspace: handleTypingBackspace,
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
@@ -87,9 +89,11 @@ async function main() {
       state.zoneAuto = false; // otherwise the zone logic flips you straight back
       setMode(state.mode === 'city' ? 'highway' : 'city');
     } : undefined,
+    // Dev-only: F6 jumps the clock forward by 1/8 of a day, to eyeball every time of day quickly.
+    skipTime: import.meta.env.DEV ? () => { state.worldTime = wrapTime(state.worldTime + 0.125); } : undefined,
     reset: () => {
       spawn();
-      beginTypingSession();
+      beginTypingSession({ restartStory: true });
       input.clearHeld();
       state.worldTime = 0;
       state.zoneAuto = true;
@@ -116,9 +120,10 @@ async function main() {
     if (state.paused) dt = 0; // everything below is dt-driven, so this freezes the sim
 
     state.time += dt;
-    state.worldTime = Math.min(state.worldTime + dt / DAY_LENGTH_SECONDS, 1);
+    state.worldTime = wrapTime(state.worldTime + dt / DAY_CYCLE_SECONDS); // loops forever
     updateZoneMode();
     director.update(vehicle.center.z);
+    setAct(director.getDirectorState()); // story text follows the horror act (takes effect on the next prompt)
 
     // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);

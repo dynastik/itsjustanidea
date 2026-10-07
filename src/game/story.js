@@ -1,24 +1,141 @@
-// Story and typing content. Phase 3 expands this to full sentences and dynamic sources.
-// For now, a fixed bank of highway-mode prompts that feed the HUD.
+// Story and typing content. The highway prompts ARE the story: each act delivers its lines in order
+// (so the narrative reads as one thread), then falls back to a filler pool if the player outlasts them.
+// Typing tiers rise with the act: lowercase words -> lowercase + punctuation -> sentences + capitals -> pressure.
+//
+// Rules for writing prompts:
+//  - ASCII only, and never a backtick (it is the debug hotkey).
+//  - Never name the entity. Keep it deniable ("maybe it's just tired driving").
+//  - Keep calm/uneasy lines short; they are also the typing tutorial by osmosis.
 
-const PROMPTS_BY_ACT = {
-  calm: [
-    'sunset', 'highway', 'engine', 'gravel', 'horizon',
-    'static', 'exhaust', 'asphalt', 'flicker', 'signal', 'distance',
-    'headlight', 'shoulder', 'wander', 'silence', 'radio',
-  ],
-  // Phase 5: uneasy, wrong, horror prompts go here
+const ACTS = {
+  calm: {
+    // first prompts are single easy words, so nobody is thrown in with a sentence
+    warmup: ['sunset', 'highway', 'engine', 'horizon', 'radio', 'gravel'],
+    lines: [
+      'sunny morning',
+      'radio on low',
+      'coffee still warm',
+      'twelve boxes in the back',
+      'every stop is on time',
+      'the hills look soft today',
+      'wave at the cyclist',
+      'nothing ahead but road',
+      'window down a little',
+      'good day for a long drive',
+      'nobody waiting on this one',
+      'one more delivery then lunch',
+    ],
+    filler: [
+      'static', 'exhaust', 'asphalt', 'flicker', 'signal', 'distance', 'headlight',
+      'shoulder', 'wander', 'silence', 'open road', 'easy miles', 'soft light',
+    ],
+  },
+  uneasy: {
+    lines: [
+      'forty miles to the next stop.',
+      'same sign again, huh.',
+      'the radio is quieter than i left it.',
+      'that is the third mile marker today.',
+      'must be tired driving.',
+      'forty miles to the next stop.', // repeated on purpose
+      'did i pick up the last box?',
+      'the hills all look alike out here.',
+      'keep going, it is only the road.',
+      'someone hums along, low, in the static.',
+    ],
+    filler: [
+      'almost there.', 'just the wind.', 'keep your eyes ahead.', 'it is fine, really.',
+      'same hill, maybe.', 'nobody else out here.',
+    ],
+  },
+  wrong: {
+    lines: [
+      'The passenger seat is warm.',
+      'You do not remember buckling it.',
+      'The mirror shows the road behind you. Mostly.',
+      'Someone moved the air freshener.',
+      'The radio is saying what you were about to type.',
+      'It is very quiet on the passenger side.',
+      'You have been on this road before. Have you?',
+      'Do not check the mirror. Keep typing.',
+      'The last package had no address.',
+      'Your speed is fine. Something else is not.',
+    ],
+    filler: [
+      'Eyes on the road.', 'Nobody is in the back.', 'The seat is only warm from the sun.',
+      'Keep your hands on the wheel.', 'It is only tired driving.',
+    ],
+  },
+  horror: {
+    lines: [
+      'Keep typing. It only stays while you type.',
+      'Every word you finish makes the seat feel warmer.',
+      'It knows how fast you type.',
+      'You were never the only driver of this van.',
+      'Do not look in the mirror. Type instead.',
+      'The road does not end because you stopped looking for the end.',
+      'Stop typing and listen to who is breathing.',
+      'Finish this sentence and it will still be sitting beside you.',
+      'You already know whose hands are on the wheel.',
+      'Do not slow down.',
+    ],
+    filler: [
+      'Do not stop.', 'It is closer now.', 'Faster.', 'Keep going. Keep going. Keep going.',
+      'Look at the road, not the seat.',
+    ],
+  },
 };
 
 let currentAct = 'calm';
+let cursors = {};      // act -> index of the next story line
+let warmupLeft = [];   // shuffled warmup words not yet used
+let lastPrompt = '';
 
-export function pickWord() {
-  const bank = PROMPTS_BY_ACT[currentAct] || PROMPTS_BY_ACT.calm;
-  return bank[Math.floor(Math.random() * bank.length)];
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
+export function resetStory() {
+  currentAct = 'calm';
+  cursors = {};
+  warmupLeft = shuffled(ACTS.calm.warmup);
+  lastPrompt = '';
+}
+resetStory();
+
+function randomFiller(act) {
+  const pool = act.filler.filter((p) => p !== lastPrompt);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Next thing for the player to type: warmup words (calm only), then story lines in order, then filler.
+export function pickPrompt() {
+  const act = ACTS[currentAct] || ACTS.calm;
+  let next;
+  if (currentAct === 'calm' && warmupLeft.length) {
+    next = warmupLeft.pop();
+  } else {
+    const i = cursors[currentAct] || 0;
+    if (i < act.lines.length) {
+      next = act.lines[i];
+      cursors[currentAct] = i + 1;
+    } else {
+      next = randomFiller(act);
+    }
+  }
+  lastPrompt = next;
+  return next;
+}
+
+export const pickWord = pickPrompt; // old name, kept so nothing breaks
+
 export function setAct(act) {
-  currentAct = act;
+  if (ACTS[act]) currentAct = act;
 }
 
 export function getAct() {

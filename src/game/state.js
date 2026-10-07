@@ -2,7 +2,7 @@
 export const state = {
   mode: 'city',        // 'city' | 'highway'
   zoneAuto: true,      // false after a dev Tab override (until reset)
-  worldTime: 0,        // 0 = morning, 1 = night. TODO Phase 5: drive by distance/story beat
+  worldTime: 0,        // looping day clock: 0..1 is one full day, wraps forever (daycycle.js). TODO Phase 5: drive by distance/story beat
   time: 0,             // game clock in seconds; frozen while paused (typing windows use this)
   paused: false,
   debug: false,

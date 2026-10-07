@@ -3,6 +3,8 @@ import { getWpm, getAccuracy } from '../game/typing.js';
 import * as director from '../game/director.js';
 import { HANDOFF_UI_FADE_S } from '../game/zones.js';
 
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function createHud() {
   const $ = (id) => document.getElementById(id);
   const modeLabel = $('mode-label');
@@ -37,9 +39,12 @@ export function createHud() {
     if (highway) {
       const t = state.typing;
       const flash = state.time - t.lastErrorAt < 0.15;
+      const done = esc(t.buffer);
+      const next = esc(t.target.charAt(t.buffer.length));
+      const rest = esc(t.target.slice(t.buffer.length + 1));
       const html = flash
-        ? `<span style="color:#f44336">${t.target}</span>`
-        : `<span style="color:#4caf50">${t.buffer}</span><span style="color:#333">${t.target.slice(t.buffer.length)}</span>`;
+        ? `<span class="t-err">${esc(t.target)}</span>`
+        : `<span class="t-ok">${done}</span><span class="t-cur">${next}</span><span class="t-rest">${rest}</span>`;
       set(targetWordEl, 'word', html, 'innerHTML');
       set(typedInputEl, 'typed', t.buffer);
       set(statsEl, 'stats', `WPM: ${Math.round(getWpm())} | Accuracy: ${Math.round(getAccuracy() * 100)}%`);

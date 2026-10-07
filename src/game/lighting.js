@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { dayFactors } from './daycycle.js';
 
 const clamp01 = (value) => THREE.MathUtils.clamp(value, 0, 1);
 const smooth = (edge0, edge1, value) => THREE.MathUtils.smoothstep(value, edge0, edge1);
@@ -39,7 +40,7 @@ function createGlowingSquare(color, haloColor) {
   });
 }
 
-// A three-stage morning -> sunset -> night cycle. Sky horizon and fog always share one color.
+// An endless morning -> sunset -> night -> sunrise cycle (see daycycle.js). Sky horizon and fog always share one color.
 export function createLighting(scene) {
   const sun = new THREE.DirectionalLight(0xffe7c2, 1.6);
   sun.castShadow = true;
@@ -159,20 +160,16 @@ export function createLighting(scene) {
   const MOON_NIGHT = 0.62;
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
-  const DUSK_START = 0.2, DUSK_END = 0.62;
-  const NIGHT_START = 0.62, NIGHT_END = 0.94;
 
   scene.background = horizon;
   scene.fog = new THREE.FogExp2(horizon, FOG_DAY);
 
   const lerp = THREE.MathUtils.lerp;
   function update(worldTime, center, fogScale = 1) {
-    const time = clamp01(worldTime);
-    const evening = smooth(DUSK_START, DUSK_END, time);
-    const night = smooth(NIGHT_START, NIGHT_END, time);
-    const sunProgress = clamp01(time / 0.78);
-    const sunAzimuth = lerp(-0.3, 0.3, sunProgress);
-    const sunElevation = 0.72 - sunProgress * 0.9;
+    const { evening, night, dayFrac, moonFrac, moonAmount } = dayFactors(worldTime);
+    // sun arcs from one side to the other between sunrise (dayFrac 0) and sunset (1), then stays below the horizon
+    const sunAzimuth = lerp(-0.3, 0.3, clamp01(dayFrac));
+    const sunElevation = dayFrac <= 1 ? -0.1 + 0.82 * Math.sin(Math.PI * dayFrac) : -0.3;
     const sunVisibility = smooth(-0.08, 0.12, sunElevation);
 
     setCycleColor(horizon, horizonMorning, horizonEvening, horizonNight, evening, night);
@@ -210,9 +207,8 @@ export function createLighting(scene) {
       sunDisc.material.uniforms.opacity.value = sunVisibility;
       sunDisc.visible = sunVisibility > 0.001;
 
-    const moonProgress = clamp01((time - 0.65) / 0.35);
-    const moonAzimuth = lerp(-0.3, -0.05, moonProgress);
-    const moonElevation = lerp(0.12, 0.75, moonProgress);
+    const moonAzimuth = lerp(-0.3, 0.1, moonFrac);
+    const moonElevation = 0.12 + 0.63 * Math.sin(Math.PI * moonFrac); // rises, peaks, sets before sunrise
     moonDirection.set(
       Math.sin(moonAzimuth) * Math.cos(moonElevation),
       Math.sin(moonElevation),
@@ -220,10 +216,10 @@ export function createLighting(scene) {
     ).normalize();
     moon.position.copy(center).addScaledVector(moonDirection, 40);
     moonTarget.position.copy(center);
-    moon.intensity = MOON_NIGHT * smooth(0.67, 0.88, time);
+    moon.intensity = MOON_NIGHT * moonAmount;
     moonDisc.position.copy(center).addScaledVector(moonDirection, SKY_BODY_DISTANCE);
     moonDisc.lookAt(center);
-    moonDisc.material.uniforms.opacity.value = smooth(0.67, 0.84, time);
+    moonDisc.material.uniforms.opacity.value = moonAmount;
     moonDisc.visible = moonDisc.material.uniforms.opacity.value > 0.001;
   }
 
