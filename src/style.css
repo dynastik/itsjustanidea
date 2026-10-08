@@ -20,13 +20,16 @@ body {
   background: rgba(0, 0, 0, 0.5);
   padding: 10px 14px;
   border-radius: 6px;
-  width: 480px;
+  width: 640px;
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
 }
 
 #prompt-source { font-size: 11px; letter-spacing: 3px; color: #9ab; margin-bottom: 2px; }
-#target-word { font-size: 22px; letter-spacing: 1px; margin-bottom: 4px; white-space: pre-wrap; min-height: 2.6em; }
+#target-word { font: 20px/1.5 Georgia, 'Times New Roman', serif; letter-spacing: 0.3px; margin-bottom: 4px; white-space: pre-wrap; min-height: 3em; }
+#typing-panel.message #target-word { font: 24px/1.4 monospace; letter-spacing: 3px; }
+#typing-panel.message #prompt-source { color: #d88; }
+#typed-input { display: none; }
 .t-ok { color: #4caf50; }
 .t-cur { color: #fff; background: rgba(255, 255, 255, 0.28); }
 .t-rest { color: #ddd; }
@@ -58,3 +61,25 @@ body {
   letter-spacing: 8px;
   pointer-events: none;
 }
+
+#ending {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2.5s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#ending.on { opacity: 1; }
+#ending-line {
+  color: #ddd;
+  font: 28px Georgia, 'Times New Roman', serif;
+  letter-spacing: 3px;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+#ending-line.on { opacity: 1; }

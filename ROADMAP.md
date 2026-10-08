@@ -147,8 +147,8 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 
 ## Phase 5: The horror pivot (the point of the game)
 **Done when:** a first-time player is comfortable for the first few minutes, then unsettled without being told why, and never sees a "monster".
-- [ ] Decouple `worldTime` from the wall clock; drive it by distance/story beat (Open Decision 5)
-- [ ] Director: state machine CALM -> UNEASY -> WRONG -> HORROR, driven by distance (typing modulates later)
+- [x] Decouple `worldTime` from the wall clock: it now follows how far through the story the player has typed (`CLOCK_MODE` in `daycycle.js`; 'free' keeps the old 300 s loop for sky tuning)
+- [x] Director: act is chosen by the story (CALM -> UNEASY -> WRONG -> HORROR -> FINALE), `director.getDirectorState()` reports it
 - [ ] **Cab interior model** (built from simple primitives or free CC0 pieces): steering wheel, dash, gauges, seats, air freshener, mirror. It is the main horror stage
 - [ ] Cab wrongness list (all implied, nothing shown outright):
   - passenger seat belt clicks, seat compresses, or an item on it shifts
@@ -162,7 +162,7 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 - [ ] Typing turns adversarial: wrong prompts, prompts addressed to the player, messages that know things
 - [ ] Controls stop being trustworthy: wheel pull, brake lag, phantom steering
 - [ ] Environment: fog, lighting, road-loop tricks (same sign twice, road that doesn't end, the same hill again)
-- [ ] Climax + ending
+- [x] Climax + ending (v1): false sunrise, "Delivery accepted.", fade to black, "Next driver, please.", run restarts from the morning
 - [ ] Accessibility toggle: reduce flashing / scare intensity
 
 ## Phase 6: Neural networks (OPTIONAL, must never block release)
@@ -182,7 +182,15 @@ The game is a controlled driving experience, not an open-world free-roam game. E
 
 ---
 
-## Story & typing content
+## Story v1 (implemented in `story.js`)
+Elias, a delivery driver, one package, a road that was never built. The player types the story paragraph by paragraph;
+the road's own lines ("You have been here before.") are short `message` paragraphs shown in a different style.
+Acts: calm (bright day) -> uneasy (afternoon, repeated sign) -> wrong (sunset, messages) -> horror (night, the road explains itself)
+-> finale (false sunrise, "Delivery accepted.", black, "Next driver, please.", restart). About 2.5k characters, so roughly
+8-14 minutes at 30-50 WPM. Note: the old lowercase -> punctuation -> capitals tiers are gone; novel text uses normal
+punctuation from the first line, and the learner ramp (see `HIGHWAY_CONFIG`) provides the easy start.
+
+## Story & typing content (original plan, kept for reference)
 The highway prompts are the story, so the writing has to do double duty: teach typing and carry the dread.
 
 | Act | Feel | Prompt content | Typing tier |
@@ -203,7 +211,7 @@ Guidelines: never name the entity, keep the story deniable ("maybe it's just tir
 | 2 | Target length | 10-15 minutes, confirm after Phase 3 playtest | Phase 3 |
 | 3 | What is the horror? | **DECIDED (direction):** implied presence in the cab, no visible entity, weirdness only. Road loops as a supporting trick | Phase 5 (shapes props/words from Phase 2) |
 | 4 | Zone switch | **DECIDED:** automatic on-ramp trigger, no key press | Phase 2 |
-| 5 | Pacing trigger: time, distance, or typing performance? | Distance-based, typing modulates later | Phase 5 |
+| 5 | Pacing trigger: time, distance, or typing performance? | **DECIDED:** story-driven. The act and the sky clock follow how many characters of the story have been typed. Typing speed only changes how long it takes | done |
 | 6 | Word content | **DECIDED:** story-driven, themed per act | Phase 3 |
 | 7 | Platform | Desktop keyboard only | Phase 7 |
 | 8 | Art direction | **DECIDED:** miniature/diorama driving style inspired by Art of Rally's low-poly environmental design, with restrained toon shading, a tight hand-painted palette, and tilt-shift in the chase camera. This is not a commitment to exact Art of Rally replication or heavy anime-style cel shading. | Phase 2 |

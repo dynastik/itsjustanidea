@@ -5,6 +5,8 @@ export const state = {
   worldTime: 0,        // looping day clock: 0..1 is one full day, wraps forever (daycycle.js). TODO Phase 5: drive by distance/story beat
   time: 0,             // game clock in seconds; frozen while paused (typing windows use this)
   paused: false,
+  storyDone: false,    // the last paragraph has been typed: the ending plays, then the run restarts
+  loops: 0,            // how many full runs have been completed
   debug: false,
   speed: 0,            // forward speed mirrored from the vehicle (HUD, audio, camera read this)
   highwayEnteredAt: -Infinity, // game-clock time of the last city -> highway handoff (speed ease + typing UI fade key off this)

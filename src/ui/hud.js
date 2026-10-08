@@ -30,7 +30,8 @@ export function createHud() {
     const dev = state.zoneAuto ? '' : ' [DEV]';
     const directorState = highway ? ` [${director.getDirectorState().toUpperCase()}]` : '';
     set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState);
-    set(typingPanel.style, 'panel', highway ? 'block' : 'none', 'display');
+    const typing = highway && !state.storyDone; // the panel goes away once the last line is typed
+    set(typingPanel.style, 'panel', typing ? 'block' : 'none', 'display');
     // typing panel fades in over the handoff instead of popping on
     const fade = Math.min(1, (state.time - state.highwayEnteredAt) / HANDOFF_UI_FADE_S);
     set(typingPanel.style, 'fade', Math.round(fade * 20) / 20, 'opacity');
@@ -38,8 +39,12 @@ export function createHud() {
     set(speedoEl, 'speed', `${reverse ? 'R ' : ''}${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 
-    if (highway) {
+    if (typing) {
       const t = state.typing;
+      if (cache.kind !== t.source) { // the road's own messages look different from the narration
+        cache.kind = t.source;
+        typingPanel.classList.toggle('message', t.source === 'message');
+      }
       const flash = state.time - t.lastErrorAt < 0.15;
       const done = esc(t.buffer);
       const next = esc(t.target.charAt(t.buffer.length));

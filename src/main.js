@@ -14,11 +14,12 @@ import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
-import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog } from './game/typing.js';
-import { setAct } from './game/story.js';
-import { DAY_CYCLE_SECONDS, wrapTime } from './game/daycycle.js';
+import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
+import { getStoryTime } from './game/story.js';
+import { CLOCK_MODE, DAY_CYCLE_SECONDS, wrapTime } from './game/daycycle.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
+import { createEnding } from './ui/ending.js';
 import * as director from './game/director.js';
 
 const MAX_STEPS_PER_FRAME = 5;
@@ -49,6 +50,7 @@ async function main() {
   const rig = createCameraRig(camera, gfx.domElement, vehicle, cabin);
   const audio = createAudio();
   const hud = createHud();
+  const ending = createEnding();
   const driveInput = createDriveInput();
 
   let accumulator = 0;
@@ -77,6 +79,20 @@ async function main() {
     window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
   }
 
+  // Full restart: back to the city on a bright morning with the story rewound. Also what the ending calls.
+  function fullReset() {
+    spawn();
+    beginTypingSession({ restartStory: true });
+    input.clearHeld();
+    state.worldTime = 0;
+    state.zoneAuto = true;
+    state.highwayEnteredAt = -Infinity;
+    state.storyDone = false;
+    prevSpeed = 0;
+    director.reset();
+    setMode('city');
+  }
+
   const input = createInput({
     typeKey: handleTypingKey,
     typeBackspace: handleTypingBackspace,
@@ -94,19 +110,11 @@ async function main() {
       state.zoneAuto = false; // otherwise the zone logic flips you straight back
       setMode(state.mode === 'city' ? 'highway' : 'city');
     } : undefined,
-    // Dev-only: F6 jumps the clock forward by 1/8 of a day, to eyeball every time of day quickly.
-    skipTime: import.meta.env.DEV ? () => { state.worldTime = wrapTime(state.worldTime + 0.125); } : undefined,
-    reset: () => {
-      spawn();
-      beginTypingSession({ restartStory: true });
-      input.clearHeld();
-      state.worldTime = 0;
-      state.zoneAuto = true;
-      state.highwayEnteredAt = -Infinity;
-      prevSpeed = 0;
-      director.reset();
-      setMode('city');
-    },
+    // Dev-only: F6 jumps to the next act of the story (or, in free clock mode, 1/8 of a day forward).
+    skipTime: import.meta.env.DEV
+      ? () => { if (CLOCK_MODE === 'story') skipActDev(); else state.worldTime = wrapTime(state.worldTime + 0.125); }
+      : undefined,
+    reset: fullReset,
   });
 
   function updateZoneMode() {
@@ -125,10 +133,19 @@ async function main() {
     if (state.paused) dt = 0; // everything below is dt-driven, so this freezes the sim
 
     state.time += dt;
-    state.worldTime = wrapTime(state.worldTime + dt / DAY_CYCLE_SECONDS); // loops forever
+    if (CLOCK_MODE === 'story') {
+      // the sky follows how far through the story you have typed (eased, so a finished paragraph never snaps it)
+      const target = getStoryTime(state.typing.buffer.length);
+      state.worldTime += (target - state.worldTime) * (1 - Math.exp(-dt / 3));
+    } else {
+      state.worldTime = wrapTime(state.worldTime + dt / DAY_CYCLE_SECONDS); // free-running loop
+    }
     updateZoneMode();
     director.update(vehicle.center.z);
-    setAct(director.getDirectorState()); // story text follows the horror act (takes effect on the next prompt)
+    if (state.storyDone && !ending.active) {
+      state.loops++;
+      ending.play(fullReset);
+    }
 
     // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);
@@ -169,11 +186,12 @@ async function main() {
     });
 
     city.update(state.worldTime);
-    lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1);
+    lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1, state.time);
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     rig.update(dt);
     hud.update();
     gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
+    gfx.adapt(dt);
     gfx.render();
   }
   animate();

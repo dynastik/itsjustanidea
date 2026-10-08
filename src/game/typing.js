@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { pickPrompt, resetStory } from './story.js';
+import { pickPrompt, resetStory, skipToNextAct } from './story.js';
 
 // Highway tuning lives here so typing feel is tweaked in one place.
 export const HIGHWAY_CONFIG = {
@@ -16,7 +16,8 @@ export const HIGHWAY_CONFIG = {
 
   // ---- speed model: WPM sustains speed, accuracy buys stability ----
   instabilityGain: 3,     // instability = (1 - accuracy) * this, clamped 0..1 (90% accuracy -> 0.3)
-  jerkSteer: 0.6,         // wheel jerk per wrong key, as a fraction of full steering lock
+  jerkSteer: 0.6,         // wheel jerk per mistake, as a fraction of full steering lock
+  jerkStreak: 3,          // ...but only once this many wrong keys happen IN A ROW (a slip or two is forgiven)
   driftAmp: 2.2,          // metres of lane wander at full instability
   driftSpeed: 0.6,        // rad/s of the wander
   hillGradeRef: 0.05,     // road grade (rise/run) that counts as a full climb
@@ -44,14 +45,21 @@ let charTimes = [];   // game-clock time of each correct character
 let keystrokes = [];  // rolling window of right/wrong
 let kicks = [];       // recent wrong keys -> decaying wheel jerks { t, sign }
 let sessionStart = null;
+let wrongStreak = 0;  // consecutive wrong keys; any correct key clears it
 let keyLog = [];      // whole-run record { t, key, expected, ok } (telemetry; cleared on a full reset)
 
 export function pickNewWord() {
   const t = state.typing;
   const p = pickPrompt();
+  t.buffer = '';
+  if (!p) { // story over: the ending takes it from here (main.js)
+    t.target = '';
+    t.source = 'end';
+    state.storyDone = true;
+    return;
+  }
   t.target = p.text;
   t.source = p.source;
-  t.buffer = '';
 }
 
 // restartStory: true on a full game reset. Re-entering the highway from the city keeps your place in the story.
@@ -60,11 +68,13 @@ export function beginTypingSession({ restartStory = false } = {}) {
   keystrokes = [];
   kicks = [];
   sessionStart = null;
+  wrongStreak = 0;
   state.typing.wordsCompleted = 0;
   state.typing.lastErrorAt = -Infinity;
   if (restartStory) {
     keyLog = [];
     resetStory();
+    state.storyDone = false;
   }
   if (restartStory || !state.typing.target) pickNewWord();
   else state.typing.buffer = '';
@@ -73,6 +83,7 @@ export function beginTypingSession({ restartStory = false } = {}) {
 // key is the literal character typed (case and punctuation preserved), one character long.
 export function handleTypingKey(key) {
   const t = state.typing;
+  if (!t.target) return; // nothing to type (story finished)
   if (sessionStart === null) sessionStart = state.time;
 
   const expected = t.target[t.buffer.length];
@@ -85,15 +96,24 @@ export function handleTypingKey(key) {
   if (ok) {
     t.buffer += key;
     charTimes.push(state.time);
+    wrongStreak = 0;
   } else {
     t.lastErrorAt = state.time;
-    kicks.push({ t: state.time, sign: Math.random() < 0.5 ? -1 : 1 });
+    wrongStreak++;
+    // a slip or two is forgiven; a streak of mistakes yanks the wheel (each extra wrong key yanks it again)
+    if (wrongStreak >= HIGHWAY_CONFIG.jerkStreak) kicks.push({ t: state.time, sign: Math.random() < 0.5 ? -1 : 1 });
   }
 
   if (t.buffer === t.target) {
     t.wordsCompleted++;
     pickNewWord();
   }
+}
+
+// Dev (F6): jump to the first paragraph of the next act.
+export function skipActDev() {
+  skipToNextAct();
+  pickNewWord();
 }
 
 export function handleTypingBackspace() {

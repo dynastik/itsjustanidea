@@ -83,6 +83,34 @@ export function createRenderer(scene, camera) {
     composer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  // Adaptive resolution: if the frame rate sags for a couple of seconds, render at a lower pixel ratio (0.25 steps,
+  // never below 0.75); creep back up when it has been smooth for a while. A safety net for weak GPUs, and it
+  // stays out of the way (no change) on a machine that holds 60 FPS.
+  const maxPixelRatio = Math.min(window.devicePixelRatio, 2);
+  let pixelRatio = maxPixelRatio;
+  let avgFrame = 1 / 60;
+  let slowFor = 0;
+  let fastFor = 0;
+  let cooldown = 0; // after dropping, do not try to go back up for a while (stops flip-flopping)
+  function adapt(dt) {
+    if (dt <= 0) return; // paused
+    avgFrame += (dt - avgFrame) * 0.05;
+    cooldown = Math.max(0, cooldown - dt);
+    if (avgFrame > 1 / 45) { slowFor += dt; fastFor = 0; }
+    else if (avgFrame < 1 / 57) { fastFor += dt; slowFor = 0; }
+    else { slowFor = 0; fastFor = 0; }
+    let next = pixelRatio;
+    if (slowFor > 2 && pixelRatio > 0.75) next = Math.max(0.75, pixelRatio - 0.25);
+    else if (fastFor > 10 && cooldown === 0 && pixelRatio < maxPixelRatio) next = Math.min(maxPixelRatio, pixelRatio + 0.25);
+    if (next === pixelRatio) return;
+    if (next < pixelRatio) cooldown = 40;
+    pixelRatio = next;
+    slowFor = fastFor = 0;
+    renderer.setPixelRatio(pixelRatio);
+    composer.setPixelRatio(pixelRatio);
+    if (import.meta.env.DEV) console.info('[render] pixel ratio ->', pixelRatio);
+  }
+
   let tiltAmount = 0;
   const lerp = THREE.MathUtils.lerp;
 
@@ -110,5 +138,6 @@ export function createRenderer(scene, camera) {
     domElement: renderer.domElement,
     render: () => composer.render(),
     setLook,
+    adapt,
   };
 }

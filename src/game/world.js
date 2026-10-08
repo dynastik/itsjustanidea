@@ -60,9 +60,13 @@ export function terrainHeight(x, z) {
 }
 
 // Heights (row-major: zi * N + xi) and vertex colours for the grid centred on (0, centerZ).
+// The two arrays are shared and rewritten on every rebuild (nothing keeps a reference to the old values),
+// so recentring the terrain every ~200 m no longer allocates and throws away ~2 MB each time.
+const TERRAIN_HEIGHTS = new Float32Array(N * N);
+const TERRAIN_COLORS = new Float32Array(N * N * 3);
 function buildTerrainData(centerZ) {
-  const heights = new Float32Array(N * N);
-  const colors = new Float32Array(N * N * 3);
+  const heights = TERRAIN_HEIGHTS;
+  const colors = TERRAIN_COLORS;
   const c = new THREE.Color();
   for (let zi = 0; zi < N; zi++) {
     const z = centerZ + (-VIEW + zi * CELL);
@@ -87,9 +91,11 @@ function buildTerrainData(centerZ) {
   return { heights, colors };
 }
 
-function buildTerrainGeometry({ heights, colors }) {
-  const pos = new Float32Array(N * N * 3);
-  const nor = new Float32Array(N * N * 3);
+// Created once. Later rebuilds pass the existing geometry and only rewrite heights, normals and colours in place:
+// no new geometry, no 600k-entry index rebuild, no GPU buffer churn.
+function buildTerrainGeometry({ heights, colors }, existing = null) {
+  const pos = existing ? existing.attributes.position.array : new Float32Array(N * N * 3);
+  const nor = existing ? existing.attributes.normal.array : new Float32Array(N * N * 3);
   for (let zi = 0; zi < N; zi++) {
     const zl = Math.max(zi - 1, 0), zr = Math.min(zi + 1, SEG);
     for (let xi = 0; xi < N; xi++) {
@@ -106,6 +112,12 @@ function buildTerrainGeometry({ heights, colors }) {
       nor[i * 3 + 1] = 1 / len;
       nor[i * 3 + 2] = -dz / len;
     }
+  }
+  if (existing) {
+    existing.attributes.position.needsUpdate = true;
+    existing.attributes.normal.needsUpdate = true;
+    existing.attributes.color.needsUpdate = true; // its array IS the shared colour buffer, already rewritten
+    return existing;
   }
   const idx = new Uint32Array(SEG * SEG * 6);
   let k = 0;
@@ -203,6 +215,7 @@ export function createWorld(scene, physics, RAPIER) {
     new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradientMap })
   );
   terrain.receiveShadow = true;
+  terrain.frustumCulled = false; // the geometry is rewritten in place and always surrounds the vehicle
   scene.add(terrain);
 
   const road = new THREE.Mesh(
@@ -253,8 +266,7 @@ export function createWorld(scene, physics, RAPIER) {
   function rebuildTerrain(newCenterZ) {
     centerZ = newCenterZ;
     const data = buildTerrainData(centerZ);
-    terrain.geometry.dispose();
-    terrain.geometry = buildTerrainGeometry(data);
+    buildTerrainGeometry(data, terrain.geometry);
     terrain.position.z = centerZ;
     road.geometry.dispose();
     road.geometry = buildRoadGeometry(centerZ);
