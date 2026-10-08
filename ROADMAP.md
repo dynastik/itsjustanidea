@@ -2,7 +2,7 @@
 
 ## Pitch
 
-A calm, sunny drive through scenic hills in a delivery van slowly turns into supernatural and paranormal horror. Elias is a delivery driver whose route begins recording deliveries before he reaches them. The road, delivery records, and the narration suggest that another version of his route is already happening.
+A calm, sunny drive through scenic hills in a delivery van slowly turns into supernatural and paranormal horror. *player_username* is a delivery driver whose route begins recording deliveries before he reaches them. The road, delivery records, and the narration suggest that another version of his route is already happening.
 
 **The horror is never explained outright.** No visible monster, no rendered replacement-driver character, no lore dump. Evidence arrives through impossible chronology, repeating roads, unreliable text, lighting, headlights, and the driver's own van.
 
@@ -26,7 +26,7 @@ WASD driving in towns; typing drives the highway. The same typing system that te
 - Headlights are manually controlled by the player.
 - No radio system, radio DJ, radio-dependent plot, or radio prompts.
 - No walking character, NPCs, conversations, or pedestrian interaction.
-- Town gameplay stays vehicle-based: drive with WASD, park at designated places, and optionally refuel if it adds meaningful gameplay.
+- Town gameplay stays vehicle-based: drive with WASD, park at designated places, and optionally refuel/ deliver packages in city stops.
 - No literal hundreds of deliveries. Delivery records can imply a long history without simulating hundreds of stops.
 - Never show a replacement driver as a character. Let the player infer the connection from evidence.
 - No definitive explanation of who or what causes the loop.
@@ -38,7 +38,6 @@ WASD driving in towns; typing drives the highway. The same typing system that te
 
 - Before adding a feature, ask whether it serves the pillars above. Otherwise park it in the backlog.
 - Re-read the relevant source files before changing a system. The code is authoritative; old checklist text can go stale.
-- Keep commits small and focused. Prefer one clear change per commit.
 - Every meaningful phase should end with a playable build.
 - Do not optimize blindly. Measure frame time/FPS on the Dell Latitude 3490 baseline laptop before and after expensive rendering changes.
 - Keep the project a focused driving-and-typing horror game, not an open-world delivery simulator.
@@ -67,7 +66,7 @@ Known implementation details from the current roadmap/source review:
 1. Verify the existing build and core driving loop. Fix actual regressions before adding features.
 2. Implement and tune manual headlights and night visibility.
 3. Finalize typing difficulty and interaction rules.
-4. Add a minimal, vehicle-only town stop/parking loop; decide whether refuelling earns its complexity.
+4. Add a minimal, vehicle-only town stop/parking loop; decide whether refuelling/ delivery earns its complexity.
 5. Build one complete Long Mode day-to-night cycle with one effective supernatural event.
 6. Expand that tested structure across more nights and develop the replacement-driver mystery.
 7. Implement the nightmare sequence and cliffhanger ending.
@@ -89,7 +88,7 @@ Known implementation details from the current roadmap/source review:
 - [x] Day/night lighting and fog system exists.
 - [x] Chase and cab camera profiles exist.
 - [x] Pause, reset, mute, and debug controls exist.
-- [ ] Verify startup, reset, pause/resume, collisions, camera toggles, and zone transitions in the current build.
+- [x] Verify startup, reset, pause/resume, collisions, camera toggles, and zone transitions in the current build.
 - [ ] Verify the game remains playable after restarting Short Mode and after changing modes.
 - [ ] Confirm no recent merge or scenery changes introduced black-screen, missing-material, or input regressions.
 
@@ -117,7 +116,7 @@ Known implementation details from the current roadmap/source review:
 Target a stylized miniature/diorama driving game: low-poly environmental design, restrained toon shading, a deliberate palette, strong silhouettes, fog, and a toy-like chase camera. The cab camera should feel more grounded.
 
 - [x] Toy-car chase camera profile and restrained tilt-shift effect.
-- [x] Stylized/toon material treatment and day-cycle colour grading.
+- [ ] Stylized/toon material treatment and day-cycle colour grading.
 - [x] Morning, sunset, night, and sunrise lighting transitions.
 - [x] Stylized tree and terrain treatment; no grass props.
 - [x] Improved town scenery with varied building facades, roof styles, parked cars, curbs, and pavement details.
@@ -186,7 +185,6 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 - [ ] Trigger delivery progress through a short scripted sequence, the delivery sheet, and/or a typing passage. Avoid building a separate dialogue system.
 - [ ] Make returning to driving straightforward and reliable.
 - [ ] Decide whether fuel is a real resource. Recommendation: start with parking and delivery first; add simple refuelling only if it creates an interesting decision rather than busywork.
-- [ ] If fuel is implemented, keep it forgiving, clearly communicated, and compatible with the story. Do not let fuel exhaustion soft-lock the game.
 - [ ] Reuse a small number of places and let their text, lighting, or details change as the mystery escalates.
 - [ ] Keep town sections short enough that the highway typing and horror remain the core experience.
 
@@ -232,7 +230,7 @@ Use a gradual ramp with room for quiet between major events:
 6. **Nightmare climax:** the delivery is marked complete, but the driver's status is unknown or replaced. Use darkness, brief headlight/engine moments, and disorienting but readable imagery instead of a visible monster.
 7. **False relief:** Elias wakes in the van at peaceful dawn. Ordinary ambience and the opening music return, suggesting it was a nightmare.
 8. **Final evidence:** the delivery sheet still carries an impossible record/counter. The narration describes Elias checking the mirror without the player choosing to, claims the back seat is empty, then ends with the implication that it was empty yesterday too.
-9. **Cliffhanger loop:** fade to black. “GOOD MORNING, ELIAS.” Then: “YOUR FIRST DELIVERY IS ALREADY COMPLETE.” The opening begins again with a subtle change and persistent evidence.
+9. **Cliffhanger loop:** fade to black. “GOOD MORNING, ELIAS.” Then: “YOUR FIRST DELIVERY IS ALREADY COMPLETE.” 
 
 These are story targets, not a requirement to implement every beat in one pass. Build the first complete cycle, test its pacing, then add the rest.
 
