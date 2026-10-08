@@ -206,11 +206,11 @@ export function createLighting(scene) {
   const glowDay = new THREE.Color(1.0, 0.92, 0.7);
   const glowEvening = new THREE.Color(1.0, 0.5, 0.14);
   const cloudLitDay = new THREE.Color(1.0, 1.0, 1.0);
-  const cloudLitEvening = new THREE.Color(1.0, 0.6, 0.36);
-  const cloudLitNight = new THREE.Color(0.26, 0.3, 0.46);
-  const cloudDarkDay = new THREE.Color(0.76, 0.83, 0.93);
-  const cloudDarkEvening = new THREE.Color(0.66, 0.36, 0.5);
-  const cloudDarkNight = new THREE.Color(0.08, 0.09, 0.18);
+  const cloudLitEvening = new THREE.Color(1.0, 0.97, 0.92);
+  const cloudLitNight = new THREE.Color(0.78, 0.82, 0.94);
+  const cloudDarkDay = new THREE.Color(0.91, 0.94, 0.98);
+  const cloudDarkEvening = new THREE.Color(0.88, 0.86, 0.9);
+  const cloudDarkNight = new THREE.Color(0.63, 0.68, 0.82);
   const horizon = new THREE.Color();
   const skyTop = new THREE.Color();
   const sunColor = new THREE.Color();
@@ -298,7 +298,7 @@ export function createLighting(scene) {
 
     cloudLit.copy(cloudLitDay).lerp(cloudLitEvening, evening).lerp(cloudLitNight, night);
     cloudDark.copy(cloudDarkDay).lerp(cloudDarkEvening, evening).lerp(cloudDarkNight, night);
-    clouds.update(center, time, cloudLit, cloudDark, lerp(0.92, 0.75, night));
+    clouds.update(center, time, cloudLit, cloudDark, lerp(1.0, 0.94, night));
   }
 
   function getKeyLightDirection(target) {

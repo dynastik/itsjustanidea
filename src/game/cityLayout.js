@@ -51,9 +51,14 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
         const w = Math.min(10 + rand() * 7, z1 - z - 1);
         if (w < 7) break;
         const d = 14 + rand() * 10;
-        const h = 7 + Math.pow(rand(), 1.6) * 20; // mostly low-rise, a few towers
+        const h = 8 + Math.pow(rand(), 1.8) * 17; // mostly low-rise, a few taller landmarks
+        const roofRoll = rand();
+        const roof = h < 13 && roofRoll < 0.22 ? 3 : roofRoll < 0.38 ? 2 : roofRoll < 0.7 ? 1 : 0;
         const p = sidePose(z + w / 2, side, BUILD_IN + d / 2);
-        out.buildings.push({ x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading, tone: Math.floor(rand() * 8), side });
+        out.buildings.push({
+          x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading,
+          tone: Math.floor(rand() * 8), roof, side,
+        });
         z += w + 2.4; // alley: wide enough that the road's curve can't push neighbours into each other
       }
 
@@ -61,7 +66,10 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
       for (let cz = z0 + 4; cz < z1 - 4; cz += 6.5 + rand() * 5) {
         if (rand() < 0.4) continue;
         const p = sidePose(cz, side, BAY_IN + CITY_BAY_WIDTH / 2);
-        out.cars.push({ x: p.x, y: p.y, z: p.z, heading: p.heading, tone: Math.floor(rand() * 7) });
+        out.cars.push({
+          x: p.x, y: p.y, z: p.z, heading: p.heading,
+          tone: Math.floor(rand() * 7), style: Math.floor(rand() * 3),
+        });
       }
 
       // streetlights on the sidewalk, every 24 m
@@ -79,6 +87,12 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
         out.flats.push({ kind: 'bay', x: bay.x, y: bay.y, z: bay.z, sx: CITY_BAY_WIDTH, sy: 0.07, sz: len + 0.06, heading: bay.heading, pitch });
         const walk = sidePose(zc, side, BAY_OUT + CITY_WALK_WIDTH / 2);
         out.flats.push({ kind: 'walk', x: walk.x, y: walk.y + CURB - 0.17, z: walk.z, sx: CITY_WALK_WIDTH, sy: 0.34, sz: len + 0.06, heading: walk.heading, pitch });
+        const curb = sidePose(zc, side, BAY_OUT);
+        out.flats.push({ kind: 'curb', x: curb.x, y: curb.y + CURB / 2, z: curb.z, sx: 0.18, sy: CURB, sz: len + 0.06, heading: curb.heading, pitch });
+        if (zs > z0) {
+          const joint = sidePose(zs, side, BAY_OUT + CITY_WALK_WIDTH / 2);
+          out.flats.push({ kind: 'joint', x: joint.x, y: joint.y + CURB + 0.006, z: joint.z, sx: CITY_WALK_WIDTH, sy: 0.012, sz: 0.035, heading: joint.heading, pitch: 0 });
+        }
       }
     }
   }

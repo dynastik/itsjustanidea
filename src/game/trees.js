@@ -256,7 +256,9 @@ export async function createTrees(scene, physics, RAPIER) {
   }
 
   function treeData(k, side) {
-    if (Math.floor(hash(k, side + 1) * 7) === 0) return null;
+    if (Math.floor(hash(k, side + 1) * 12) === 0) return null;
+    const cluster = Math.floor(k / 4);
+    if (hash(cluster, side + 17) < 0.26 || hash(k, side + 23) < 0.12) return null;
     const z = (k + 0.5 + (hash(k, side + 2) - 0.5) * 0.35) * TREE_SPACING;
     if (z > CITY_Z_MIN - 20 && z < CITY_Z_MAX + 20) return null; // the city has its own scenery
     const offset = THREE.MathUtils.lerp(TREE_MIN_OFFSET, TREE_MAX_OFFSET, hash(k, side + 3));
