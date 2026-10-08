@@ -1,259 +1,360 @@
-# ROADMAP: itsjustanidea (working title)
+# ROADMAP: itsjustanidea
 
 ## Pitch
-A calm, sunny drive through scenic hills in a delivery van that slowly, then suddenly, turns into horror.
-WASD in the city, typing on the highway. The same typing system that teaches you the game is what later frightens you.
-**The horror is never shown head-on.** No monster, no ghost model. Just the cab, the road, and things that are slightly wrong.
 
-## Pillars (the "don't drift" list)
-1. **Calm first.** The opening must be genuinely pleasant. Horror only lands if the comfort was real.
-2. **Typing is the highway's driving.** One input system carries both gameplay and horror delivery. The text you type *is* the story.
-3. **Horror through systems, not just scares.** Audio, fog/light, text, the cab itself, and controls that stop being trustworthy. Implication over depiction.
-4. **Small and shippable.** Stylized, free/CC0 assets only, static hosting (GitHub Pages), a 10-15 minute experience. **Budget is zero: every tool, asset and host must be free.**
+A calm, sunny drive through scenic hills in a delivery van slowly turns into supernatural and paranormal horror. Elias is a delivery driver whose route begins recording deliveries before he reaches them. The road, delivery records, and the narration suggest that another version of his route is already happening.
 
-## Rules
-- **Feature test:** before building anything, ask "does this serve pillar 1, 2 or 3?" If not, it goes in the Backlog.
-- Every phase ends with a playable, committed build.
-- One checklist item per commit. The commit message is the item name.
-- Don't start a later phase until the current phase's "Done when" is true (audio prototyping is the one exception).
-- **Cut order if time runs short:** Phase 6 (neural nets) -> tire-track/smoke shaders -> traffic -> extra zone variety -> Semantris mode. Never cut audio or the horror pivot.
-- **Model-agnostic:** the vehicle is currently a van file named `truck.glb` and may be swapped later. Keep model-specific numbers (Y offset, wheelbase, collider size, cab camera position, mirror position) in one `VEHICLE_CONFIG` object so a swap is a config change, not a rewrite.
-- **Performance target:** the primary development/test laptop is a Dell Latitude 3490. Treat it as the baseline machine for performance decisions. The goal is a stable ~60 FPS at 1080p on a typical integrated-GPU configuration; lower FPS on weaker configurations is acceptable if the game remains playable. Do not optimize blindly: measure frame time/FPS on the baseline laptop.
+**The horror is never explained outright.** No visible monster, no rendered replacement-driver character, no lore dump. Evidence arrives through impossible chronology, repeating roads, unreliable text, lighting, headlights, and the driver's own van.
+
+WASD driving in towns; typing drives the highway. The same typing system that teaches the game becomes part of the horror.
+
+## Pillars
+
+1. **Calm first.** The opening should feel genuinely pleasant and ordinary.
+2. **Driving and typing are the core.** Keep the experience focused on the van, the road, and the story text.
+3. **Supernatural horror through systems.** Imply more than is shown. Use the road, delivery sheet, narration, lighting, and headlights.
+4. **A cliffhanger, not a lore explanation.** The ending should be frightening and leave the cause ambiguous.
+5. **Small and shippable.** Stylized world, free assets, static hosting, zero budget. Prefer one complete polished experience over a sprawling simulator.
+6. **Accessible typing.** Easy, Medium, and Hard change pressure and mistake tolerance, never access to story content.
+
+## Non-negotiable scope decisions
+
+- Keep the title **itsjustanidea**.
+- Short Mode and Long Mode are separate choices with separate progression.
+- Short Mode retains its existing compact ending unless testing proves it needs a small polish pass.
+- Long Mode escalates across multiple nights. The final number of nights is undecided; build one complete day-to-night cycle first, then decide from playtesting.
+- Headlights are manually controlled by the player.
+- No radio system, radio DJ, radio-dependent plot, or radio prompts.
+- No walking character, NPCs, conversations, or pedestrian interaction.
+- Town gameplay stays vehicle-based: drive with WASD, park at designated places, and optionally refuel if it adds meaningful gameplay.
+- No literal hundreds of deliveries. Delivery records can imply a long history without simulating hundreds of stops.
+- Never show a replacement driver as a character. Let the player infer the connection from evidence.
+- No definitive explanation of who or what causes the loop.
+- Neural-network experiments and Semantris-style association typing are optional backlog items and must not delay release.
+- Audit the existing audio implementation later and polish it near the end; do not assume it is missing or complete without checking the code.
+- Do not hotlink assets. Bundle assets locally and record their licences in `CREDITS.md`.
+
+## Working rules
+
+- Before adding a feature, ask whether it serves the pillars above. Otherwise park it in the backlog.
+- Re-read the relevant source files before changing a system. The code is authoritative; old checklist text can go stale.
+- Keep commits small and focused. Prefer one clear change per commit.
+- Every meaningful phase should end with a playable build.
+- Do not optimize blindly. Measure frame time/FPS on the Dell Latitude 3490 baseline laptop before and after expensive rendering changes.
+- Keep the project a focused driving-and-typing horror game, not an open-world delivery simulator.
 
 ---
 
-## Current state (what the code actually does today)
-The code is now split into modules under `src/game` rather than being kept as one giant `main.js`. Current relevant systems include state, renderer, lighting, world, vehicle, camera, cab interior, audio, input, typing, HUD and horror director modules.
+## Current state
 
-Important current facts before continuing Phase 1/2:
-- Three.js 0.186, Rapier 0.21 (`rapier3d-compat`), Vite 8.
-- `render.js` uses `EffectComposer` with RenderPass + SMAA + OutputPass and caps pixel ratio at 2.
-- `lighting.js` uses a directional sun with a **1024x1024 shadow map**, moonlight, a moving square sun/moon, and a morning->sunset->night sky/fog palette. The baseline shadow resolution follows the performance policy below.
-- `main.js` already wires `cabin.js` and `director.js`, has automatic city/highway switching, morning->sunset->night world time, pause/reset/debug/mute controls, and the shared `driveInput`.
-- The cab interior exists and is hidden until cab view is toggled.
-- The exact current implementation is authoritative; do not assume old roadmap descriptions still match the code. Re-read the relevant source files before modifying them.
-- Truck model is local at `public/models/truck.glb`; do not hotlink assets.
-- Camera controls and other roadmap items must be verified against current source before marking them complete.
+The game is already modularized under `src/game`. Current systems include state, renderer, lighting, world, vehicle, camera, cab interior, audio, input, typing, HUD, day cycle, and horror director modules.
+
+Known implementation details from the current roadmap/source review:
+
+- Vite, Three.js, and Rapier are set up.
+- The van model is local at `public/models/truck.glb`.
+- WASD town driving and typing-driven highway driving exist, with automatic zone switching.
+- The vehicle uses Rapier's raycast vehicle controller through the shared `driveInput`.
+- A day/night cycle, toy-car chase camera, tilt-shift look, stylized terrain, trees, city buildings, parked cars, highway scenery, and a cab view exist.
+- The horror director has CALM, UNEASY, WRONG, HORROR, and FINALE acts.
+- The current Short Mode ending is “Delivery accepted.”, fade to black, “Next driver, please.”, then restart.
+- Synthesized engine audio and an audio manager exist. The full audio mix has not yet been audited.
+- Recent user testing reported roughly 60 FPS with occasional brief dips to 58 FPS. Profile again after meaningful changes rather than chasing tiny fluctuations.
+- Some roadmap items below are unverified or incomplete. Verify them in source and in a playable build before marking them done.
+
+## Priority order
+
+1. Verify the existing build and core driving loop. Fix actual regressions before adding features.
+2. Implement and tune manual headlights and night visibility.
+3. Finalize typing difficulty and interaction rules.
+4. Add a minimal, vehicle-only town stop/parking loop; decide whether refuelling earns its complexity.
+5. Build one complete Long Mode day-to-night cycle with one effective supernatural event.
+6. Expand that tested structure across more nights and develop the replacement-driver mystery.
+7. Implement the nightmare sequence and cliffhanger ending.
+8. Audit and polish audio, accessibility, performance, menus, credits, and release packaging.
 
 ---
 
-## Phase 0: Foundation (DONE)
-- [x] Repo, Vite, Three.js, Rapier set up
-- [x] Truck model loads from `public/models`, wheel animation driven by speed
-- [x] Kinematic bicycle-model steering (rear-axle pivot, speed-scaled turning)
-- [x] City (WASD) and highway (typing) prototype modes
-- [x] Auto zone switch (placeholder z-threshold with hysteresis)
-- [x] Highway auto-steer + WPM/accuracy-driven speed
-- [x] Shadow follows truck, debug orbit cam (`) + collider box
-- [x] Morning -> sunset -> night lighting/fog system (`worldTime`)
-- [ ] Roadside trees (instanced; not currently implemented in source)
-- [x] Free-look camera + speed-based FOV (drag-look and speed-responsive FOV are implemented in `camera.js`)
+## Phase 0: Foundation (mostly complete; verify regressions)
 
-## Phase 1: Structure and driving feel
-**Done when:** driving for 2 minutes feels good and the code is split into modules.
-- [x] Split `main.js` into modules (vehicle, camera, world, typing, lighting, ui, input); `main.js` now wires these systems together
-- [x] Central game state object (mode, worldTime, speed, typing stats)
-- [x] `VEHICLE_CONFIG` object (model swap-friendly, see Rules)
-- [x] **Vehicle physics v2 ("slightly realistic"):** dynamic chassis + Rapier's raycast vehicle controller (`world.createVehicleController`): 4 wheels with suspension, tire grip, mass and weight transfer, a little body roll, engine force + brake + steering inputs. Tuned to feel arcade-friendly (forgiving grip, mild oversteer), not a sim. Keep the old bicycle model in git history as a fallback
-- [x] Input layer between the player and the vehicle: all steering/throttle/brake go through one `driveInput` object. City reads WASD into it, highway writes it from typing (auto lane-follow + WPM throttle). This is also where the horror later injects wheel pull and brake lag
-- [x] `render.js` module: renderer + `EffectComposer` passthrough (RenderPass + SMAA + OutputPass), replacing `antialias: true`; pixel ratio capped at 2
-- [x] Camera module: chase cam, drag-look, speed-based FOV, **cab (first-person) view toggle (F2)**, structured as named **camera profiles**
-- [x] Cab view v1: camera at the driver's head position, hood/dash visible, no interior model yet, hides the truck's exterior mesh (or uses a simple inside-cab pass) so nothing clips
-- [x] Real road mesh (asphalt + edge lines) distinct from grass; off-road slows you down
-- [x] Tree/prop colliders with collision response (tree trunks and highway guardrails have localized physics colliders; vehicle impact audio responds to abrupt speed loss)
-- [x] HUD: speedometer, cleaner mode label, fix stale key hints in `index.html`
-- [x] Reset (R in city; F4 in either mode) and pause (Esc)
-- [x] Web Audio manager + synthesized engine sound (pitch follows speed, no downloads needed)
-- [x] Debug box hidden by default (still toggled with `)
+**Done when:** the game starts reliably and the core controls work without blocking bugs.
 
-## Phase 2: World
-**Done when:** you can drive from the city, up the on-ramp, onto a hilly scenic highway with no visible seams, and the mode switches by itself.
+- [x] Vite, Three.js, and Rapier configured.
+- [x] Local van model loads from `public/models`.
+- [x] Shared vehicle input layer routes town and highway controls through `driveInput`.
+- [x] City driving uses WASD.
+- [x] Highway driving uses typing for speed while auto lane-follow handles steering.
+- [x] Automatic city-to-highway transition exists.
+- [x] Central game state and modular game systems exist.
+- [x] Day/night lighting and fog system exists.
+- [x] Chase and cab camera profiles exist.
+- [x] Pause, reset, mute, and debug controls exist.
+- [ ] Verify startup, reset, pause/resume, collisions, camera toggles, and zone transitions in the current build.
+- [ ] Verify the game remains playable after restarting Short Mode and after changing modes.
+- [ ] Confirm no recent merge or scenery changes introduced black-screen, missing-material, or input regressions.
 
-### World generation and visibility strategy
-The game is a controlled driving experience, not an open-world free-roam game. Exploit that constraint.
+---
 
-- [x] Terrain/world is generated only within a bounded active area around the player's road position; do not create a huge fully populated world.
-- [ ] Recycle road/world segments ahead and behind the vehicle so the playable world can feel endless without keeping everything alive.
-- [ ] Use **camera frustum culling + distance tests** as the primary render visibility checks. Do not run an expensive per-object "perfect cone intersection" calculation every frame.
-- [ ] Use **distance-based LOD rings** for scenery. Starting target, to be tuned by profiling:
-  - near: full-detail meshes
-  - medium: simplified meshes/materials
-  - far: very simple silhouettes/cheap meshes
-  - very far: fog/background only
-- [ ] Keep generation/streaming separate from render visibility. A nearby road/world chunk may exist in memory while most of its objects are culled or represented by a cheaper LOD.
-- [x] Use instancing for repeated scenery (current highway rails, posts, and signs use `InstancedMesh`; extend to trees/rocks/grass when added).
-- [ ] Preserve important art-directed silhouettes even when strict mathematical visibility would allow culling; visibility optimization must not ruin composition.
-- [ ] Prefer road-relative active areas/corridors where useful. The player follows a controlled route, so there is no need for general-purpose open-world streaming logic.
+## Phase 1: World and driving feel
 
-### Terrain, road and zones
-- [x] Terrain: bounded, taller and broader hilly heightfield; the road corridor stays flat across its width with its own gentle elevation changes
-- [x] Terrain collider: Rapier heightfield collider generated from the same height data as the visual terrain mesh, so the raycast vehicle climbs, crests and settles on hills naturally (retune suspension and engine force for grades)
-- [ ] Road generator: segments recycled ahead/behind so the road is endless; gentle curves **and elevation**
-- [x] City zone: low-poly buildings, intersections, streetlights, parked cars (flat-ish start area)
-- [x] Highway zone: guardrails, signs, mile markers
-- [ ] **Scenic set pieces:** ridge-top vista, valley with a lake or river, distant mountains, a tunnel or overpass, a rest stop (all reused later for horror loops)
-- [x] **Real zone transition:** on-ramp trigger volume switches WASD -> typing automatically (no key press), with a short handoff moment (speed eases, typing UI fades in) so it is never abrupt. Tab dev override removed from release build
-- [ ] Prop sets per zone, swappable per "act" (needed for the horror pivot later)
+**Done when:** the player can drive through the town, join the scenic highway, and continue without visible seams or major control problems.
+
+### Road and world
+
+- [x] City zone with low-poly buildings, intersections, streetlights, parked cars, and roadside detail.
+- [x] Highway zone with guardrails, signs, and mile markers.
+- [x] Hilly terrain and a road corridor.
+- [x] Trees with near and distant visual treatments.
+- [x] On-ramp trigger switches from WASD driving to highway typing automatically.
+- [ ] Verify road/world segments recycle ahead and behind the vehicle. Implement or repair this only if the current build needs it.
+- [ ] Verify visibility checks use frustum culling and distance checks sensibly.
+- [ ] Add or tune distance-based LOD only where profiling shows it helps.
+- [ ] Add a small number of memorable scenic set pieces if the current route needs them: a vista, a valley/water feature, a tunnel/overpass, or a rest stop. Do not add all of them by default.
+- [ ] Verify that each zone can change its props or lighting by story act without requiring an open-world system.
 
 ### Art direction
-**Target look:** a miniature/diorama driving game with an Art of Rally-inspired environmental design language, but with restrained toon/cel-style shading and hand-painted color choices. Do **not** interpret this as full anime/cartoon cel shading. The goal is a coherent low-poly miniature world with simple, deliberate light bands, a tight palette, strong silhouettes, fog and a toy-like camera.
 
-- [x] **Art pass 1a, camera look:** "toy-car" chase profile: camera high and far, narrow FOV (about 15-25 degrees), lerped follow with slight lag. Raise the camera enough that hills do not block the view of the truck
-- [x] **Art pass 1b, miniature/tilt-shift:** use a restrained screen-space tilt-shift effect in the chase profile. Top and bottom of the frame should blur while a horizontal band stays relatively sharp. Start with Three.js horizontal/vertical tilt-shift shaders or an equivalent lightweight implementation. Prefer a lightweight tilt-shift treatment over a full cinematic depth-of-field/bokeh system. **Cab view should normally disable the miniature tilt-shift look** so the horror transition can feel more grounded.
-- [x] **Art pass 1c, color grade:** custom grading pass (saturation up, blacks lifted for the film-print look, palette clamp), driven by `worldTime` so the grade can sour during the horror pivot
-- [x] **Art pass 1d, toon materials:** `MeshToonMaterial` with a shared custom 3-tone gradient map on terrain and roadside props; convert the truck GLB's materials on load while preserving color and maps. Use flat shading on custom meshes where it improves the silhouette. Toon shading is a visual style choice, not a reason to increase geometry.
-- [x] **Endless day cycle:** `worldTime` now loops (morning -> sunset -> night -> sunrise -> morning, 300 s per day, `daycycle.js` is the single source for all factors). Dev: F6 skips 1/8 day.
-- [x] **Art pass 1e, fog and sky:** switch to `FogExp2` with fog color locked to the sky horizon; transition through morning, orange sunset with a purple opposite horizon, and purple night.
-- [x] **Art pass 1f, lighting and shadows:** harsh directional sun plus a colored `HemisphereLight` (blue sky, warm ground) so shadows stay colorful. Use a tight shadow frustum around the vehicle for useful shadow resolution.
-- [x] **Shadow performance policy:** start with a **1024x1024** main sun shadow map, not 2048x2048. Keep shadow casting focused on important nearby objects. Distant/small scenery should use simplified shadows, receive no shadow, or cast no shadow. A lower-resolution shadow setup such as 512x512 may be tested for cheaper distant/alternative passes if technically useful, but do not build a complex per-object shadow-map system unless profiling proves it is needed.
-- [x] **Trees:** use nearby layered foliage clusters with a leaf-cutout canopy texture and canopy-centered light gradients; simplify distant trees to silhouettes. Combine each LOD into a single instanced batch.
-- [x] ~~**Grass:**~~ REMOVED. Grass clumps cut from `trees.js` (not worth the draw cost/look). Ground colour comes from the terrain vertex colours only.
-- [ ] **Other vegetation:** bushes and small plants should use a few solid stylized clusters or sparse alpha-tested cards, not dense individual leaves.
-- [x] **Distant vegetation:** simplify trees to low-poly silhouettes and let fog/tilt-shift soften the transition.
-- [ ] **Art pass 2 (polish, cut early if short on time):** tire-track shader (solid dark marks behind the wheels; on hills use short ribbon decals rather than a flat canvas texture) and stylized particle smoke (`THREE.Points` + `ShaderMaterial`: solid squares/spheres that grow, drift back, shrink and snap-fade, no soft alpha textures)
-- [ ] Simple traffic (city only, cars following lanes)
+Target a stylized miniature/diorama driving game: low-poly environmental design, restrained toon shading, a deliberate palette, strong silhouettes, fog, and a toy-like chase camera. The cab camera should feel more grounded.
 
-### Performance budget and profiling
-- [x] Treat the Dell Latitude 3490 as the primary baseline test machine.
-- [x] During visual development, measure FPS and frame time on the baseline laptop after major rendering changes (user reports a steady 60 FPS with occasional brief 58 FPS dips across all modes).
-- [ ] Profile GPU-heavy candidates separately: shadow map size, tilt-shift, foliage overdraw, terrain detail, pixel ratio and post-processing.
-- [ ] Profile CPU-heavy candidates separately: object count, draw-call count, world generation/streaming, visibility tests and physics.
-- [ ] Keep the scene visually rich by spending geometry where it is noticeable: truck, road, major trees and set pieces. Spend less on grass, distant vegetation and tiny props.
-- [ ] Avoid adding post-processing passes just because they are available. Every pass must earn its GPU cost visually.
-- [ ] Keep repeated scenery instanced and materials reasonably shared.
-- [ ] Do not optimize by removing visually important silhouettes or making the world look empty.
+- [x] Toy-car chase camera profile and restrained tilt-shift effect.
+- [x] Stylized/toon material treatment and day-cycle colour grading.
+- [x] Morning, sunset, night, and sunrise lighting transitions.
+- [x] Stylized tree and terrain treatment; no grass props.
+- [x] Improved town scenery with varied building facades, roof styles, parked cars, curbs, and pavement details.
+- [ ] Add small bushes or plants only if they improve the composition without making the scene visually noisy or expensive.
+- [ ] Defer tire tracks, smoke particles, extra traffic, and other optional visual effects until the core experience is complete and profiled.
 
-## Phase 3: Highway typing v2
-**Done when:** a 5-minute highway stretch is fun on its own, before any horror.
-- [x] Highway steering decision: auto lane-follow, typing controls speed (already prototyped)
-- [x] **Story as prompts (v1, placeholder writing):** highway text is a narrative delivered line by line (see "Story & typing content" below)
-- [x] Full keyboard support (v1: any printable char incl. space/caps/punctuation; Backspace steps back through correct letters, toggle `HIGHWAY_CONFIG.allowBackspace`; wrong keys never enter the buffer): spaces, punctuation, capitals, backspace policy, correct handling of wrong keys (currently only `a-z`, wrong keys ignored)
-- [x] Pluggable prompt sources (v1: story + road signs + radio, mixed in every 3-5 prompts via `SOURCES` in `story.js`; CB chatter / thoughts are one entry each to add): story, radio, road signs, CB chatter, "thoughts"
-- [x] Words -> phrases -> sentences; tiers (tied to director act via `setAct`; WPM now counts characters/5) (lowercase -> punctuation -> capitals) as difficulty rises
-- [x] Speed model (WPM sustains speed and holds it uphill, wrong keys jerk the wheel, low accuracy makes the lane wander; all in `HIGHWAY_CONFIG`): WPM sustains speed, accuracy affects stability (wheel jerk, lane drift, and on hills, engine strain uphill)
-- [ ] In-cab typing UI (radio/dashboard display instead of floating HTML), designed to work in both chase and cab views
-- [ ] Semantris-style association mode (v1: hand-written association lists)
-- [x] Typing telemetry recorder (`getTelemetry()` rolling 30 s metrics + whole-run key log; dev console `window.typingTelemetry`): (keystroke timings, error patterns), needed later for pacing
-- [x] Difficulty ramp + tutorial-by-osmosis (warmup words, 45 s learner ramp: speed floor + halved jerk/drift; no tutorial screens): (no tutorial screens)
+### Performance
 
-## Phase 4: Audio (prototype starts in Phase 1)
-**Done when:** you can play with your eyes closed and still tell speed, road type and mood.
-- [ ] Layered audio: engine, tires/road, wind, ambient bed, radio
-- [ ] Radio system (music loops + DJ text synced with typing prompts)
-- [ ] Wire in the sounds you download (free/CC0 only) from `public/audio`, logged in `CREDITS.md`
-- [ ] Cab-specific audio: muffled interior mix vs open exterior mix when switching views, rattles, seatbelt/dash sounds
-- [ ] Horror audio toolkit: sudden silence, distant sounds, static bursts, low drones, positional panning (sounds from the passenger seat / back of the van)
-- [ ] Master volume + mix settings
-
-## Phase 5: The horror pivot (the point of the game)
-**Done when:** a first-time player is comfortable for the first few minutes, then unsettled without being told why, and never sees a "monster".
-- [x] Decouple `worldTime` from the wall clock: it now follows how far through the story the player has typed (`CLOCK_MODE` in `daycycle.js`; 'free' keeps the old 300 s loop for sky tuning)
-- [x] Director: act is chosen by the story (CALM -> UNEASY -> WRONG -> HORROR -> FINALE), `director.getDirectorState()` reports it
-- [ ] **Cab interior model** (built from simple primitives or free CC0 pieces): steering wheel, dash, gauges, seats, air freshener, mirror. It is the main horror stage
-- [ ] Cab wrongness list (all implied, nothing shown outright):
-  - passenger seat belt clicks, seat compresses, or an item on it shifts
-  - hanging object swaying against the motion
-  - steering wheel turns slightly on its own
-  - dash lights/gauges misbehave, radio speaks a line you did not type
-  - reflections in the windshield or window that are almost right
-  - something in the corner of view that is gone when you look
-- [ ] Rear-view mirror (render target) for the "something is behind you" moments, usable in cab view
-- [ ] Subtle world wrongness: prop swaps, radio glitches, typing errors that aren't your fault, sky drifting
-- [ ] Typing turns adversarial: wrong prompts, prompts addressed to the player, messages that know things
-- [ ] Controls stop being trustworthy: wheel pull, brake lag, phantom steering
-- [ ] Environment: fog, lighting, road-loop tricks (same sign twice, road that doesn't end, the same hill again)
-- [x] Climax + ending (v1): false sunrise, "Delivery accepted.", fade to black, "Next driver, please.", run restarts from the morning
-- [ ] Accessibility toggle: reduce flashing / scare intensity
-
-## Phase 6: Neural networks (OPTIONAL, must never block release)
-- [ ] Heuristic "tension estimator" from typing telemetry (same interface a NN would use)
-- [ ] Director uses tension to hold back or escalate
-- [ ] Stretch: replace heuristic with a tiny TF.js model trained on your own playtest data (TF.js is free and runs in-browser)
-- [ ] Stretch: word-embedding similarity for Semantris (small precomputed vector file, cosine similarity in plain JS)
-
-## Phase 7: Ship
-- [ ] Main menu, settings, credits
-- [x] Truck loads from local `public/models` (hotlink already removed); just confirm license is logged in `CREDITS.md`
-- [ ] Bundle every other asset locally, never hotlink
-- [ ] Performance pass: profile on Dell Latitude 3490; tune pixel ratio, draw calls, shadow map size, instancing, scenery LOD, visibility/generation radius, terrain detail and post-processing
-- [x] Vite `base` config + GitHub Pages deploy (`BASE_URL` is already used for the model path)
-- [ ] Playtest with 3-5 people, tune calm -> horror timing
-- [ ] Tag v1.0
+- [x] Dell Latitude 3490 is the baseline test machine.
+- [x] Main sun shadow map starts at 1024x1024.
+- [ ] Profile GPU costs: shadows, foliage, terrain, pixel ratio, tilt-shift, and post-processing.
+- [ ] Profile CPU costs: object count, draw calls, physics, visibility checks, and world generation.
+- [ ] Preserve important silhouettes and the cozy visual density. Do not optimize by making the world empty.
+- [ ] Keep the game near a stable 60 FPS at 1080p on the baseline laptop where practical. Prioritize visible stutters and actual playability over tiny FPS fluctuations.
 
 ---
 
-## Story v1 (implemented in `story.js`)
-Elias, a delivery driver, one package, a road that was never built. The player types the story paragraph by paragraph;
-the road's own lines ("You have been here before.") are short `message` paragraphs shown in a different style.
-Acts: calm (bright day) -> uneasy (afternoon, repeated sign) -> wrong (sunset, messages) -> horror (night, the road explains itself)
--> finale (false sunrise, "Delivery accepted.", black, "Next driver, please.", restart). About 2.5k characters, so roughly
-8-14 minutes at 30-50 WPM. Note: the old lowercase -> punctuation -> capitals tiers are gone; novel text uses normal
-punctuation from the first line, and the learner ramp (see `HIGHWAY_CONFIG`) provides the easy start.
+## Phase 2: Headlights and night driving
 
-## Story & typing content (original plan, kept for reference)
-The highway prompts are the story, so the writing has to do double duty: teach typing and carry the dread.
+**Priority: first major feature after core verification.**
 
-| Act | Feel | Prompt content | Typing tier |
-|-----|------|----------------|-------------|
-| 1. Calm | Sunny, scenic, cozy | Short delivery-driver thoughts, radio DJ banter, road sign text, easy words | lowercase words |
-| 2. Uneasy | Still nice, something is off | Same voices, but small oddities (a repeated line, a sign with slightly wrong text) | short phrases + punctuation |
-| 3. Wrong | Light fading, radio unreliable | Lines that reference the player, the cab, the passenger seat, without saying what it is | sentences + capitals |
-| 4. Horror | Dusk/fog, nothing trustworthy | Prompts that address you directly, ones you are afraid to finish typing | full sentences, pressure |
+**Done when:** headlights are useful at night, easy to control, and can support a carefully staged horror moment.
 
-Guidelines: never name the entity, keep the story deniable ("maybe it's just tired driving"), and let *typing the line* be the moment the player commits to the creepy thing. Story length scales to the final playthrough length (decide after Phase 3).
+- [ ] Add a clear player control for switching headlights on and off.
+- [ ] Show a small, unobtrusive HUD indicator for headlight state and make the control discoverable.
+- [ ] Create a useful forward beam with a readable road hotspot and gradual falloff. Avoid lighting the entire world like daylight.
+- [ ] Tune beam brightness, colour, range, and shadows for the current art style and target hardware.
+- [ ] Ensure headlights remain readable in both chase and cab camera profiles.
+- [ ] Make manual control reliable through pauses, resets, mode changes, and story transitions.
+- [ ] Test dusk, full night, fog, and sunrise.
+- [ ] Add scripted supernatural flickers or temporary failures only when the story director requests them. Never make the lights randomly unreliable during normal driving.
+- [ ] Create at least one deliberate reveal that is visible only when the beam catches the right part of the road or scenery.
+- [ ] Profile performance with headlights on, especially on the baseline laptop.
+
+**Design note:** build ordinary, dependable headlights first. Their later failure matters only if the player has learned to trust them.
 
 ---
+
+## Phase 3: Typing experience and accessibility
+
+**Done when:** typing feels fair and readable at different skill levels, and story progression does not require a high WPM.
+
+- [x] Typing advances the highway narrative.
+- [x] Correct-key handling, backspace behaviour, typing telemetry, and a learner ramp exist in some form.
+- [ ] Re-test character handling, punctuation, capitals, spaces, corrections, and wrong-key behaviour against the actual story text.
+- [ ] Confirm the player can pause without losing progress or receiving unfair pressure.
+- [ ] Add or verify three difficulty settings:
+  - **Easy:** forgiving mistakes, lower pressure, comfortable speed response.
+  - **Medium:** intended default balance.
+  - **Hard:** less forgiving mistakes and stronger driving pressure, without unfairly hiding story content.
+- [ ] Difficulty must affect pressure and mistake tolerance, not which scenes or lore the player can see.
+- [ ] Avoid strict WPM gates. A slower typist must still be able to finish the story.
+- [ ] Ensure road safety and readability remain fair when text gets unsettling.
+- [ ] Verify story and act progression stay consistent for slow and fast typists.
+- [ ] Keep the typing presentation clean. A dedicated in-cab dashboard typing display is optional and should only be built if it materially improves readability or immersion.
+
+---
+
+## Phase 4: Town stops and delivery interactions
+
+**Done when:** a town stop feels purposeful without turning the game into an open-world simulator.
+
+- [ ] Keep all town interaction inside the van. No walking character, pedestrian NPCs, conversations, or dialogue trees.
+- [ ] Create one simple, readable way to identify a designated parking/delivery spot.
+- [ ] Let the player drive to the spot and park within a forgiving trigger area.
+- [ ] Trigger delivery progress through a short scripted sequence, the delivery sheet, and/or a typing passage. Avoid building a separate dialogue system.
+- [ ] Make returning to driving straightforward and reliable.
+- [ ] Decide whether fuel is a real resource. Recommendation: start with parking and delivery first; add simple refuelling only if it creates an interesting decision rather than busywork.
+- [ ] If fuel is implemented, keep it forgiving, clearly communicated, and compatible with the story. Do not let fuel exhaustion soft-lock the game.
+- [ ] Reuse a small number of places and let their text, lighting, or details change as the mystery escalates.
+- [ ] Keep town sections short enough that the highway typing and horror remain the core experience.
+
+---
+
+## Phase 5: Short Mode and Long Mode
+
+### Short Mode
+
+**Goal:** preserve a compact, complete introduction to the game.
+
+- [x] Existing Short Mode has a calm-to-horror progression and a restart ending.
+- [ ] Play through it from a clean start and verify the complete experience.
+- [ ] Check that its ending still lands after the new mode-selection and headlight work.
+- [ ] Keep changes to Short Mode small unless playtesting identifies a clear problem.
+
+### Long Mode structure
+
+**Goal:** a longer, multi-night supernatural horror story built from the same core driving and typing systems.
+
+- [ ] Add separate Short Mode and Long Mode selection in the main menu.
+- [ ] Give Long Mode its own story progression and ending; do not simply stretch Short Mode's prompts.
+- [ ] Build and playtest one complete day-to-night cycle before choosing the final number of nights.
+- [ ] Expand to additional nights only after the first cycle is satisfying. Each night should change the mystery or the player's trust, not just repeat the same scare.
+- [ ] Make the delivery sheet/records a recurring source of evidence. Entries may show deliveries completed before Elias arrives, impossible timestamps, previous routes, or events he has not experienced.
+- [ ] Use a persistent delivery counter or a small set of selected records to imply an enormous history. Do not simulate hundreds of deliveries or force the player to complete hundreds of stops.
+- [ ] Escalate from ordinary records, to impossible chronology, to narration that predicts or contradicts what the player sees and does.
+- [ ] Keep the identity of the other driver ambiguous: future Elias, previous Elias, another timeline, or something produced by the road are all possible interpretations.
+- [ ] Do not show a replacement-driver model. Evidence should come through text, the road, lighting, delivery records, and the van.
+- [ ] Make supernatural events authored and paced by the story director. Do not rely on constant random glitches.
+- [ ] Use the manual headlights for occasional deliberate moments of uncertainty and revelation.
+- [ ] Keep the cause of the phenomenon unexplained.
+
+### Recommended pacing
+
+Use a gradual ramp with room for quiet between major events:
+
+1. **Comfort:** ordinary delivery work, scenic road, dependable van, calm narration.
+2. **Unease:** repeated landmarks, small inconsistencies, a delivery record that is slightly wrong.
+3. **Contradiction:** the sheet claims a delivery is complete before Elias reaches it; the narration remembers something the player has not done.
+4. **Intrusion:** road geometry, signs, lighting, and headlight reveals become impossible to trust.
+5. **Night escalation:** records imply other versions of Elias have driven this route. The game never confirms exactly who or what they are.
+6. **Nightmare climax:** the delivery is marked complete, but the driver's status is unknown or replaced. Use darkness, brief headlight/engine moments, and disorienting but readable imagery instead of a visible monster.
+7. **False relief:** Elias wakes in the van at peaceful dawn. Ordinary ambience and the opening music return, suggesting it was a nightmare.
+8. **Final evidence:** the delivery sheet still carries an impossible record/counter. The narration describes Elias checking the mirror without the player choosing to, claims the back seat is empty, then ends with the implication that it was empty yesterday too.
+9. **Cliffhanger loop:** fade to black. “GOOD MORNING, ELIAS.” Then: “YOUR FIRST DELIVERY IS ALREADY COMPLETE.” The opening begins again with a subtle change and persistent evidence.
+
+These are story targets, not a requirement to implement every beat in one pass. Build the first complete cycle, test its pacing, then add the rest.
+
+---
+
+## Phase 6: Horror implementation and polish
+
+**Done when:** the horror feels authored, escalating, and coherent without relying on a visible monster or constant jump scares.
+
+- [x] Story-driven director with CALM, UNEASY, WRONG, HORROR, and FINALE acts exists.
+- [x] World time can be driven by story progress.
+- [ ] Re-read the current cab and director code before deciding what is actually missing.
+- [ ] Verify whether the existing cab interior is sufficient. Add only the minimum useful detail needed for atmosphere and readability.
+- [ ] Use the rear-view mirror only if it supports a specific, effective event and can be implemented reliably.
+- [ ] Add subtle world wrongness: repeated signs, impossible distances, altered props, a road that returns to a familiar place, or a light that reveals something inconsistent.
+- [ ] Add adversarial narration gradually: first strange, then personally specific, then demonstrably wrong about the player's experience.
+- [ ] Let vehicle controls become subtly unreliable only during authored events. Keep normal driving trustworthy outside those moments.
+- [ ] Use headlight failures, flickers, and reveals sparingly. Preserve player control wherever possible.
+- [ ] Avoid a visible monster, an explanatory cutscene, a lore dump, or a confirmed identity for the other driver.
+- [ ] Implement the Long Mode nightmare and false-awakening ending.
+- [ ] Add accessibility settings for reduced flashing and reduced scare intensity if effects warrant them.
+- [ ] Playtest pacing so quiet stretches remain quiet and major moments have room to land.
+
+---
+
+## Phase 7: Audio audit and final audio polish
+
+**Do this after the main gameplay and story shape are stable.** Audio systems already exist, so inspect and test them before adding more.
+
+**Done when:** audio communicates speed, road, time of day, and horror without needing a radio.
+
+- [ ] Audit the current audio manager and all sound hooks. Record what works, what is missing, and what is broken before changing anything.
+- [ ] Verify the synthesized engine sound responds sensibly to speed.
+- [ ] Review road/tire sound, wind, town ambience, highway ambience, and night ambience. Add only the layers that materially help.
+- [ ] Tune the cab/exterior mix if the current camera/audio architecture supports it cleanly.
+- [ ] Build a small horror audio vocabulary: silence, distant ambiguous sounds, low ambience, brief mechanical irregularities, and positional sound only where it has a clear purpose.
+- [ ] No radio, DJ, radio music loop, or radio-dependent story beat.
+- [ ] Add master volume and any necessary separate volume controls.
+- [ ] Use only free/licensed audio and record sources in `CREDITS.md`.
+- [ ] Keep a playable experience with audio muted. Important story information must remain available through text and visuals.
+
+---
+
+## Phase 8: Ship
+
+**Done when:** a new player can launch the game, understand the controls, finish either mode, and play without major bugs.
+
+- [ ] Main menu with separate Short Mode and Long Mode choices.
+- [ ] Settings for typing difficulty, audio, and relevant accessibility options.
+- [ ] Credits and asset licences in `CREDITS.md`.
+- [x] Vite base path and GitHub Pages deployment configuration exist.
+- [x] Van model is bundled locally rather than hotlinked.
+- [ ] Confirm all required assets are local and licensed.
+- [ ] Verify controls and key hints match the final implementation.
+- [ ] Test a clean load, pause/resume, reset, mode switching, and browser refresh.
+- [ ] Play through all of Short Mode and the full Long Mode ending.
+- [ ] Test with 3-5 people if possible; focus feedback on clarity, typing fairness, horror pacing, and whether the ending is understandable without being explained.
+- [ ] Profile the baseline laptop and fix meaningful stutters, bugs, or readability issues.
+- [ ] Confirm the game works at common desktop resolutions and remains playable at lower performance.
+- [ ] Tag v1.0 only after both modes are complete and the ending is stable.
+
+---
+
+## Optional backlog (must not block release)
+
+- Heuristic tension estimator using existing typing telemetry.
+- A tiny TensorFlow.js model only if the heuristic is already useful and there is time.
+- Semantris-style word-association mode.
+- Tire-track shaders and stylized smoke particles.
+- City traffic.
+- Extra vehicle models, multiplayer, weather simulation, procedural story, mobile touch controls, level editor, and realistic vehicle simulation.
+
+## Asset and tool policy
+
+- Use free assets with compatible licences, such as Kenney and Quaternius CC0 assets, or properly licensed sources.
+- Keep models and audio inside `public/models` and `public/audio` where appropriate.
+- Record asset names, sources, and licences in `CREDITS.md`.
+- Never hotlink assets in the final build.
+- Keep tools and hosting free.
 
 ## Open decisions
-| # | Decision | Status / suggested default | Needed by |
-|---|----------|----------------------------|-----------|
-| 1 | Highway steering | **DECIDED:** auto lane-follow, typing controls speed, horror uses drift/wheel-jerk | done |
-| 2 | Target length | 10-15 minutes, confirm after Phase 3 playtest | Phase 3 |
-| 3 | What is the horror? | **DECIDED (direction):** implied presence in the cab, no visible entity, weirdness only. Road loops as a supporting trick | Phase 5 (shapes props/words from Phase 2) |
-| 4 | Zone switch | **DECIDED:** automatic on-ramp trigger, no key press | Phase 2 |
-| 5 | Pacing trigger: time, distance, or typing performance? | **DECIDED:** story-driven. The act and the sky clock follow how many characters of the story have been typed. Typing speed only changes how long it takes | done |
-| 6 | Word content | **DECIDED:** story-driven, themed per act | Phase 3 |
-| 7 | Platform | Desktop keyboard only | Phase 7 |
-| 8 | Art direction | **DECIDED:** miniature/diorama driving style inspired by Art of Rally's low-poly environmental design, with restrained toon shading, a tight hand-painted palette, and tilt-shift in the chase camera. This is not a commitment to exact Art of Rally replication or heavy anime-style cel shading. | Phase 2 |
-| 9 | Physics realism | **DECIDED:** "slightly realistic". Rapier raycast vehicle (suspension, grip, weight transfer, roll) tuned arcade-friendly. Not a full sim: no gearbox, tire temperature or damage. Highway typing drives the same controller through `driveInput` | Phase 1 |
-| 10 | Terrain method | Noise/heightmap terrain with the road laid on top, generated/recycled around the active road corridor for endless feel. Simplest to loop for horror tricks | Phase 2 |
-| 11 | Vehicle model | Keep the current van for now, swap later via `VEHICLE_CONFIG` | Phase 7 |
-| 12 | Camera profiles vs the miniature look | **DECIDED:** the toy-car/tilt-shift look is the chase profile only. The cab profile uses a normal wider FOV and normally disables tilt-shift. Calm should feel like a pleasant miniature diorama; horror can move toward the cab and remove the miniature illusion. | Phase 2 |
-| 13 | Visibility strategy | **DECIDED:** combine frustum culling + distance checks + distance-based LOD. World generation/streaming is separate and keeps only a bounded active road corridor. Avoid per-object perfect cone calculations every frame unless profiling later proves a specific need. | Phase 2 |
-| 14 | Shadow budget | **DECIDED:** start at 1024x1024 for the main sun shadow map. Restrict shadow casting to important nearby objects; distant/small scenery can use 512x512-style simplification if useful, or no shadows. Tune from Dell 3490 profiling. | Phase 2 |
-| 15 | Tree style | **DECIDED:** low-poly trunk/branch structure plus multiple solid foliage clusters. No single blob canopy. Reuse/instance variants and use LOD for distance. | Phase 2 |
-| 16 | Grass style | **DECIDED:** no grass props at all. Terrain vertex colours carry the ground. Revisit only if the world looks empty after profiling. | Phase 2 |
-| 17 | Performance baseline | **DECIDED:** Dell Latitude 3490 is the primary test machine. Measure FPS/frame time rather than guessing. Keep toon shading and stylization cheap; focus optimization on shadows, foliage overdraw, draw calls, post-processing, terrain and world population. | Phase 2/7 |
 
-## Asset plan (everything free)
-- **Vehicles/city/nature:** Kenney.nl, Quaternius (CC0)
-- **Sky/lighting:** Poly Haven HDRIs (use 1k versions; blend or tint for the dusk transition)
-- **Better truck/van:** Sketchfab, filtered to CC0
-- **Audio:** you download from Freesound (filter to CC0) and drop into `public/audio`; synthesized Web Audio for engine/wind (no downloads)
-- **Tools, all free:** Vite, Three.js, Rapier, Blender (models/heightmaps), Audacity (audio trimming), GitHub Pages (hosting)
-- Commit into `public/models` and `public/audio`, log everything in `CREDITS.md`
-- Never hotlink assets in the final build
+| Decision | Status |
+|---|---|
+| Title | **Decided:** itsjustanidea |
+| Core loop | **Decided:** WASD in towns, typing on highway |
+| Modes | **Decided:** Short and Long are separate |
+| Long Mode length | **Open:** decide the number of nights after testing one complete cycle |
+| Headlights | **Decided:** manual player control |
+| Towns | **Decided:** vehicle-only parking/stops; no walking, NPCs, or conversations |
+| Refuelling | **Open:** add only if it adds meaningful choices and cannot soft-lock progress |
+| Typing difficulty | **Decided:** Easy/Medium/Hard change pressure and mistake tolerance, not story access |
+| Horror premise | **Decided direction:** another Elias-like driver appears to complete deliveries ahead of the player; exact cause stays ambiguous |
+| Ending | **Decided:** nightmare/false awakening followed by persistent evidence and a cliffhanger loop |
+| Audio | **Open until audit:** inspect existing implementation, then polish near the end |
+| Final Long Mode pacing | **Open:** prototype one day-to-night cycle, then expand |
+| Neural network and Semantris | **Optional backlog only** |
 
 ## Target file structure
+
+Treat this as a guide, not a mandate to create files that already exist or reorganize working code just to match a diagram.
+
 ```
 src/
-  main.js          (wiring only)
-  game/state.js
-  game/vehicle.js  (+ VEHICLE_CONFIG, raycast vehicle, driveInput)
-  game/camera.js   (camera profiles: toy chase, free-look, cab)
-  game/render.js   (renderer, EffectComposer, tilt-shift, grade, toon materials)
-  game/fx.js       (tire tracks, smoke, Art pass 2)
-  game/world.js    (terrain, road, zones, active-area generation/LOD)
-  game/typing.js
-  game/story.js    (act text, prompt sources)
-  game/director.js (horror pacing)
-  game/audio.js
-  ui/hud.js
-public/models/
-public/audio/
+  main.js
+  game/
+    state.js
+    vehicle.js
+    camera.js
+    render.js
+    world.js
+    typing.js
+    story.js
+    director.js
+    audio.js
+    daycycle.js
+    input.js
+  ui/
+    hud.js
+public/
+  models/
+  audio/
 CREDITS.md
 ROADMAP.md
 ```
-
-## Backlog (parked, does not serve the pillars)
-Multiple vehicles, multiplayer, weather, procedural story, mobile touch controls, level editor, fully realistic vehicle dynamics.
