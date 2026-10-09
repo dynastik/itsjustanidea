@@ -336,6 +336,9 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
         );
       }
     }
+    // Some rail segments are intentionally skipped at the merge opening.
+    // Restrict the instance count so unused transforms do not render as stray rails.
+    rails.count = count;
     rails.instanceMatrix.needsUpdate = true;
     rails.frustumCulled = false;
     scene.add(rails);
