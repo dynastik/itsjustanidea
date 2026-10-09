@@ -90,6 +90,8 @@ Known implementation details from the current roadmap/source review:
 - [x] Pause, reset, mute, and debug controls exist.
 - [x] Verify startup, reset, pause/resume, collisions, camera toggles, and zone transitions in the current build.
 - [ ] Verify the game remains playable after restarting Short Mode and after changing modes.
+- [ ] Verify the new headlight toggle, indicator, and spotlight alignment in chase and cab views.
+- [ ] Re-test frame rate after removing the speed-blur pass and darkening the night grade.
 - [ ] Confirm no recent merge or scenery changes introduced black-screen, missing-material, or input regressions.
 
 ---
@@ -140,9 +142,10 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 
 **Done when:** headlights are useful at night, easy to control, and can support a carefully staged horror moment.
 
-- [ ] Add a clear player control for switching headlights on and off.
-- [ ] Show a small, unobtrusive HUD indicator for headlight state and make the control discoverable.
+- [x] Add a clear player control for switching headlights on and off (F5 key).
+- [x] Show a small, unobtrusive HUD indicator for headlight state and make the control discoverable.
 - [ ] Create a useful forward beam with a readable road hotspot and gradual falloff. Avoid lighting the entire world like daylight.
+- [x] Increase headlight intensity and range after initial playtesting feedback.
 - [ ] Tune beam brightness, colour, range, and shadows for the current art style and target hardware.
 - [ ] Ensure headlights remain readable in both chase and cab camera profiles.
 - [ ] Make manual control reliable through pauses, resets, mode changes, and story transitions.
@@ -197,7 +200,8 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 **Goal:** preserve a compact, complete introduction to the game.
 
 - [x] Existing Short Mode has a calm-to-horror progression and a restart ending.
-- [ ] Play through it from a clean start and verify the complete experience.
+- [x] Replaced the previous short placeholder story with the supplied six-act Bellweather script, including repeated-sign contradiction, the road's messages, and the bittersweet false sunrise.
+- [ ] Play through it from a clean start and verify the complete experience, including the new Bellweather sign sequence and ending.
 - [ ] Check that its ending still lands after the new mode-selection and headlight work.
 - [ ] Keep changes to Short Mode small unless playtesting identifies a clear problem.
 
@@ -245,7 +249,11 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [ ] Re-read the current cab and director code before deciding what is actually missing.
 - [ ] Verify whether the existing cab interior is sufficient. Add only the minimum useful detail needed for atmosphere and readability.
 - [ ] Use the rear-view mirror only if it supports a specific, effective event and can be implemented reliably.
-- [ ] Add subtle world wrongness: repeated signs, impossible distances, altered props, a road that returns to a familiar place, or a light that reveals something inconsistent.
+- [x] Add the first authored repeated-sign event: Bellweather appears twice with the same twelve-mile distance along the uninterrupted highway.
+- [x] Reveal each sign when its associated story paragraph begins typing; use two side supports so the pole does not obscure the sign text.
+- [x] Remove the motion-blur post-processing pass after performance/readability feedback.
+- [x] Remove visible stars while retaining the moon and clouds; deepen night ambience and grading.
+- [ ] Verify sign timing, night darkness, moon/cloud visibility, headlight brightness, and FPS in a local playthrough.
 - [ ] Add adversarial narration gradually: first strange, then personally specific, then demonstrably wrong about the player's experience.
 - [ ] Let vehicle controls become subtly unreliable only during authored events. Keep normal driving trustworthy outside those moments.
 - [ ] Use headlight failures, flickers, and reveals sparingly. Preserve player control wherever possible.
