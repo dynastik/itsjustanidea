@@ -40,6 +40,24 @@ async function main() {
   const city = createCity(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
+  // Manual forward-facing headlights. They are attached to the van, and the player toggles them with F5.
+  // Keep shadow casting off here: the two local spotlights should illuminate the road without doubling shadow cost.
+  const headlights = [-0.34, 0.34].map((x) => {
+    const light = new THREE.SpotLight(0xffe8c2, 42, 82, Math.PI / 7, 0.72, 1.2);
+    light.position.set(x, 0.12, 1.05);
+    light.castShadow = false;
+    const target = new THREE.Object3D();
+    target.position.set(x * 1.8, -0.7, 34);
+    vehicle.visual.add(light, target);
+    light.target = target;
+    light.visible = false;
+    return light;
+  });
+  function toggleHeadlights() {
+    state.headlightsOn = !state.headlightsOn;
+    headlights.forEach((light) => { light.visible = state.headlightsOn; });
+  }
+
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
   // (and again after the ride height is measured).
   const cabin = createCabInterior(vehicle);
@@ -55,6 +73,8 @@ async function main() {
 
   let accumulator = 0;
   let prevSpeed = 0;
+  let lastStoryTarget = null;
+  let storySignCount = 0;
   const treeLightDirection = new THREE.Vector3();
 
   // Spawn on the road, pointing along it.
@@ -63,6 +83,7 @@ async function main() {
     vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
     world.update(0, 0);
     props.update(0);
+    props.showStorySign(-1);
     trees.update(0);
   }
   spawn();
@@ -85,6 +106,11 @@ async function main() {
     beginTypingSession({ restartStory: true });
     input.clearHeld();
     state.worldTime = 0;
+    state.headlightsOn = false;
+    lastStoryTarget = null;
+    storySignCount = 0;
+    props.showStorySign(-1);
+    headlights.forEach((light) => { light.visible = false; });
     state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
     state.storyDone = false;
@@ -99,6 +125,7 @@ async function main() {
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    toggleHeadlights,
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
       state.debug = !state.debug;
@@ -150,6 +177,18 @@ async function main() {
     // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);
     props.update(vehicle.center.z);
+    // Reveal each overhead sign when its actual sign text becomes the active typing prompt.
+    // Spawn it ahead of the van so the player can see it while typing, regardless of world distance.
+    const storyTarget = state.typing.target;
+    if (storyTarget !== lastStoryTarget) {
+      if (storyTarget === 'WELCOME TO BELLWEATHER.') {
+        props.showStorySign(Math.min(storySignCount, 1), vehicle.center.z + 70);
+        storySignCount = Math.min(storySignCount + 1, 2);
+      } else if (storyTarget === 'He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back.') {
+        props.showStorySign(-1);
+      }
+      lastStoryTarget = storyTarget;
+    }
     trees.update(vehicle.center.z);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);

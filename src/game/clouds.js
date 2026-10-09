@@ -26,7 +26,7 @@ export function createClouds(scene) {
     vertexColors: true,
     transparent: true,
     opacity: 1,
-    depthWrite: false,
+    depthWrite: true,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -56,6 +56,7 @@ export function createClouds(scene) {
         float topLight = smoothstep(0.2, 0.9, vCloudNormal.y);
         diffuseColor.rgb *= mix(uDark, uLit, topLight);
         float cloudDistance = length(vCloudPosition.xz - uCenter);
+        if (cloudDistance >= uFade.y) discard;
         diffuseColor.a *= 1.0 - smoothstep(uFade.x, uFade.y, cloudDistance);`);
   };
   material.customProgramCacheKey = () => 'voxel-clouds-v1';
@@ -96,6 +97,7 @@ export function createClouds(scene) {
 
         for (const [ox, oy, oz, sx, sy, sz] of blocks) {
           dummy.position.set(cloudX + ox - center.x, y + oy - center.y, cloudZ + oz - center.z);
+          // Keep the game's chunky voxel-cloud silhouette; only the palette changes.
           dummy.scale.set(sx, sy, sz);
           dummy.updateMatrix();
           mesh.setMatrixAt(slot, dummy.matrix);

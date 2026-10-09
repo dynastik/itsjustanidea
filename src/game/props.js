@@ -30,6 +30,74 @@ export function createProps(scene, physics, RAPIER) {
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), postMat, SLOTS * 2);
   const plates = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.7, 0.05), signMat, MARK_SLOTS);
   const markPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 2.2, 0.08), postMat, MARK_SLOTS);
+
+  // Story landmarks are revealed by the corresponding typed narration, not visible from the start.
+  // These are full overhead highway gantries, with the supports outside the driving lane.
+  function makeTownSignTexture(distance, faded = false) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = faded ? '#24583a' : '#1f7041';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = faded ? '#c7c1a4' : '#f0ead7';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(9, 9, canvas.width - 18, canvas.height - 18);
+    ctx.fillStyle = '#f7f2df';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 48px monospace';
+    ctx.fillText('WELCOME TO', 512, 83);
+    ctx.font = 'bold 76px monospace';
+    ctx.fillText('BELLWEATHER', 512, 173);
+    ctx.font = 'bold 42px monospace';
+    ctx.fillText(distance, 512, 247);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+  const storySigns = [
+    { z: 230, distance: '12 MILES', faded: false },
+    { z: 370, distance: '12 MILES', faded: true },
+  ].map(({ z, distance, faded }) => {
+    const frame = getRoadFrame(z);
+    const group = new THREE.Group();
+    group.position.set(frame.x, frame.y, z);
+    group.rotation.y = frame.heading;
+
+    const roadSpan = ROAD_HALF_WIDTH + 1.35;
+    const supportHeight = 6.6;
+    // The two legs sit beyond the road edges, so neither the supports nor the crossbar obscure the lettering.
+    for (const x of [-roadSpan, roadSpan]) {
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, supportHeight, 0.2), postMat);
+      pole.position.set(x, supportHeight / 2, 0);
+      group.add(pole);
+    }
+    const crossbar = new THREE.Mesh(
+      new THREE.BoxGeometry(roadSpan * 2 + 0.35, 0.22, 0.22),
+      postMat
+    );
+    crossbar.position.set(0, supportHeight - 0.05, 0);
+    group.add(crossbar);
+
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(roadSpan * 2 - 0.2, 2.15),
+      new THREE.MeshBasicMaterial({ map: makeTownSignTexture(distance, faded), side: THREE.DoubleSide })
+    );
+    board.position.set(0, 5.15, 0.14);
+    board.rotation.y = Math.PI; // Face approaching traffic; otherwise the double-sided plane reads mirrored.
+    group.add(board);
+    group.visible = false;
+    scene.add(group);
+    return group;
+  });
+  function showStorySign(index = -1, aheadZ = null) {
+    if (index >= 0 && Number.isFinite(aheadZ)) {
+      const frame = getRoadFrame(aheadZ);
+      storySigns[index].position.set(frame.x, frame.y, aheadZ);
+      storySigns[index].rotation.y = frame.heading;
+    }
+    storySigns.forEach((sign, i) => { sign.visible = i === index; });
+  }
   for (const m of [rails, posts, plates, markPosts]) {
     m.frustumCulled = false; // instances move; the cached bounding sphere would cull them
     scene.add(m);
@@ -116,5 +184,5 @@ export function createProps(scene, physics, RAPIER) {
     }
   }
 
-  return { update };
+  return { update, showStorySign };
 }

@@ -50,7 +50,7 @@ export const VEHICLE_CONFIG = {
     maxSteerAngle: 0.55,
     steerFalloffSpeed: 20,
     steerLerpSpeed: 5,
-    offRoad: { gripFactor: 0.55, speedFactor: 0.5, dragForce: 4000 },
+    offRoad: { gripFactor: 0.55, speedFactor: 1.0, dragForce: 0 },
     engineSign: 1,
     steerSign: 1,
     autoCalibrate: true,

@@ -11,7 +11,7 @@ function setCycleColor(target, morning, evening, night, eveningBlend, nightBlend
 
 // A flat glowing square (the sun / moon) with a big soft halo around it. The plane is 3x the body size and the
 // square only fills the middle third (SQ), so the halo has room to fade out before the plane edge.
-function createGlowingBody(color, haloColor) {
+function createGlowingBody(color, haloColor, haloScale = 1) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -22,6 +22,7 @@ function createGlowingBody(color, haloColor) {
       color: { value: new THREE.Color(color) },
       haloColor: { value: new THREE.Color(haloColor) },
       opacity: { value: 0 },
+      haloScale: { value: haloScale },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -33,6 +34,7 @@ function createGlowingBody(color, haloColor) {
       uniform vec3 color;
       uniform vec3 haloColor;
       uniform float opacity;
+      uniform float haloScale;
       varying vec2 vUv;
       const float SQ = 0.3333;
       void main() {
@@ -40,7 +42,7 @@ function createGlowingBody(color, haloColor) {
         float edge = max(abs(p.x), abs(p.y)) / SQ;
         float square = 1.0 - smoothstep(0.88, 0.96, edge);
         float r2 = dot(p, p);
-        float halo = exp(-r2 * 9.0) * 0.30 + exp(-r2 * 45.0) * 0.45;
+        float halo = exp(-r2 * 9.0 / haloScale) * 0.30 + exp(-r2 * 45.0 / haloScale) * 0.45;
         gl_FragColor = vec4(color * square + haloColor * halo, max(square, halo) * opacity);
       }`,
   });
@@ -93,8 +95,7 @@ export function createLighting(scene) {
     sunGlowColor: { value: new THREE.Color(1, 0.9, 0.7) },
     sunGlow: { value: 0 },
     moonGlow: { value: 0 },
-    starAmount: { value: 0 },
-    uTime: { value: 0 },
+
   };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(800, 24, 16),
@@ -114,29 +115,7 @@ export function createLighting(scene) {
         uniform vec3 sunGlowColor;
         uniform float sunGlow;
         uniform float moonGlow;
-        uniform float starAmount;
-        uniform float uTime;
         varying vec3 vDir;
-
-        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-
-        // blocky square stars, one grid per cube face so there is no pinching at the poles
-        float stars(vec3 dir) {
-          vec3 a = abs(dir);
-          vec2 uv;
-          float face;
-          if (a.x > a.y && a.x > a.z) { uv = dir.yz / a.x; face = 0.0; }
-          else if (a.y > a.z) { uv = dir.xz / a.y; face = 1.0; }
-          else { uv = dir.xy / a.z; face = 2.0; }
-          uv *= 34.0;
-          vec2 id = floor(uv) + face * 31.7;
-          vec2 f = fract(uv) - 0.5;
-          float h = hash(id);
-          float size = 0.16 + 0.16 * hash(id + 3.1);
-          float sq = 1.0 - step(size, max(abs(f.x), abs(f.y)));
-          float twinkle = 0.65 + 0.35 * sin(uTime * 2.0 + h * 60.0);
-          return step(0.975, h) * sq * twinkle;
-        }
 
         void main() {
           vec3 dir = normalize(vDir);
@@ -163,8 +142,7 @@ export function createLighting(scene) {
           col += vec3(0.5, 0.62, 1.0) * (pow(md, 9.0) * 0.18 + pow(md, 70.0) * 0.45) * moonGlow;
 
           // stars fade in with the night, only above the horizon, and are drowned out near the moon
-          float st = stars(dir) * starAmount * smoothstep(0.02, 0.3, h) * (1.0 - pow(md, 12.0));
-          col += vec3(0.85, 0.9, 1.0) * st;
+          // Stars intentionally disabled for the game's quieter, clouded night sky.
 
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -181,7 +159,7 @@ export function createLighting(scene) {
   scene.add(sky);
 
   const sunDisc = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), createGlowingBody(0xffffff, 0xff8a36));
-  const moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(78, 78), createGlowingBody(0xf0f2ff, 0x8999d8));
+  const moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(78, 78), createGlowingBody(0xf0f2ff, 0x8999d8, 0.3));
   sunDisc.renderOrder = -0.5; // behind the clouds (renderOrder 0), in front of the sky
   moonDisc.renderOrder = -0.5;
   scene.add(sunDisc, moonDisc);
@@ -190,10 +168,10 @@ export function createLighting(scene) {
 
   const horizonMorning = new THREE.Color(0xb7d7f2);
   const horizonEvening = new THREE.Color(0xff762b);
-  const horizonNight = new THREE.Color(0x21182f);
+  const horizonNight = new THREE.Color(0x1c1428);
   const topMorning = new THREE.Color(0x4b91d0);
   const topEvening = new THREE.Color(0x70517f);
-  const topNight = new THREE.Color(0x090713);
+  const topNight = new THREE.Color(0x07050d);
   const sunMorning = new THREE.Color(0xffedc4);
   const sunEvening = new THREE.Color(0xff4f00);
   const sunNight = new THREE.Color(0x271a38);
@@ -205,12 +183,14 @@ export function createLighting(scene) {
   const hemiGroundNight = new THREE.Color(0x352b49);
   const glowDay = new THREE.Color(1.0, 0.92, 0.7);
   const glowEvening = new THREE.Color(1.0, 0.5, 0.14);
-  const cloudLitDay = new THREE.Color(1.0, 1.0, 1.0);
-  const cloudLitEvening = new THREE.Color(1.0, 0.97, 0.92);
-  const cloudLitNight = new THREE.Color(0.78, 0.82, 0.94);
-  const cloudDarkDay = new THREE.Color(0.91, 0.94, 0.98);
-  const cloudDarkEvening = new THREE.Color(0.88, 0.86, 0.9);
-  const cloudDarkNight = new THREE.Color(0.63, 0.68, 0.82);
+  // Keep clouds opaque-looking and mostly neutral across the day cycle instead of
+  // inheriting strong blue, orange, and purple tints from the sky.
+  const cloudLitDay = new THREE.Color(0xfafaf7);
+  const cloudLitEvening = new THREE.Color(0xece9e2);
+  const cloudLitNight = new THREE.Color(0xbfc4cc);
+  const cloudDarkDay = new THREE.Color(0x9a9d9e);
+  const cloudDarkEvening = new THREE.Color(0x85837e);
+  const cloudDarkNight = new THREE.Color(0x626873);
   const horizon = new THREE.Color();
   const skyTop = new THREE.Color();
   const sunColor = new THREE.Color();
@@ -222,8 +202,8 @@ export function createLighting(scene) {
   const moonDirection = new THREE.Vector3();
 
   const SUN_DAY = 1.65, SUN_EVENING = 0.85;
-  const HEMI_DAY = 0.8, HEMI_EVENING = 0.55, HEMI_NIGHT = 0.42;
-  const MOON_NIGHT = 0.62;
+  const HEMI_DAY = 0.8, HEMI_EVENING = 0.5, HEMI_NIGHT = 0.20;
+  const MOON_NIGHT = 0.54;
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
 
@@ -248,8 +228,6 @@ export function createLighting(scene) {
     skyUniforms.bottom.value.copy(horizon);
     skyUniforms.top.value.copy(skyTop);
     skyUniforms.sunsetAmount.value = evening * (1 - night);
-    skyUniforms.uTime.value = time;
-    skyUniforms.starAmount.value = night;
 
     setCycleColor(sunColor, sunMorning, sunEvening, sunNight, evening, night);
     sun.color.copy(sunColor);
@@ -298,7 +276,7 @@ export function createLighting(scene) {
 
     cloudLit.copy(cloudLitDay).lerp(cloudLitEvening, evening).lerp(cloudLitNight, night);
     cloudDark.copy(cloudDarkDay).lerp(cloudDarkEvening, evening).lerp(cloudDarkNight, night);
-    clouds.update(center, time, cloudLit, cloudDark, lerp(1.0, 0.94, night));
+    clouds.update(center, time, cloudLit, cloudDark, 1.0);
   }
 
   function getKeyLightDirection(target) {
