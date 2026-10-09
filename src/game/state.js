@@ -9,6 +9,7 @@ export const state = {
   loops: 0,            // how many full runs have been completed
   debug: false,
   speed: 0,            // forward speed mirrored from the vehicle (HUD, audio, camera read this)
+  headlightsOn: false, // manual player-controlled headlights
   highwayEnteredAt: -Infinity, // game-clock time of the last city -> highway handoff (speed ease + typing UI fade key off this)
   highwayEntrySpeed: 0,        // forward speed at that moment (m/s)
   typing: {
