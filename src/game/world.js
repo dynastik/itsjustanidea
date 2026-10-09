@@ -209,13 +209,14 @@ function makeRoadTexture() {
 function createHighwayInterchange(scene, roadMaterial) {
   const width = 5.8;
   const controls = [
-    [roadCenterX(255) + 14, terrainHeight(roadCenterX(255) + 14, 255) + 0.12, 255],
-    [roadCenterX(300) + 14, terrainHeight(roadCenterX(300) + 14, 300) + 1.8, 300],
-    [roadCenterX(335) + 10, roadHeight(335) + 6.4, 335],
-    [roadCenterX(370) + 1, roadHeight(370) + 7.2, 370],
-    [roadCenterX(400) - 8, roadHeight(400) + 6.2, 400],
-    [roadCenterX(435) - 11, terrainHeight(roadCenterX(435) - 11, 435) + 2.7, 435],
-    [roadCenterX(470) - 4.8, terrainHeight(roadCenterX(470) - 4.8, 470) + 0.12, 470],
+    // Both ends sit close enough to the main road for the deck to visibly join its edge.
+    [roadCenterX(255) + 7, terrainHeight(roadCenterX(255) + 7, 255) + 0.12, 255],
+    [roadCenterX(300) + 11, terrainHeight(roadCenterX(300) + 11, 300) + 2.2, 300],
+    [roadCenterX(335) + 8, roadHeight(335) + 7.6, 335],
+    [roadCenterX(370), roadHeight(370) + 9.0, 370],
+    [roadCenterX(400) - 8, roadHeight(400) + 7.8, 400],
+    [roadCenterX(435) - 10, terrainHeight(roadCenterX(435) - 10, 435) + 2.8, 435],
+    [roadCenterX(470) - 7, terrainHeight(roadCenterX(470) - 7, 470) + 0.12, 470],
   ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
 
   const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
@@ -252,7 +253,10 @@ function createHighwayInterchange(scene, roadMaterial) {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeVertexNormals();
-  const deck = new THREE.Mesh(geometry, roadMaterial);
+  // The underside must render too: the van drives beneath this flyover, not through a vanished one-sided face.
+  const deckMaterial = roadMaterial.clone();
+  deckMaterial.side = THREE.DoubleSide;
+  const deck = new THREE.Mesh(geometry, deckMaterial);
   deck.castShadow = false;
   deck.receiveShadow = true;
   deck.frustumCulled = false;
