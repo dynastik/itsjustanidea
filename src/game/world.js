@@ -207,33 +207,53 @@ function makeRoadTexture() {
 // A compact, model-free flyover ramp. It is a visual set piece for the typing highway:
  // one road ribbon, instanced guardrails, and instanced box pillars keep draw calls low.
 function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
-  const width = ROAD_HALF_WIDTH * 2; // match the normal 9 m-wide road
-  const controls = [
-    // Longitudinal transition: city ends, the road ramps up, then descends into the highway.
-    // It stays aligned with the normal road so the player drives onto it instead of crossing it.
-    [roadCenterX(88), roadHeight(88) + 0.08, 88],
-    [roadCenterX(100), roadHeight(100) + 0.35, 100],
-    [roadCenterX(115), roadHeight(115) + 1.8, 115],
-    [roadCenterX(132), roadHeight(132) + 4.0, 132],
-    [roadCenterX(148), roadHeight(148) + 4.0, 148],
-    [roadCenterX(164), roadHeight(164) + 1.8, 164],
-    [roadCenterX(178), roadHeight(178) + 0.08, 178],
-  ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const width = ROAD_HALF_WIDTH * 2;
+  const highwayZ = 154;
+  const deckY = roadHeight(highwayZ) + 4.5;
+  const startX = roadCenterX(88);
 
+  // The main highway runs across the city road, not parallel to it.
+  // Build a long east-west deck at a fixed height so it visibly extends both ways.
+  const highwayLength = 180;
+  const highwayGeometry = new THREE.PlaneGeometry(highwayLength, width, 1, 1);
+  highwayGeometry.rotateX(-Math.PI / 2);
+  highwayGeometry.translate(0, deckY, highwayZ);
+  const highwayMaterial = roadMaterial.clone();
+  highwayMaterial.side = THREE.DoubleSide;
+  const highway = new THREE.Mesh(highwayGeometry, highwayMaterial);
+  highway.receiveShadow = true;
+  scene.add(highway);
+
+  const highwayBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+  physics.createCollider(
+    RAPIER.ColliderDesc.cuboid(highwayLength / 2, 0.18, width / 2)
+      .setTranslation(0, deckY, highwayZ)
+      .setFriction(0.8),
+    highwayBody
+  );
+
+  // The on-ramp leaves the city road at city-end, curves to the side, and joins
+  // the elevated cross-highway at a right angle. It never replaces the city road.
+  const controls = [
+    [startX, roadHeight(88) + 0.08, 88],
+    [startX + 1.0, roadHeight(105) + 0.25, 105],
+    [startX + 5.0, roadHeight(122) + 1.2, 122],
+    [startX + 13.0, deckY - 1.8, 138],
+    [startX + 22.0, deckY - 0.45, highwayZ - 5.0],
+    [startX + 22.0, deckY, highwayZ],
+  ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
-  const samples = curve.getPoints(56);
+  const samples = curve.getPoints(48);
   const sides = [];
   const lengths = [0];
   for (let i = 0; i < samples.length; i++) {
     const before = samples[Math.max(0, i - 1)];
     const after = samples[Math.min(samples.length - 1, i + 1)];
     const tangent = after.clone().sub(before);
-    const side = new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
-    sides.push(side);
+    sides.push(new THREE.Vector3(tangent.z, 0, -tangent.x).normalize());
     if (i > 0) lengths.push(lengths[i - 1] + samples[i].distanceTo(samples[i - 1]));
   }
 
-  // Ribbon shares the existing asphalt material/texture, including its painted edge and centre lines.
   const positions = new Float32Array(samples.length * 2 * 3);
   const uvs = new Float32Array(samples.length * 2 * 2);
   const indices = new Uint32Array((samples.length - 1) * 6);
@@ -254,26 +274,19 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeVertexNormals();
-  // The underside must render too: the van drives beneath this flyover, not through a vanished one-sided face.
-  const deckMaterial = roadMaterial.clone();
-  deckMaterial.side = THREE.DoubleSide;
-  const deck = new THREE.Mesh(geometry, deckMaterial);
-  deck.castShadow = false;
-  deck.receiveShadow = true;
-  deck.frustumCulled = false;
-  scene.add(deck);
+  const deckMaterialRamp = roadMaterial.clone();
+  deckMaterialRamp.side = THREE.DoubleSide;
+  const ramp = new THREE.Mesh(geometry, deckMaterialRamp);
+  ramp.receiveShadow = true;
+  ramp.frustumCulled = false;
+  scene.add(ramp);
 
-  // Give the elevated road a real Rapier surface so the van cannot pass through it.
   const rampBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  physics.createCollider(
-    RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8),
-    rampBody
-  );
+  physics.createCollider(RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8), rampBody);
 
-  // Guardrails use one InstancedMesh instead of dozens of individual scene objects.
+  // Guardrails are visible and collidable, with all segments sharing the fixed ramp body.
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
-  const railCount = (samples.length - 1) * 2;
-  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, railCount);
+  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, (samples.length - 1) * 2);
   const dummy = new THREE.Object3D();
   let railIndex = 0;
   for (let i = 0; i < samples.length - 1; i++) {
@@ -284,17 +297,12 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
     const yaw = Math.atan2(dx, dz);
     for (const side of [-1, 1]) {
       const offset = sides[i].clone().add(sides[i + 1]).normalize().multiplyScalar(side * (width / 2 - 0.12));
-      const railX = mid.x + offset.x;
-      const railY = mid.y + 0.43;
-      const railZ = mid.z + offset.z;
+      const railX = mid.x + offset.x, railY = mid.y + 0.43, railZ = mid.z + offset.z;
       dummy.position.set(railX, railY, railZ);
       dummy.rotation.set(0, yaw, 0);
       dummy.scale.set(0.16, 0.52, segmentLength);
       dummy.updateMatrix();
       rails.setMatrixAt(railIndex++, dummy.matrix);
-
-      // Match every visible rail segment with a thin oriented collider.
-      // Colliders share the fixed ramp body, avoiding one rigid body per segment.
       physics.createCollider(
         RAPIER.ColliderDesc.cuboid(0.08, 0.26, segmentLength / 2)
           .setTranslation(railX, railY, railZ)
@@ -306,36 +314,20 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
   }
   rails.instanceMatrix.needsUpdate = true;
   rails.frustumCulled = false;
-  rails.castShadow = false;
   scene.add(rails);
 
-  // Pillars are placed only where they stand outside the existing highway's road corridor.
-  const pillarCapacity = samples.length * 2;
-  const pillarMaterial = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
-  const pillars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), pillarMaterial, pillarCapacity);
-  let pillarIndex = 0;
-  for (let i = 4; i < samples.length - 4; i += 5) {
-    const p = samples[i];
-    const deckHeight = p.y - 0.45;
-    for (const side of [-1, 1]) {
-      const offset = sides[i].clone().multiplyScalar(side * (width / 2 + 1.1));
-      const x = p.x + offset.x, z = p.z + offset.z;
-      if (Math.abs(x - roadCenterX(z)) <= ROAD_HALF_WIDTH + 1.0) continue;
-      const base = terrainHeight(x, z);
-      const height = deckHeight - base;
-      if (height < 2.2) continue;
-      dummy.position.set(x, base + height / 2, z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(0.72, height, 0.72);
-      dummy.updateMatrix();
-      pillars.setMatrixAt(pillarIndex++, dummy.matrix);
-    }
+  // Short barriers at the outer ends make the cross-highway read as a continuous elevated road.
+  const endRailGeometry = new THREE.BoxGeometry(0.16, 0.52, 0.25);
+  const endRails = new THREE.InstancedMesh(endRailGeometry, railMaterial, 2);
+  for (let i = 0; i < 2; i++) {
+    dummy.position.set(i === 0 ? -highwayLength / 2 : highwayLength / 2, deckY + 0.43, highwayZ);
+    dummy.rotation.set(0, Math.PI / 2, 0);
+    dummy.scale.set(1, 1, width);
+    dummy.updateMatrix();
+    endRails.setMatrixAt(i, dummy.matrix);
   }
-  pillars.count = pillarIndex;
-  pillars.instanceMatrix.needsUpdate = true;
-  pillars.frustumCulled = false;
-  pillars.castShadow = false;
-  scene.add(pillars);
+  endRails.instanceMatrix.needsUpdate = true;
+  scene.add(endRails);
 }
 
 // Hilly terrain with the road laid on it. Roadside props (guardrails, markers) live in props.js.
