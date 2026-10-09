@@ -40,10 +40,10 @@ async function main() {
   const city = createCity(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
-  // Manual forward-facing headlights. They are attached to the van, and the player toggles them with L.
+  // Manual forward-facing headlights. They are attached to the van, and the player toggles them with F5.
   // Keep shadow casting off here: the two local spotlights should illuminate the road without doubling shadow cost.
   const headlights = [-0.34, 0.34].map((x) => {
-    const light = new THREE.SpotLight(0xffe8c2, 24, 72, Math.PI / 7, 0.72, 1.2);
+    const light = new THREE.SpotLight(0xffe8c2, 42, 82, Math.PI / 7, 0.72, 1.2);
     light.position.set(x, 0.12, 1.05);
     light.castShadow = false;
     const target = new THREE.Object3D();
@@ -211,7 +211,7 @@ async function main() {
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     rig.update(dt);
     hud.update();
-    gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt, speed: vehicle.speed });
+    gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
     gfx.adapt(dt);
     gfx.render();
   }
