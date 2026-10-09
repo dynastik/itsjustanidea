@@ -1,63 +1,85 @@
-// The story IS the typing. The player types a short novel, paragraph by paragraph, as Elias's last delivery
-// goes wrong. Each paragraph belongs to an act, and the act drives the whole world: the sky clock, the
-// horror director, the wording on screen. Nothing here is timed: the story moves as fast as you type.
-//
-//   calm   - bright day, ordinary         (clock 0.00 -> 0.10: morning)
-//   uneasy - the repeating road           (0.10 -> 0.40: afternoon to sunset)
-//   wrong  - signs, messages, dusk        (0.40 -> 0.66: sunset to night)
-//   horror - the road explains itself     (0.66 -> 0.76: deep night)
-//   finale - the false sunrise, delivery  (0.76 -> 0.93: sunrise that ends nothing)
-//
-// Writing rules: ASCII only (straight quotes), never a backtick (debug hotkey), never describe the road's
-// nature until the horror act, and keep it deniable for as long as possible.
-// 'message' paragraphs are the road speaking: short, shown differently, always addressed to the player.
+// Short Mode: Elias's final delivery, told paragraph by paragraph through the typing system.
+// The story begins as a calm countryside drive, then lets the world contradict the narration.
+// Keep the road's nature unexplained until the horror act; the player should infer more than the text says.
 
 const P = (act, text, kind = 'narration') => ({ act, kind, text });
 
 const PARAGRAPHS = [
-  // ---- calm ----
-  P('calm', "Elias was a delivery driver finishing his last shift of the day."),
-  P('calm', "One package remained in the back of his van. The address on its label meant nothing to him, but he had a job to finish, so he followed the road that would supposedly take him there."),
-  P('calm', "At first, everything was ordinary. The countryside stretched beneath a clear sky, and the road wound gently through quiet hills. He rolled the window down and let the radio hum."),
+  // ACT I: The Last Delivery. Warm afternoon, ordinary life.
+  P('calm', "The afternoon sun rested over a quiet stretch of countryside. Green fields rolled toward distant hills, and clouds drifted lazily across the sky."),
+  P('calm', "Elias had one delivery left. It had been an uneventful day, which was exactly how he liked his working days. No traffic jams, no angry customers, no packages sent to the wrong address."),
+  P('calm', "He had already decided what he would have for dinner. He would leave his work boots by the door, open a window, and watch the sunset from his living room."),
+  P('calm', "One more delivery, and the day was his."),
+  P('calm', "The road curved gently between the fields. A wooden sign pointed toward a nearby town, and a farmhouse stood beyond a line of trees. Somewhere in the distance, smoke rose from a chimney."),
+  P('calm', "For a while, the world was exactly as it should be."),
 
-  // ---- uneasy ----
-  P('uneasy', "Then he passed a sign he was certain he had seen before."),
-  P('uneasy', "A few minutes later, he passed it again. The same hills appeared in the same order, and the same mile marker stood beside the road."),
-  P('uneasy', "Elias told himself he was tired. Everyone repeats a stretch of road in their head when the day has been long. He turned the radio up and kept driving."),
+  // ACT II: A Long, Pleasant Drive. Let the player trust the road.
+  P('uneasy', "The fields gradually gave way to low stone walls and scattered houses. Sunlight caught the windows of passing farmhouses, turning them gold."),
+  P('uneasy', "Elias passed a small roadside shop with flower boxes beneath its windows. A handwritten sign outside advertised fresh bread."),
+  P('uneasy', "He wondered whether he should have stopped to buy something for dinner. Then he remembered that he had already decided what to eat, and laughed quietly at himself."),
+  P('uneasy', "The road climbed a gentle hill before descending into a wide valley. From the top, he could see miles of countryside, dotted with cottages and narrow lanes."),
+  P('uneasy', "There was something lovely about having somewhere to return to."),
 
-  // ---- wrong ----
-  P('wrong', "But as the hours passed, the road grew stranger. Signs pointed toward towns that didn't exist. The landscape seemed to change whenever he looked away."),
-  P('wrong', "Then the messages began, describing things he had never told anyone."),
-  P('wrong', "You have been here before.", 'message'),
-  P('wrong', "You are not getting closer.", 'message'),
-  P('wrong', "The road knows your name.", 'message'),
+  // ACT III: The Wrong Way. The first physical contradiction is a repeated sign.
+  P('wrong', "The sun had begun to sink toward the hills when Elias saw a sign beside the road."),
+  P('wrong', "WELCOME TO BELLWEATHER.", 'message'),
+  P('wrong', "He didn't recognize the name, but that wasn't surprising. He had taken unfamiliar roads before. A smaller sign beneath it gave the distance to the town: twelve miles."),
+  P('wrong', "The road bent around a wooded hill, passed open farmland, and descended into a shallow valley."),
+  P('wrong', "WELCOME TO BELLWEATHER.", 'message'),
+  P('wrong', "Elias frowned. The lettering was different, and the sign looked newer than the first. But the name was unmistakable."),
+  P('wrong', "He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back."),
+  P('wrong', "A few minutes later, he passed a roadside milestone."),
+  P('wrong', "TWELVE MILES TO BELLWEATHER.", 'message'),
+  P('wrong', "The road ahead remained empty. The countryside was quiet, the sky peaceful, and the last sunlight lay across the fields like a blanket."),
+  P('wrong', "Nothing looked wrong. That was what bothered him."),
+  P('wrong', "Elias looked down at the delivery label again. The destination was unfamiliar now in a way he couldn't explain. He had read it several times that afternoon. He was certain of that."),
+  P('wrong', "He simply couldn't remember the name. The sun touched the horizon, and the destination remained twelve miles away."),
 
-  // ---- horror ----
-  P('horror', "Elias began to understand that he wasn't lost in any normal sense. The road itself was impossible. It had no reliable beginning or end, and no matter how far he drove, he never reached another place."),
-  P('horror', "Stories of such roads had existed for centuries. Travelers spoke of highways that appeared out of nowhere, journeys that lasted impossibly long, and people who vanished without a trace. Most people dismissed them as superstition."),
-  P('horror', "They were wrong."),
-  P('horror', "The road existed somewhere between destinations, outside the ordinary rules of geography and time. It had never been built. But over the centuries it had learned from everyone who traveled it. It remembered their landscapes, their expectations, and the things that made a journey feel real."),
-  P('horror', "It learned to imitate the world without understanding it. It could create the appearance of an exit without providing a way out. It could reproduce a sunrise without ending the night."),
-  P('horror', "And it had been collecting travelers all along."),
-  P('horror', "Elias's package was part of that. The road had given his journey a purpose so he would keep moving, even when everything around him became impossible. The package was never meant for a person. It was meant for the road."),
+  // ACT IV: A Place Between Places. The road begins speaking.
+  P('wrong', "Elias pulled onto the shoulder and stopped. For the first time that day, he wasn't sure what to do next."),
+  P('wrong', "There was no signal, and no other cars passed. The sunset was beautiful. For a moment, he felt embarrassed by his own fear."),
+  P('wrong', "It was just a road. Roads could be confusing. Signs could be wrong. People got tired."),
+  P('wrong', "YOU ARE MAKING GOOD PROGRESS.", 'message'),
+  P('wrong', "The words weren't on a road sign or printed on the package. They appeared where the story of his journey should have been, calm and matter-of-fact."),
+  P('wrong', "YOUR DESTINATION IS STILL AHEAD.", 'message'),
+  P('wrong', "The road emerged from the trees into open countryside. There were no houses now, no farm tracks, no distant town lights. Only the highway and the dark fields beyond it."),
+  P('wrong', "YOU HAVE BEEN HERE BEFORE.", 'message'),
+  P('wrong', "Elias shook his head. He had never been here before. He was certain of it."),
+  P('wrong', "YOU WERE ALWAYS GOING TO COME HERE.", 'message'),
+  P('wrong', "He tried to remember who had handed him the package at the depot. He couldn't. He tried to remember what it contained. He couldn't remember that, either."),
+  P('wrong', "THE DELIVERY MUST BE COMPLETED.", 'message'),
+  P('wrong', "For the first time, Elias understood that the road wasn't simply leading him somewhere unfamiliar. It was keeping him from going anywhere else."),
 
-  // ---- finale ----
-  P('finale', "Destination reached.", 'message'),
-  P('finale', "Recipient identified.", 'message'),
-  P('finale', "Thank you for bringing yourself.", 'message'),
-  P('finale', "The sky brightened. A beautiful sunrise spread across the hills, and the road ahead looked peaceful again. For a moment, Elias believed he had escaped."),
-  P('finale', "Delivery accepted.", 'message'),
-  // after this the screen fades to black, then: "Next driver, please." (ui/ending.js) and the loop restarts
+  // ACT V: The Road Remembers. A partial explanation, never a full lore dump.
+  P('horror', "The road had no exit. Elias drove until fields gave way to hills, hills to forests, and forests to landscapes he couldn't have named. The world changed around him, but the highway remained."),
+  P('horror', "He passed places that felt almost familiar: a little town beneath a church steeple, a stone bridge over a dry riverbed, a row of houses with warm windows. None of them led anywhere."),
+  P('horror', "The road wasn't a road in the ordinary sense. It was a journey without a proper beginning or end, a place between destinations. It borrowed the shapes of the world because that was all it knew how to do."),
+  P('horror', "Fields. Houses. Towns. Sunsets. It could imitate the things a traveler expected to find along the way, but it couldn't understand why those things mattered."),
+  P('horror', "A house was just walls and windows. A town was just buildings beside a road. A sunset was just light disappearing beyond the horizon. And home was just another destination printed on a label."),
+  P('horror', "The package had never been intended for an ordinary recipient. The road had given Elias a delivery because a journey needed a purpose. A destination gave a traveler a reason to keep moving."),
+  P('horror', "YOU HAVE FOLLOWED EVERY DIRECTION.", 'message'),
+  P('horror', "YOU HAVE COMPLETED EVERY MILE.", 'message'),
+  P('horror', "YOU HAVE REACHED THE END OF THE ROAD.", 'message'),
+  P('horror', "DELIVERY RECIPIENT: IDENTIFIED.", 'message'),
+  P('horror', "The road had not been taking him to a place. It had been taking him to the end of the journey itself. The package was the reason he had been allowed to keep going."),
+
+  // ACT VI: The Last Sunset. A beautiful, deliberately false peace.
+  P('finale', "The sky began to brighten. A pale line of gold spread across the hills, and the road straightened. The fields returned, green and peaceful beneath the morning light."),
+  P('finale', "For the first time in what felt like an eternity, Elias could breathe. Perhaps it was over. Perhaps there had been an explanation all along."),
+  P('finale', "DELIVERY ACCEPTED.", 'message'),
+  P('finale', "Elias thought about his living room, his work boots by the door, and the simple dinner he had planned to eat. He wondered whether he would ever see any of those things again."),
+  P('finale', "The fields glowed gold, and the road ahead looked warm and inviting. For one brief moment, Elias believed he was going home."),
+  P('finale', "THANK YOU FOR BRINGING YOURSELF.", 'message'),
+  P('finale', "The road continued toward the horizon, smooth and empty beneath the beautiful sky. Elias didn't know whether the journey had ended. He only knew that, for the first time since the afternoon began, he no longer felt afraid."),
+  // ui/ending.js fades to black and displays: "Next driver, please."
 ];
 
-// Where the world clock (daycycle.js) sits while each act is being typed: it moves smoothly from the first
-// number to the second as the act's characters are typed, so the sky follows your typing, not a timer.
 const ACT_TIME = {
   calm: [0.0, 0.10],
-  uneasy: [0.10, 0.40],
-  wrong: [0.40, 0.66],
-  horror: [0.66, 0.76],
-  finale: [0.76, 0.93],
+  uneasy: [0.10, 0.30],
+  wrong: [0.30, 0.66],
+  horror: [0.66, 0.82],
+  finale: [0.82, 0.98],
 };
 
 const LABELS = { narration: 'THE STORY', message: 'THE ROAD' };
@@ -74,7 +96,7 @@ PARAGRAPHS.forEach((p) => {
 });
 export const STORY_LENGTH_CHARS = totalChars;
 
-let cursor = 0;        // paragraphs handed out so far (the one being typed is cursor - 1)
+let cursor = 0;
 let finished = false;
 let currentAct = 'calm';
 
@@ -84,7 +106,6 @@ export function resetStory() {
   currentAct = 'calm';
 }
 
-// Next paragraph -> { text, source, act }, or null once the story is over.
 export function pickPrompt() {
   if (cursor >= PARAGRAPHS.length) {
     finished = true;
@@ -103,7 +124,6 @@ export function isStoryFinished() {
   return finished;
 }
 
-// World clock target (0..1) for the current point in the story. bufferLen = characters typed in the current paragraph.
 export function getStoryTime(bufferLen = 0) {
   if (finished) return ACT_TIME.finale[1];
   const i = Math.max(cursor - 1, 0);
@@ -115,7 +135,6 @@ export function getStoryTime(bufferLen = 0) {
   return a + (b - a) * f;
 }
 
-// Dev: jump to the first paragraph of the next act (the caller then picks the next prompt).
 export function skipToNextAct() {
   const cur = PARAGRAPHS[Math.max(cursor - 1, 0)].act;
   let i = cursor;
