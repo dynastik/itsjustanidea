@@ -204,6 +204,115 @@ function makeRoadTexture() {
   return tex;
 }
 
+// A compact, model-free flyover ramp. It is a visual set piece for the typing highway:
+ // one road ribbon, instanced guardrails, and instanced box pillars keep draw calls low.
+function createHighwayInterchange(scene, roadMaterial) {
+  const width = 5.8;
+  const controls = [
+    [roadCenterX(255) + 14, terrainHeight(roadCenterX(255) + 14, 255) + 0.12, 255],
+    [roadCenterX(300) + 14, terrainHeight(roadCenterX(300) + 14, 300) + 1.8, 300],
+    [roadCenterX(335) + 10, roadHeight(335) + 6.4, 335],
+    [roadCenterX(370) + 1, roadHeight(370) + 7.2, 370],
+    [roadCenterX(400) - 8, roadHeight(400) + 6.2, 400],
+    [roadCenterX(435) - 11, terrainHeight(roadCenterX(435) - 11, 435) + 2.7, 435],
+    [roadCenterX(470) - 4.8, terrainHeight(roadCenterX(470) - 4.8, 470) + 0.12, 470],
+  ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+
+  const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
+  const samples = curve.getPoints(56);
+  const sides = [];
+  const lengths = [0];
+  for (let i = 0; i < samples.length; i++) {
+    const before = samples[Math.max(0, i - 1)];
+    const after = samples[Math.min(samples.length - 1, i + 1)];
+    const tangent = after.clone().sub(before);
+    const side = new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
+    sides.push(side);
+    if (i > 0) lengths.push(lengths[i - 1] + samples[i].distanceTo(samples[i - 1]));
+  }
+
+  // Ribbon shares the existing asphalt material/texture, including its painted edge and centre lines.
+  const positions = new Float32Array(samples.length * 2 * 3);
+  const uvs = new Float32Array(samples.length * 2 * 2);
+  const indices = new Uint32Array((samples.length - 1) * 6);
+  for (let i = 0; i < samples.length; i++) {
+    const p = samples[i];
+    const left = p.clone().addScaledVector(sides[i], -width / 2);
+    const right = p.clone().addScaledVector(sides[i], width / 2);
+    const vi = i * 2;
+    positions.set([left.x, left.y, left.z, right.x, right.y, right.z], vi * 3);
+    uvs.set([0, lengths[i] / 10, 1, lengths[i] / 10], vi * 2);
+    if (i < samples.length - 1) {
+      const k = i * 6, a = vi, b = vi + 1, c = vi + 2, d = vi + 3;
+      indices.set([a, c, b, b, c, d], k);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeVertexNormals();
+  const deck = new THREE.Mesh(geometry, roadMaterial);
+  deck.castShadow = false;
+  deck.receiveShadow = true;
+  deck.frustumCulled = false;
+  scene.add(deck);
+
+  // Guardrails use one InstancedMesh instead of dozens of individual scene objects.
+  const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
+  const railCount = (samples.length - 1) * 2;
+  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, railCount);
+  const dummy = new THREE.Object3D();
+  let railIndex = 0;
+  for (let i = 0; i < samples.length - 1; i++) {
+    const a = samples[i], b = samples[i + 1];
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const segmentLength = Math.hypot(dx, dz) + 0.15;
+    const yaw = Math.atan2(dx, dz);
+    for (const side of [-1, 1]) {
+      const offset = sides[i].clone().add(sides[i + 1]).normalize().multiplyScalar(side * (width / 2 - 0.12));
+      dummy.position.set(mid.x + offset.x, mid.y + 0.43, mid.z + offset.z);
+      dummy.rotation.set(0, yaw, 0);
+      dummy.scale.set(0.16, 0.52, segmentLength);
+      dummy.updateMatrix();
+      rails.setMatrixAt(railIndex++, dummy.matrix);
+    }
+  }
+  rails.instanceMatrix.needsUpdate = true;
+  rails.frustumCulled = false;
+  rails.castShadow = false;
+  scene.add(rails);
+
+  // Pillars are placed only where they stand outside the existing highway's road corridor.
+  const pillarCapacity = samples.length * 2;
+  const pillarMaterial = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
+  const pillars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), pillarMaterial, pillarCapacity);
+  let pillarIndex = 0;
+  for (let i = 4; i < samples.length - 4; i += 5) {
+    const p = samples[i];
+    const deckHeight = p.y - 0.45;
+    for (const side of [-1, 1]) {
+      const offset = sides[i].clone().multiplyScalar(side * (width / 2 + 1.1));
+      const x = p.x + offset.x, z = p.z + offset.z;
+      if (Math.abs(x - roadCenterX(z)) <= ROAD_HALF_WIDTH + 1.0) continue;
+      const base = terrainHeight(x, z);
+      const height = deckHeight - base;
+      if (height < 2.2) continue;
+      dummy.position.set(x, base + height / 2, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0.72, height, 0.72);
+      dummy.updateMatrix();
+      pillars.setMatrixAt(pillarIndex++, dummy.matrix);
+    }
+  }
+  pillars.count = pillarIndex;
+  pillars.instanceMatrix.needsUpdate = true;
+  pillars.frustumCulled = false;
+  pillars.castShadow = false;
+  scene.add(pillars);
+}
+
 // Hilly terrain with the road laid on it. Roadside props (guardrails, markers) live in props.js.
 export function createWorld(scene, physics, RAPIER) {
   let centerZ = 0;
@@ -230,6 +339,9 @@ export function createWorld(scene, physics, RAPIER) {
   );
   road.receiveShadow = true;
   scene.add(road);
+
+  // One lightweight elevated joining ramp ahead of the player; no imported models or extra lights.
+  createHighwayInterchange(scene, road.material);
 
   // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
   // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
