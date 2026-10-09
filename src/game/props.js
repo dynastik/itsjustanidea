@@ -84,6 +84,7 @@ export function createProps(scene, physics, RAPIER) {
       new THREE.MeshBasicMaterial({ map: makeTownSignTexture(distance, faded), side: THREE.DoubleSide })
     );
     board.position.set(0, 5.15, 0.14);
+    board.rotation.y = Math.PI; // Face approaching traffic; otherwise the double-sided plane reads mirrored.
     group.add(board);
     group.visible = false;
     scene.add(group);
