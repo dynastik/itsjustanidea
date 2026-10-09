@@ -209,14 +209,14 @@ function makeRoadTexture() {
 function createHighwayInterchange(scene, roadMaterial) {
   const width = 5.8;
   const controls = [
-    // Both ends sit close enough to the main road for the deck to visibly join its edge.
-    [roadCenterX(255) + 7, terrainHeight(roadCenterX(255) + 7, 255) + 0.12, 255],
-    [roadCenterX(300) + 11, terrainHeight(roadCenterX(300) + 11, 300) + 2.2, 300],
-    [roadCenterX(335) + 8, roadHeight(335) + 7.6, 335],
-    [roadCenterX(370), roadHeight(370) + 9.0, 370],
-    [roadCenterX(400) - 8, roadHeight(400) + 7.8, 400],
-    [roadCenterX(435) - 10, terrainHeight(roadCenterX(435) - 10, 435) + 2.8, 435],
-    [roadCenterX(470) - 7, terrainHeight(roadCenterX(470) - 7, 470) + 0.12, 470],
+    // A separate flyover running alongside the highway, never crossing its driving lane.
+    [roadCenterX(255) + 24, terrainHeight(roadCenterX(255) + 24, 255) + 0.12, 255],
+    [roadCenterX(300) + 24, terrainHeight(roadCenterX(300) + 24, 300) + 2.2, 300],
+    [roadCenterX(335) + 24, roadHeight(335) + 7.6, 335],
+    [roadCenterX(370) + 24, roadHeight(370) + 9.0, 370],
+    [roadCenterX(400) + 24, roadHeight(400) + 7.8, 400],
+    [roadCenterX(435) + 24, terrainHeight(roadCenterX(435) + 24, 435) + 2.8, 435],
+    [roadCenterX(470) + 24, terrainHeight(roadCenterX(470) + 24, 470) + 0.12, 470],
   ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
 
   const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
