@@ -206,7 +206,7 @@ function makeRoadTexture() {
 
 // A compact, model-free flyover ramp. It is a visual set piece for the typing highway:
  // one road ribbon, instanced guardrails, and instanced box pillars keep draw calls low.
-function createHighwayInterchange(scene, roadMaterial) {
+function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
   const width = 5.8;
   const controls = [
     // A separate flyover running alongside the highway, never crossing its driving lane.
@@ -261,6 +261,13 @@ function createHighwayInterchange(scene, roadMaterial) {
   deck.receiveShadow = true;
   deck.frustumCulled = false;
   scene.add(deck);
+
+  // Give the elevated road a real Rapier surface so the van cannot pass through it.
+  const rampBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+  physics.createCollider(
+    RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8),
+    rampBody
+  );
 
   // Guardrails use one InstancedMesh instead of dozens of individual scene objects.
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
@@ -345,7 +352,7 @@ export function createWorld(scene, physics, RAPIER) {
   scene.add(road);
 
   // One lightweight elevated joining ramp ahead of the player; no imported models or extra lights.
-  createHighwayInterchange(scene, road.material);
+  createHighwayInterchange(scene, physics, RAPIER, road.material);
 
   // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
   // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
