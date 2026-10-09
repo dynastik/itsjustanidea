@@ -93,8 +93,7 @@ export function createLighting(scene) {
     sunGlowColor: { value: new THREE.Color(1, 0.9, 0.7) },
     sunGlow: { value: 0 },
     moonGlow: { value: 0 },
-    starAmount: { value: 0 },
-    uTime: { value: 0 },
+
   };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(800, 24, 16),
@@ -114,8 +113,6 @@ export function createLighting(scene) {
         uniform vec3 sunGlowColor;
         uniform float sunGlow;
         uniform float moonGlow;
-        uniform float starAmount;
-        uniform float uTime;
         varying vec3 vDir;
 
         float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -247,8 +244,6 @@ export function createLighting(scene) {
     skyUniforms.bottom.value.copy(horizon);
     skyUniforms.top.value.copy(skyTop);
     skyUniforms.sunsetAmount.value = evening * (1 - night);
-    skyUniforms.uTime.value = time;
-    skyUniforms.starAmount.value = night;
 
     setCycleColor(sunColor, sunMorning, sunEvening, sunNight, evening, night);
     sun.color.copy(sunColor);
