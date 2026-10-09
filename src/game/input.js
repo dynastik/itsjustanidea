@@ -11,7 +11,7 @@ export const KEYS = {
   reset: 'f4',
   skipTime: 'f6',
   mute: 'f9',
-  headlights: 'l',
+  headlights: 'f5',
   pause: 'escape',
 };
 
