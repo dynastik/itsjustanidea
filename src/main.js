@@ -40,6 +40,24 @@ async function main() {
   const city = createCity(scene, physics, RAPIER);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
+  // Manual forward-facing headlights. They are attached to the van, and the player toggles them with L.
+  // Keep shadow casting off here: the two local spotlights should illuminate the road without doubling shadow cost.
+  const headlights = [-0.34, 0.34].map((x) => {
+    const light = new THREE.SpotLight(0xffe8c2, 24, 72, Math.PI / 7, 0.72, 1.2);
+    light.position.set(x, 0.12, 1.05);
+    light.castShadow = false;
+    const target = new THREE.Object3D();
+    target.position.set(x * 1.8, -0.7, 34);
+    vehicle.visual.add(light, target);
+    light.target = target;
+    light.visible = false;
+    return light;
+  });
+  function toggleHeadlights() {
+    state.headlightsOn = !state.headlightsOn;
+    headlights.forEach((light) => { light.visible = state.headlightsOn; });
+  }
+
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
   // (and again after the ride height is measured).
   const cabin = createCabInterior(vehicle);
@@ -85,6 +103,8 @@ async function main() {
     beginTypingSession({ restartStory: true });
     input.clearHeld();
     state.worldTime = 0;
+    state.headlightsOn = false;
+    headlights.forEach((light) => { light.visible = false; });
     state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
     state.storyDone = false;
@@ -99,6 +119,7 @@ async function main() {
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    toggleHeadlights,
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
       state.debug = !state.debug;
