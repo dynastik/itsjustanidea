@@ -11,6 +11,7 @@ export const KEYS = {
   reset: 'f4',
   skipTime: 'f6',
   mute: 'f9',
+  headlights: 'l',
   pause: 'escape',
 };
 
@@ -34,6 +35,7 @@ export function createInput(actions) {
     [KEYS.reset]: actions.reset,
     [KEYS.skipTime]: actions.skipTime,
     [KEYS.mute]: actions.toggleMute,
+    [KEYS.headlights]: actions.toggleHeadlights,
     [KEYS.pause]: actions.togglePause,
   };
   for (const k in hotkeys) if (!hotkeys[k]) delete hotkeys[k]; // e.g. the dev mode switch isn't registered in release builds
