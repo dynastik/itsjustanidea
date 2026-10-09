@@ -163,8 +163,7 @@ export function createLighting(scene) {
           col += vec3(0.5, 0.62, 1.0) * (pow(md, 9.0) * 0.18 + pow(md, 70.0) * 0.45) * moonGlow;
 
           // stars fade in with the night, only above the horizon, and are drowned out near the moon
-          float st = stars(dir) * starAmount * smoothstep(0.02, 0.3, h) * (1.0 - pow(md, 12.0));
-          col += vec3(0.85, 0.9, 1.0) * st;
+          // Stars intentionally disabled for the game's quieter, clouded night sky.
 
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -222,7 +221,7 @@ export function createLighting(scene) {
   const moonDirection = new THREE.Vector3();
 
   const SUN_DAY = 1.65, SUN_EVENING = 0.85;
-  const HEMI_DAY = 0.8, HEMI_EVENING = 0.55, HEMI_NIGHT = 0.42;
+  const HEMI_DAY = 0.8, HEMI_EVENING = 0.5, HEMI_NIGHT = 0.24;
   const MOON_NIGHT = 0.62;
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
