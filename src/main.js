@@ -190,7 +190,7 @@ async function main() {
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     rig.update(dt);
     hud.update();
-    gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
+    gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt, speed: vehicle.speed });
     gfx.adapt(dt);
     gfx.render();
   }
