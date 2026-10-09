@@ -115,26 +115,6 @@ export function createLighting(scene) {
         uniform float moonGlow;
         varying vec3 vDir;
 
-        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-
-        // blocky square stars, one grid per cube face so there is no pinching at the poles
-        float stars(vec3 dir) {
-          vec3 a = abs(dir);
-          vec2 uv;
-          float face;
-          if (a.x > a.y && a.x > a.z) { uv = dir.yz / a.x; face = 0.0; }
-          else if (a.y > a.z) { uv = dir.xz / a.y; face = 1.0; }
-          else { uv = dir.xy / a.z; face = 2.0; }
-          uv *= 34.0;
-          vec2 id = floor(uv) + face * 31.7;
-          vec2 f = fract(uv) - 0.5;
-          float h = hash(id);
-          float size = 0.16 + 0.16 * hash(id + 3.1);
-          float sq = 1.0 - step(size, max(abs(f.x), abs(f.y)));
-          float twinkle = 0.65 + 0.35 * sin(uTime * 2.0 + h * 60.0);
-          return step(0.975, h) * sq * twinkle;
-        }
-
         void main() {
           vec3 dir = normalize(vDir);
           float h = dir.y;
