@@ -183,12 +183,14 @@ export function createLighting(scene) {
   const hemiGroundNight = new THREE.Color(0x352b49);
   const glowDay = new THREE.Color(1.0, 0.92, 0.7);
   const glowEvening = new THREE.Color(1.0, 0.5, 0.14);
-  const cloudLitDay = new THREE.Color(1.0, 1.0, 1.0);
-  const cloudLitEvening = new THREE.Color(1.0, 0.97, 0.92);
-  const cloudLitNight = new THREE.Color(0.78, 0.82, 0.94);
-  const cloudDarkDay = new THREE.Color(0.91, 0.94, 0.98);
-  const cloudDarkEvening = new THREE.Color(0.88, 0.86, 0.9);
-  const cloudDarkNight = new THREE.Color(0.63, 0.68, 0.82);
+  // Keep clouds opaque-looking and mostly neutral across the day cycle instead of
+  // inheriting strong blue, orange, and purple tints from the sky.
+  const cloudLitDay = new THREE.Color(0xfafaf7);
+  const cloudLitEvening = new THREE.Color(0xece9e2);
+  const cloudLitNight = new THREE.Color(0xbfc4cc);
+  const cloudDarkDay = new THREE.Color(0x9a9d9e);
+  const cloudDarkEvening = new THREE.Color(0x85837e);
+  const cloudDarkNight = new THREE.Color(0x626873);
   const horizon = new THREE.Color();
   const skyTop = new THREE.Color();
   const sunColor = new THREE.Color();
