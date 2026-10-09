@@ -37,7 +37,7 @@ export function createHud() {
     const fade = Math.min(1, (state.time - state.highwayEnteredAt) / HANDOFF_UI_FADE_S);
     set(typingPanel.style, 'fade', Math.round(fade * 20) / 20, 'opacity');
     const reverse = state.speed < -0.3;
-    set(headlightEl, 'headlights', state.headlightsOn ? 'HEADLIGHTS: ON (L)' : 'HEADLIGHTS: OFF (L)');
+    set(headlightEl, 'headlights', state.headlightsOn ? 'HEADLIGHTS: ON (F5)' : 'HEADLIGHTS: OFF (F5)');
     set(speedoEl, 'speed', `${reverse ? 'R ' : ''}${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 
