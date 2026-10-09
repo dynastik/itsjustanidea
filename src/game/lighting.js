@@ -276,7 +276,7 @@ export function createLighting(scene) {
 
     cloudLit.copy(cloudLitDay).lerp(cloudLitEvening, evening).lerp(cloudLitNight, night);
     cloudDark.copy(cloudDarkDay).lerp(cloudDarkEvening, evening).lerp(cloudDarkNight, night);
-    clouds.update(center, time, cloudLit, cloudDark, lerp(1.0, 0.94, night));
+    clouds.update(center, time, cloudLit, cloudDark, 1.0);
   }
 
   function getKeyLightDirection(target) {
