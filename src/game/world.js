@@ -207,17 +207,17 @@ function makeRoadTexture() {
 // A compact, model-free flyover ramp. It is a visual set piece for the typing highway:
  // one road ribbon, instanced guardrails, and instanced box pillars keep draw calls low.
 function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
-  const width = 5.8;
+  const width = ROAD_HALF_WIDTH * 2; // match the normal 9 m-wide road
   const controls = [
-    // A side branch: it leaves the highway near z=360, curves away in +X, rises,
-    // then descends into the terrain. It does not run along or cross the main road.
-    [roadCenterX(360) + 6, roadHeight(360) + 0.12, 360],
-    [roadCenterX(365) + 17, terrainHeight(roadCenterX(365) + 17, 365) + 1.8, 365],
-    [roadCenterX(370) + 34, roadHeight(370) + 6.5, 370],
-    [roadCenterX(375) + 53, roadHeight(375) + 9.0, 375],
-    [roadCenterX(380) + 73, roadHeight(380) + 7.8, 380],
-    [roadCenterX(385) + 94, terrainHeight(roadCenterX(385) + 94, 385) + 2.8, 385],
-    [roadCenterX(390) + 114, terrainHeight(roadCenterX(390) + 114, 390) + 0.12, 390],
+    // Longitudinal transition: city ends, the road ramps up, then descends into the highway.
+    // It stays aligned with the normal road so the player drives onto it instead of crossing it.
+    [roadCenterX(88), roadHeight(88) + 0.08, 88],
+    [roadCenterX(100), roadHeight(100) + 0.35, 100],
+    [roadCenterX(115), roadHeight(115) + 1.8, 115],
+    [roadCenterX(132), roadHeight(132) + 4.0, 132],
+    [roadCenterX(148), roadHeight(148) + 4.0, 148],
+    [roadCenterX(164), roadHeight(164) + 1.8, 164],
+    [roadCenterX(178), roadHeight(178) + 0.08, 178],
   ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
 
   const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
