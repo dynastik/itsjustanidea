@@ -91,6 +91,7 @@ Known implementation details from the current roadmap/source review:
 - [x] Verify startup, reset, pause/resume, collisions, camera toggles, and zone transitions in the current build.
 - [ ] Verify the game remains playable after restarting Short Mode and after changing modes.
 - [ ] Verify the new headlight toggle, indicator, and spotlight alignment in chase and cab views.
+- [ ] Re-test frame rate after removing the speed-blur pass and darkening the night grade.
 - [ ] Confirm no recent merge or scenery changes introduced black-screen, missing-material, or input regressions.
 
 ---
@@ -144,6 +145,7 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 - [x] Add a clear player control for switching headlights on and off (F5 key).
 - [x] Show a small, unobtrusive HUD indicator for headlight state and make the control discoverable.
 - [ ] Create a useful forward beam with a readable road hotspot and gradual falloff. Avoid lighting the entire world like daylight.
+- [x] Increase headlight intensity and range after initial playtesting feedback.
 - [ ] Tune beam brightness, colour, range, and shadows for the current art style and target hardware.
 - [ ] Ensure headlights remain readable in both chase and cab camera profiles.
 - [ ] Make manual control reliable through pauses, resets, mode changes, and story transitions.
@@ -247,7 +249,11 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [ ] Re-read the current cab and director code before deciding what is actually missing.
 - [ ] Verify whether the existing cab interior is sufficient. Add only the minimum useful detail needed for atmosphere and readability.
 - [ ] Use the rear-view mirror only if it supports a specific, effective event and can be implemented reliably.
-- [x] Add the first authored repeated-sign event: Bellweather appears twice with the same twelve-mile distance along the uninterrupted highway. (Needs in-game pacing verification.)
+- [x] Add the first authored repeated-sign event: Bellweather appears twice with the same twelve-mile distance along the uninterrupted highway.
+- [x] Reveal each sign when its associated story paragraph begins typing; use two side supports so the pole does not obscure the sign text.
+- [x] Remove the motion-blur post-processing pass after performance/readability feedback.
+- [x] Remove visible stars while retaining the moon and clouds; deepen night ambience and grading.
+- [ ] Verify sign timing, night darkness, moon/cloud visibility, headlight brightness, and FPS in a local playthrough.
 - [ ] Add adversarial narration gradually: first strange, then personally specific, then demonstrably wrong about the player's experience.
 - [ ] Let vehicle controls become subtly unreliable only during authored events. Keep normal driving trustworthy outside those moments.
 - [ ] Use headlight failures, flickers, and reveals sparingly. Preserve player control wherever possible.
