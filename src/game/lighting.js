@@ -166,10 +166,10 @@ export function createLighting(scene) {
 
   const horizonMorning = new THREE.Color(0xb7d7f2);
   const horizonEvening = new THREE.Color(0xff762b);
-  const horizonNight = new THREE.Color(0x21182f);
+  const horizonNight = new THREE.Color(0x1c1428);
   const topMorning = new THREE.Color(0x4b91d0);
   const topEvening = new THREE.Color(0x70517f);
-  const topNight = new THREE.Color(0x090713);
+  const topNight = new THREE.Color(0x07050d);
   const sunMorning = new THREE.Color(0xffedc4);
   const sunEvening = new THREE.Color(0xff4f00);
   const sunNight = new THREE.Color(0x271a38);
@@ -198,8 +198,8 @@ export function createLighting(scene) {
   const moonDirection = new THREE.Vector3();
 
   const SUN_DAY = 1.65, SUN_EVENING = 0.85;
-  const HEMI_DAY = 0.8, HEMI_EVENING = 0.5, HEMI_NIGHT = 0.24;
-  const MOON_NIGHT = 0.62;
+  const HEMI_DAY = 0.8, HEMI_EVENING = 0.5, HEMI_NIGHT = 0.20;
+  const MOON_NIGHT = 0.54;
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
 
