@@ -141,7 +141,7 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 
 **Done when:** headlights are useful at night, easy to control, and can support a carefully staged horror moment.
 
-- [x] Add a clear player control for switching headlights on and off (L key).
+- [x] Add a clear player control for switching headlights on and off (F5 key).
 - [x] Show a small, unobtrusive HUD indicator for headlight state and make the control discoverable.
 - [ ] Create a useful forward beam with a readable road hotspot and gradual falloff. Avoid lighting the entire world like daylight.
 - [ ] Tune beam brightness, colour, range, and shadows for the current art style and target hardware.
