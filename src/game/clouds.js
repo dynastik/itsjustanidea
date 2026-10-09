@@ -60,7 +60,7 @@ export function createClouds(scene) {
   };
   material.customProgramCacheKey = () => 'voxel-clouds-v1';
 
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, CLOUD_SLOTS);
+  const mesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), material, CLOUD_SLOTS);
   mesh.frustumCulled = false;
   mesh.renderOrder = 0;
   scene.add(mesh);
@@ -96,7 +96,13 @@ export function createClouds(scene) {
 
         for (const [ox, oy, oz, sx, sy, sz] of blocks) {
           dummy.position.set(cloudX + ox - center.x, y + oy - center.y, cloudZ + oz - center.z);
-          dummy.scale.set(sx, sy, sz);
+          // Rounded low-poly puffs soften the rigid voxel silhouette without adding instances.
+          dummy.scale.set(sx * 0.5, sy * 0.5, sz * 0.5);
+          dummy.rotation.set(
+            (hash(gx, gz, slot + 7) - 0.5) * 0.22,
+            hash(gx, gz, slot + 8) * Math.PI,
+            (hash(gx, gz, slot + 9) - 0.5) * 0.22
+          );
           dummy.updateMatrix();
           mesh.setMatrixAt(slot, dummy.matrix);
           mesh.setColorAt(slot, white);
