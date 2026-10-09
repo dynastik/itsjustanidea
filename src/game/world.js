@@ -284,11 +284,24 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
     const yaw = Math.atan2(dx, dz);
     for (const side of [-1, 1]) {
       const offset = sides[i].clone().add(sides[i + 1]).normalize().multiplyScalar(side * (width / 2 - 0.12));
-      dummy.position.set(mid.x + offset.x, mid.y + 0.43, mid.z + offset.z);
+      const railX = mid.x + offset.x;
+      const railY = mid.y + 0.43;
+      const railZ = mid.z + offset.z;
+      dummy.position.set(railX, railY, railZ);
       dummy.rotation.set(0, yaw, 0);
       dummy.scale.set(0.16, 0.52, segmentLength);
       dummy.updateMatrix();
       rails.setMatrixAt(railIndex++, dummy.matrix);
+
+      // Match every visible rail segment with a thin oriented collider.
+      // Colliders share the fixed ramp body, avoiding one rigid body per segment.
+      physics.createCollider(
+        RAPIER.ColliderDesc.cuboid(0.08, 0.26, segmentLength / 2)
+          .setTranslation(railX, railY, railZ)
+          .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
+          .setFriction(0.7),
+        rampBody
+      );
     }
   }
   rails.instanceMatrix.needsUpdate = true;
