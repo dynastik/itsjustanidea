@@ -73,6 +73,7 @@ async function main() {
 
   let accumulator = 0;
   let prevSpeed = 0;
+  let lastStoryTarget = null;
   const treeLightDirection = new THREE.Vector3();
 
   // Spawn on the road, pointing along it.
@@ -81,6 +82,7 @@ async function main() {
     vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
     world.update(0, 0);
     props.update(0);
+    props.showStorySign(-1);
     trees.update(0);
   }
   spawn();
@@ -104,6 +106,8 @@ async function main() {
     input.clearHeld();
     state.worldTime = 0;
     state.headlightsOn = false;
+    lastStoryTarget = null;
+    props.showStorySign(-1);
     headlights.forEach((light) => { light.visible = false; });
     state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
@@ -171,6 +175,19 @@ async function main() {
     // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);
     props.update(vehicle.center.z);
+    // Reveal the authored landmark exactly when the player starts typing its narration.
+    // Keep each sign visible through the sign's own prompt and the immediate reaction paragraph.
+    const storyTarget = state.typing.target;
+    if (storyTarget !== lastStoryTarget) {
+      if (storyTarget === 'The sun had begun to sink toward the hills when Elias saw a sign beside the road.') {
+        props.showStorySign(0);
+      } else if (storyTarget === 'The road bent around a wooded hill, passed open farmland, and descended into a shallow valley.') {
+        props.showStorySign(1);
+      } else if (storyTarget === 'He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back.') {
+        props.showStorySign(-1);
+      }
+      lastStoryTarget = storyTarget;
+    }
     trees.update(vehicle.center.z);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
