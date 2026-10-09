@@ -155,10 +155,12 @@ function buildRoadGeometry(centerZ) {
     const z = centerZ + lz;
     const rx = roadCenterX(z);
     const ry = roadHeight(z) + 0.035;
+    // The city road ends here; the elevated cross-highway is now the primary highway.
+    const roadVisible = z <= CITY_Z_MAX;
     for (let s = 0; s < 2; s++) {
       const i = zi * 2 + s;
       pos[i * 3] = rx + (s === 0 ? -ROAD_HALF_WIDTH : ROAD_HALF_WIDTH);
-      pos[i * 3 + 1] = ry;
+      pos[i * 3 + 1] = roadVisible ? ry : -1000;
       pos[i * 3 + 2] = lz;
       nor[i * 3 + 1] = 1;
       uv[i * 2] = s;
@@ -208,126 +210,159 @@ function makeRoadTexture() {
  // one road ribbon, instanced guardrails, and instanced box pillars keep draw calls low.
 function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
   const width = ROAD_HALF_WIDTH * 2;
-  const highwayZ = 154;
-  const deckY = roadHeight(highwayZ) + 4.5;
-  const startX = roadCenterX(88);
+  const cityEndZ = CITY_Z_MAX;
+  const startX = roadCenterX(cityEndZ);
+  const startY = roadHeight(cityEndZ);
+  const highwayStartX = startX + 34;
+  const highwayY = startY + 4.5;
+  const highwayLength = 360;
+  const descentLength = 150;
+  const highwayZ = 170;
 
-  // The main highway runs across the city road, not parallel to it.
-  // Build a long east-west deck at a fixed height so it visibly extends both ways.
-  const highwayLength = 180;
-  const highwayGeometry = new THREE.PlaneGeometry(highwayLength, width, 1, 1);
-  highwayGeometry.rotateX(-Math.PI / 2);
-  highwayGeometry.translate(0, deckY, highwayZ);
+  // Primary highway: it runs across the city road, stays elevated briefly, then
+  // gradually descends to ground level and continues as the normal highway.
+  const highwayControls = [
+    [highwayStartX, highwayY, highwayZ],
+    [highwayStartX + 65, highwayY, highwayZ],
+    [highwayStartX + 130, highwayY - 0.3, highwayZ],
+    [highwayStartX + 190, highwayY - 1.8, highwayZ],
+    [highwayStartX + 250, highwayY - 3.8, highwayZ],
+    [highwayStartX + 310, startY + 0.35, highwayZ],
+    [highwayStartX + highwayLength, startY + 0.08, highwayZ],
+    [highwayStartX + highwayLength + descentLength, startY + 0.08, highwayZ],
+  ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const highwayCurve = new THREE.CatmullRomCurve3(highwayControls, false, 'catmullrom', 0.25);
+  const highwaySamples = highwayCurve.getPoints(120);
+  const highwaySides = highwaySamples.map((p, i) => {
+    const before = highwaySamples[Math.max(0, i - 1)];
+    const after = highwaySamples[Math.min(highwaySamples.length - 1, i + 1)];
+    const tangent = after.clone().sub(before);
+    return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
+  });
+  const highwayLengths = [0];
+  for (let i = 1; i < highwaySamples.length; i++) highwayLengths.push(highwayLengths[i - 1] + highwaySamples[i].distanceTo(highwaySamples[i - 1]));
+
+  function makeRibbon(samples, sides, lengths) {
+    const positions = new Float32Array(samples.length * 2 * 3);
+    const uvs = new Float32Array(samples.length * 2 * 2);
+    const indices = new Uint32Array((samples.length - 1) * 6);
+    for (let i = 0; i < samples.length; i++) {
+      const p = samples[i];
+      const left = p.clone().addScaledVector(sides[i], -width / 2);
+      const right = p.clone().addScaledVector(sides[i], width / 2);
+      const vi = i * 2;
+      positions.set([left.x, left.y, left.z, right.x, right.y, right.z], vi * 3);
+      uvs.set([0, lengths[i] / 10, 1, lengths[i] / 10], vi * 2);
+      if (i < samples.length - 1) {
+        const k = i * 6, a = vi, b = vi + 1, c = vi + 2, d = vi + 3;
+        indices.set([a, c, b, b, c, d], k);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    geometry.computeVertexNormals();
+    return { geometry, positions, indices };
+  }
+
+  const highwayRibbon = makeRibbon(highwaySamples, highwaySides, highwayLengths);
   const highwayMaterial = roadMaterial.clone();
   highwayMaterial.side = THREE.DoubleSide;
-  const highway = new THREE.Mesh(highwayGeometry, highwayMaterial);
-  highway.receiveShadow = true;
-  scene.add(highway);
-
+  const highwayMesh = new THREE.Mesh(highwayRibbon.geometry, highwayMaterial);
+  highwayMesh.receiveShadow = true;
+  highwayMesh.frustumCulled = false;
+  scene.add(highwayMesh);
   const highwayBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  physics.createCollider(
-    RAPIER.ColliderDesc.cuboid(highwayLength / 2, 0.18, width / 2)
-      .setTranslation(0, deckY, highwayZ)
-      .setFriction(0.8),
-    highwayBody
-  );
+  physics.createCollider(RAPIER.ColliderDesc.trimesh(highwayRibbon.positions, highwayRibbon.indices).setFriction(0.8), highwayBody);
 
-  // The on-ramp leaves the city road at city-end, curves to the side, and joins
-  // the elevated cross-highway at a right angle. It never replaces the city road.
-  const controls = [
-    [startX, roadHeight(88) + 0.08, 88],
-    [startX + 1.0, roadHeight(105) + 0.25, 105],
-    [startX + 5.0, roadHeight(122) + 1.2, 122],
-    [startX + 13.0, deckY - 1.8, 138],
-    [startX + 22.0, deckY - 0.45, highwayZ - 5.0],
-    [startX + 22.0, deckY, highwayZ],
+  // The curved on-ramp leaves the city road at city-end and joins the new highway.
+  const rampControls = [
+    [startX, startY + 0.08, cityEndZ],
+    [startX + 2, startY + 0.2, cityEndZ + 12],
+    [startX + 7, startY + 0.9, cityEndZ + 24],
+    [startX + 17, highwayY - 1.8, cityEndZ + 38],
+    [highwayStartX - 5, highwayY - 0.35, highwayZ + 9],
+    [highwayStartX, highwayY, highwayZ],
   ].map(([x, y, z]) => new THREE.Vector3(x, y, z));
-  const curve = new THREE.CatmullRomCurve3(controls, false, 'catmullrom', 0.35);
-  const samples = curve.getPoints(48);
-  const sides = [];
-  const lengths = [0];
-  for (let i = 0; i < samples.length; i++) {
-    const before = samples[Math.max(0, i - 1)];
-    const after = samples[Math.min(samples.length - 1, i + 1)];
+  const rampCurve = new THREE.CatmullRomCurve3(rampControls, false, 'catmullrom', 0.35);
+  const rampSamples = rampCurve.getPoints(56);
+  const rampSides = rampSamples.map((p, i) => {
+    const before = rampSamples[Math.max(0, i - 1)];
+    const after = rampSamples[Math.min(rampSamples.length - 1, i + 1)];
     const tangent = after.clone().sub(before);
-    sides.push(new THREE.Vector3(tangent.z, 0, -tangent.x).normalize());
-    if (i > 0) lengths.push(lengths[i - 1] + samples[i].distanceTo(samples[i - 1]));
-  }
-
-  const positions = new Float32Array(samples.length * 2 * 3);
-  const uvs = new Float32Array(samples.length * 2 * 2);
-  const indices = new Uint32Array((samples.length - 1) * 6);
-  for (let i = 0; i < samples.length; i++) {
-    const p = samples[i];
-    const left = p.clone().addScaledVector(sides[i], -width / 2);
-    const right = p.clone().addScaledVector(sides[i], width / 2);
-    const vi = i * 2;
-    positions.set([left.x, left.y, left.z, right.x, right.y, right.z], vi * 3);
-    uvs.set([0, lengths[i] / 10, 1, lengths[i] / 10], vi * 2);
-    if (i < samples.length - 1) {
-      const k = i * 6, a = vi, b = vi + 1, c = vi + 2, d = vi + 3;
-      indices.set([a, c, b, b, c, d], k);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.computeVertexNormals();
-  const deckMaterialRamp = roadMaterial.clone();
-  deckMaterialRamp.side = THREE.DoubleSide;
-  const ramp = new THREE.Mesh(geometry, deckMaterialRamp);
-  ramp.receiveShadow = true;
-  ramp.frustumCulled = false;
-  scene.add(ramp);
-
+    return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
+  });
+  const rampLengths = [0];
+  for (let i = 1; i < rampSamples.length; i++) rampLengths.push(rampLengths[i - 1] + rampSamples[i].distanceTo(rampSamples[i - 1]));
+  const rampRibbon = makeRibbon(rampSamples, rampSides, rampLengths);
+  const rampMaterial = roadMaterial.clone();
+  rampMaterial.side = THREE.DoubleSide;
+  const rampMesh = new THREE.Mesh(rampRibbon.geometry, rampMaterial);
+  rampMesh.receiveShadow = true;
+  rampMesh.frustumCulled = false;
+  scene.add(rampMesh);
   const rampBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  physics.createCollider(RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8), rampBody);
+  physics.createCollider(RAPIER.ColliderDesc.trimesh(rampRibbon.positions, rampRibbon.indices).setFriction(0.8), rampBody);
 
-  // Guardrails are visible and collidable, with all segments sharing the fixed ramp body.
+  // Collidable rails follow both the ramp and the primary highway.
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
-  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, (samples.length - 1) * 2);
   const dummy = new THREE.Object3D();
-  let railIndex = 0;
-  for (let i = 0; i < samples.length - 1; i++) {
-    const a = samples[i], b = samples[i + 1];
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const segmentLength = Math.hypot(dx, dz) + 0.15;
-    const yaw = Math.atan2(dx, dz);
+  function addRails(samples, sides, body, collidable = true) {
+    const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, (samples.length - 1) * 2);
+    let idx = 0;
+    for (let i = 0; i < samples.length - 1; i++) {
+      const a = samples[i], b = samples[i + 1];
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) + 0.15;
+      const yaw = Math.atan2(dx, dz);
+      for (const side of [-1, 1]) {
+        const offset = sides[i].clone().add(sides[i + 1]).normalize().multiplyScalar(side * (width / 2 - 0.12));
+        const x = mid.x + offset.x, y = mid.y + 0.43, z = mid.z + offset.z;
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, yaw, 0);
+        dummy.scale.set(0.16, 0.52, len);
+        dummy.updateMatrix();
+        rails.setMatrixAt(idx++, dummy.matrix);
+        if (collidable) physics.createCollider(
+          RAPIER.ColliderDesc.cuboid(0.08, 0.26, len / 2)
+            .setTranslation(x, y, z)
+            .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
+            .setFriction(0.7),
+          body
+        );
+      }
+    }
+    rails.instanceMatrix.needsUpdate = true;
+    rails.frustumCulled = false;
+    scene.add(rails);
+  }
+  addRails(rampSamples, rampSides, rampBody);
+  addRails(highwaySamples, highwaySides, highwayBody);
+
+  // Sparse pillars only under the initially elevated span.
+  const pillarMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
+  const pillars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), pillarMat, 28);
+  let pillarIndex = 0;
+  for (let i = 8; i < 78; i += 8) {
+    const p = highwaySamples[i];
+    const base = terrainHeight(p.x, p.z);
+    const height = p.y - base;
+    if (height < 2.2) continue;
     for (const side of [-1, 1]) {
-      const offset = sides[i].clone().add(sides[i + 1]).normalize().multiplyScalar(side * (width / 2 - 0.12));
-      const railX = mid.x + offset.x, railY = mid.y + 0.43, railZ = mid.z + offset.z;
-      dummy.position.set(railX, railY, railZ);
-      dummy.rotation.set(0, yaw, 0);
-      dummy.scale.set(0.16, 0.52, segmentLength);
+      const offset = highwaySides[i].clone().multiplyScalar(side * (width / 2 + 1.1));
+      dummy.position.set(p.x + offset.x, base + height / 2, p.z + offset.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0.72, height, 0.72);
       dummy.updateMatrix();
-      rails.setMatrixAt(railIndex++, dummy.matrix);
-      physics.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.08, 0.26, segmentLength / 2)
-          .setTranslation(railX, railY, railZ)
-          .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
-          .setFriction(0.7),
-        rampBody
-      );
+      pillars.setMatrixAt(pillarIndex++, dummy.matrix);
     }
   }
-  rails.instanceMatrix.needsUpdate = true;
-  rails.frustumCulled = false;
-  scene.add(rails);
-
-  // Short barriers at the outer ends make the cross-highway read as a continuous elevated road.
-  const endRailGeometry = new THREE.BoxGeometry(0.16, 0.52, 0.25);
-  const endRails = new THREE.InstancedMesh(endRailGeometry, railMaterial, 2);
-  for (let i = 0; i < 2; i++) {
-    dummy.position.set(i === 0 ? -highwayLength / 2 : highwayLength / 2, deckY + 0.43, highwayZ);
-    dummy.rotation.set(0, Math.PI / 2, 0);
-    dummy.scale.set(1, 1, width);
-    dummy.updateMatrix();
-    endRails.setMatrixAt(i, dummy.matrix);
-  }
-  endRails.instanceMatrix.needsUpdate = true;
-  scene.add(endRails);
+  pillars.count = pillarIndex;
+  pillars.instanceMatrix.needsUpdate = true;
+  pillars.frustumCulled = false;
+  scene.add(pillars);
 }
 
 // Hilly terrain with the road laid on it. Roadside props (guardrails, markers) live in props.js.
