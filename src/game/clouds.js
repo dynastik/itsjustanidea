@@ -26,7 +26,7 @@ export function createClouds(scene) {
     vertexColors: true,
     transparent: true,
     opacity: 1,
-    depthWrite: false,
+    depthWrite: true,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
