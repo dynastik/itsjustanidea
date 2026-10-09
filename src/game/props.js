@@ -89,7 +89,12 @@ export function createProps(scene, physics, RAPIER) {
     scene.add(group);
     return group;
   });
-  function showStorySign(index = -1) {
+  function showStorySign(index = -1, aheadZ = null) {
+    if (index >= 0 && Number.isFinite(aheadZ)) {
+      const frame = getRoadFrame(aheadZ);
+      storySigns[index].position.set(frame.x, frame.y, aheadZ);
+      storySigns[index].rotation.y = frame.heading;
+    }
     storySigns.forEach((sign, i) => { sign.visible = i === index; });
   }
   for (const m of [rails, posts, plates, markPosts]) {
