@@ -313,6 +313,13 @@ function createHighwayInterchange(scene, physics, RAPIER, roadMaterial) {
       const yaw = Math.atan2(dx,dz);
       const sideVec = sides[i].clone().add(sides[i + 1]).normalize();
       for (const sign of [-1,1]) {
+        const nearMerge = Math.hypot(mid.x - mergeX, mid.z - highwayZ) < 34;
+        // Leave an opening on the ramp and on the highway edge the ramp enters.
+        // Keep the far-side highway barrier intact.
+        const isRamp = body === ramp.body;
+        const isRampFacingHighwayEdge = body === highway.body && sign === 1;
+        if (nearMerge && (isRamp || isRampFacingHighwayEdge)) continue;
+
         const off = sideVec.clone().multiplyScalar(sign * (width / 2 - 0.12));
         const x = mid.x + off.x, y = mid.y + 0.43, z = mid.z + off.z;
         dummy.position.set(x,y,z);
