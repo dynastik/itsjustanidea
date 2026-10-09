@@ -30,6 +30,52 @@ export function createProps(scene, physics, RAPIER) {
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), postMat, SLOTS * 2);
   const plates = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.7, 0.05), signMat, MARK_SLOTS);
   const markPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 2.2, 0.08), postMat, MARK_SLOTS);
+
+  // Story landmark: the same destination sign appears twice along one uninterrupted road.
+  // These are fixed scenic props, not randomized, so the player can notice the contradiction.
+  function makeTownSignTexture(distance, faded = false) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = faded ? '#24583a' : '#1f7041';
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.strokeStyle = faded ? '#c7c1a4' : '#f0ead7';
+    ctx.lineWidth = 12;
+    ctx.strokeRect(8, 8, 496, 240);
+    ctx.fillStyle = '#f7f2df';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 42px monospace';
+    ctx.fillText('WELCOME TO', 256, 86);
+    ctx.font = 'bold 58px monospace';
+    ctx.fillText('BELLWEATHER', 256, 151);
+    ctx.font = '34px monospace';
+    ctx.fillText(distance, 256, 205);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+  const storySigns = [
+    { z: 230, distance: '12 MILES', faded: false },
+    { z: 370, distance: '12 MILES', faded: true },
+  ].map(({ z, distance, faded }) => {
+    const p = sidePose(z, -1, RAIL_OFFSET + 2.2);
+    const y = terrainHeight(p.x, p.z);
+    const group = new THREE.Group();
+    group.position.set(p.x, y, p.z);
+    group.rotation.y = p.heading;
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 0.12), postMat);
+    pole.position.y = 1.2;
+    group.add(pole);
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.0, 1.5),
+      new THREE.MeshBasicMaterial({ map: makeTownSignTexture(distance, faded), side: THREE.DoubleSide })
+    );
+    board.position.set(0, 2.0, 0);
+    group.add(board);
+    scene.add(group);
+    return group;
+  });
   for (const m of [rails, posts, plates, markPosts]) {
     m.frustumCulled = false; // instances move; the cached bounding sphere would cull them
     scene.add(m);
