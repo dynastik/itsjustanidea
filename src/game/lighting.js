@@ -11,7 +11,7 @@ function setCycleColor(target, morning, evening, night, eveningBlend, nightBlend
 
 // A flat glowing square (the sun / moon) with a big soft halo around it. The plane is 3x the body size and the
 // square only fills the middle third (SQ), so the halo has room to fade out before the plane edge.
-function createGlowingBody(color, haloColor) {
+function createGlowingBody(color, haloColor, haloScale = 1) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -22,6 +22,7 @@ function createGlowingBody(color, haloColor) {
       color: { value: new THREE.Color(color) },
       haloColor: { value: new THREE.Color(haloColor) },
       opacity: { value: 0 },
+      haloScale: { value: haloScale },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -33,6 +34,7 @@ function createGlowingBody(color, haloColor) {
       uniform vec3 color;
       uniform vec3 haloColor;
       uniform float opacity;
+      uniform float haloScale;
       varying vec2 vUv;
       const float SQ = 0.3333;
       void main() {
@@ -40,7 +42,7 @@ function createGlowingBody(color, haloColor) {
         float edge = max(abs(p.x), abs(p.y)) / SQ;
         float square = 1.0 - smoothstep(0.88, 0.96, edge);
         float r2 = dot(p, p);
-        float halo = exp(-r2 * 9.0) * 0.30 + exp(-r2 * 45.0) * 0.45;
+        float halo = exp(-r2 * 9.0 / haloScale) * 0.30 + exp(-r2 * 45.0 / haloScale) * 0.45;
         gl_FragColor = vec4(color * square + haloColor * halo, max(square, halo) * opacity);
       }`,
   });
@@ -157,7 +159,7 @@ export function createLighting(scene) {
   scene.add(sky);
 
   const sunDisc = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), createGlowingBody(0xffffff, 0xff8a36));
-  const moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(78, 78), createGlowingBody(0xf0f2ff, 0x8999d8));
+  const moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(78, 78), createGlowingBody(0xf0f2ff, 0x8999d8, 0.3));
   sunDisc.renderOrder = -0.5; // behind the clouds (renderOrder 0), in front of the sky
   moonDisc.renderOrder = -0.5;
   scene.add(sunDisc, moonDisc);
