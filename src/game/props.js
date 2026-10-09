@@ -31,8 +31,7 @@ export function createProps(scene, physics, RAPIER) {
   const plates = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.7, 0.05), signMat, MARK_SLOTS);
   const markPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 2.2, 0.08), postMat, MARK_SLOTS);
 
-  // Story landmark: the same destination sign appears twice along one uninterrupted road.
-  // These are fixed scenic props, not randomized, so the player can notice the contradiction.
+  // Story landmarks are revealed by the corresponding typed narration, not visible from the start.
   function makeTownSignTexture(distance, faded = false) {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -64,18 +63,25 @@ export function createProps(scene, physics, RAPIER) {
     const group = new THREE.Group();
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.heading;
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 0.12), postMat);
-    pole.position.y = 1.2;
-    group.add(pole);
+    // Two supports sit outside the board's text area; no centre post cuts through the sign.
+    for (const x of [-1.25, 1.25]) {
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.5, 0.12), postMat);
+      pole.position.set(x, 1.25, -0.04);
+      group.add(pole);
+    }
     const board = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.0, 1.5),
+      new THREE.PlaneGeometry(3.2, 1.35),
       new THREE.MeshBasicMaterial({ map: makeTownSignTexture(distance, faded), side: THREE.DoubleSide })
     );
-    board.position.set(0, 2.0, 0);
+    board.position.set(0, 2.15, 0.04);
     group.add(board);
+    group.visible = false;
     scene.add(group);
     return group;
   });
+  function showStorySign(index = -1) {
+    storySigns.forEach((sign, i) => { sign.visible = i === index; });
+  }
   for (const m of [rails, posts, plates, markPosts]) {
     m.frustumCulled = false; // instances move; the cached bounding sphere would cull them
     scene.add(m);
@@ -162,5 +168,5 @@ export function createProps(scene, physics, RAPIER) {
     }
   }
 
-  return { update };
+  return { update, showStorySign };
 }
