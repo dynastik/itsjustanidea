@@ -45,13 +45,45 @@ const GradeShader = {
     }`,
 };
 
+// Speed-dependent peripheral blur. The centre stays readable; only the outer image gets a
+// tiny radial smear, suggesting forward motion without turning the miniature scenery to mush.
+const SpeedBlurShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    amount: { value: 0 },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float amount;
+    varying vec2 vUv;
+    void main() {
+      vec2 fromCentre = vUv - vec2(0.5);
+      float radius = length(fromCentre);
+      vec2 direction = radius > 0.0001 ? fromCentre / radius : vec2(0.0);
+      float edgeMask = smoothstep(0.16, 0.72, radius);
+      vec2 blur = direction * amount * edgeMask;
+      vec4 col = texture2D(tDiffuse, vUv) * 0.4;
+      col += texture2D(tDiffuse, vUv + blur) * 0.24;
+      col += texture2D(tDiffuse, vUv - blur) * 0.24;
+      col += texture2D(tDiffuse, vUv + blur * 2.0) * 0.06;
+      col += texture2D(tDiffuse, vUv - blur * 2.0) * 0.06;
+      gl_FragColor = col;
+    }`,
+};
+
 const TILT_FOCUS_Y = 0.5;    // the sharp horizontal strip (0 = bottom, 1 = top); the van sits mid-screen
 
 const GRADE_MORNING = { saturation: 1.2, contrast: 1, lift: 0.004, vignette: 0.2, tint: new THREE.Color(1.02, 1.01, 1.0) };
 const GRADE_EVENING = { saturation: 1.18, contrast: 1, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.95, 0.86) };
 const GRADE_NIGHT = { saturation: 0.8, contrast: 1, lift: 0.003, vignette: 0.28, tint: new THREE.Color(0.94, 0.92, 1.04) };
 
-// Composer: Render -> SMAA -> tilt-shift (H, V) -> colour grade -> Output.
+// Composer: Render -> SMAA -> tilt-shift (H, V) -> subtle speed blur -> colour grade -> Output.
 export function createRenderer(scene, camera) {
   const renderer = new THREE.WebGLRenderer({ antialias: false }); // SMAA replaces MSAA
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -71,6 +103,9 @@ export function createRenderer(scene, camera) {
   hblur.enabled = vblur.enabled = false;
   composer.addPass(hblur);
   composer.addPass(vblur);
+
+  const speedBlur = new ShaderPass(SpeedBlurShader);
+  composer.addPass(speedBlur);
 
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
@@ -116,7 +151,7 @@ export function createRenderer(scene, camera) {
 
   // tilt is the target blur radius in CSS pixels (from the camera profile; fades in/out smoothly).
   // worldTime: looping day clock, 0..1 = one full day (see daycycle.js).
-  function setLook({ tilt = 0, worldTime = 0, dt = 0 }) {
+  function setLook({ tilt = 0, worldTime = 0, dt = 0, speed = 0 }) {
     tiltAmount += (tilt - tiltAmount) * (1 - Math.exp(-4 * dt));
     const on = tiltAmount > 0.01;
     hblur.enabled = vblur.enabled = on;
@@ -124,6 +159,10 @@ export function createRenderer(scene, camera) {
       hblur.uniforms.h.value = tiltAmount / window.innerWidth;
       vblur.uniforms.v.value = tiltAmount / window.innerHeight;
     }
+
+    // vehicle speed is in m/s. Keep the effect off at low speeds and cap it so road text stays legible.
+    const speedFactor = THREE.MathUtils.smoothstep(Math.max(0, speed), 5, 24);
+    speedBlur.uniforms.amount.value = 0.0025 * speedFactor;
 
     const { evening, night } = dayFactors(worldTime);
     const u = grade.uniforms;
