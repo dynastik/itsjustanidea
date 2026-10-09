@@ -56,6 +56,7 @@ export function createClouds(scene) {
         float topLight = smoothstep(0.2, 0.9, vCloudNormal.y);
         diffuseColor.rgb *= mix(uDark, uLit, topLight);
         float cloudDistance = length(vCloudPosition.xz - uCenter);
+        if (cloudDistance >= uFade.y) discard;
         diffuseColor.a *= 1.0 - smoothstep(uFade.x, uFade.y, cloudDistance);`);
   };
   material.customProgramCacheKey = () => 'voxel-clouds-v1';
