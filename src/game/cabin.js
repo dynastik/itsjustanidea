@@ -171,8 +171,11 @@ export function createCabInterior(vehicle) {
     // in smooth stages toward the front instead of one abrupt, oversized block.
     // Make the transition fuller and longer, with a moderate ramp angle:
     // halfway between the level center tunnel and the dashboard's slight tilt.
-    const bridgeFrontZ = consoleFrontZ + 0.46;
+    // Extend the flare past the dashboard's front edge (zDash). Ending at
+    // consoleFrontZ + 0.46 left nearly all of it buried inside the dash box.
+    const bridgeFrontZ = zDash + 0.06;
     const bridgeBackZ = consoleFrontZ - 0.08;
+    const bridgeCenterZ = (bridgeBackZ + bridgeFrontZ) / 2;
     const bridgeSections = [
       { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.70, top: -0.55 },
       { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.70, top: -0.55 },
@@ -226,10 +229,10 @@ export function createCabInterior(vehicle) {
     // Rotate the whole flare at the exact midpoint between the level console (0)
     // and the dashboard (-0.12 rad), rather than approximating the angle with stepped heights.
     const bridgePivot = new THREE.Group();
-    bridgePivot.position.set(consoleX, -0.625, consoleFrontZ + 0.19);
+    bridgePivot.position.set(consoleX, -0.625, bridgeCenterZ);
     bridgePivot.rotation.x = (dash.rotation.x + 0) / 2;
     add(bridgePivot);
-    bridgeGeometry.translate(-consoleX, 0.625, -(consoleFrontZ + 0.19));
+    bridgeGeometry.translate(-consoleX, 0.625, -bridgeCenterZ);
     bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
