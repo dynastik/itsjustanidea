@@ -150,15 +150,74 @@ body {
   right: 20px;
   bottom: 19px;
   z-index: 10;
-  padding: 10px 12px;
-  border: 1px solid rgba(225, 229, 222, 0.16);
+  width: 250px;
+  padding: 11px 13px 10px;
+  border: 1px solid rgba(225, 229, 222, 0.18);
   border-radius: 4px;
-  background: rgba(8, 12, 16, 0.62);
+  background: rgba(8, 12, 16, 0.76);
   color: #eee9dd;
-  font: 600 22px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  letter-spacing: 0.3px;
   text-shadow: 0 1px 6px #000;
   pointer-events: none;
+}
+
+#speedo-readout {
+  font: 650 18px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+}
+
+#rpm-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: #aeb5b0;
+  font: 600 9px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 1.2px;
+}
+
+#rpm-value {
+  color: #eee9dd;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+#rpm-track {
+  height: 5px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(225, 229, 222, 0.15);
+}
+
+#rpm-fill {
+  width: 16%;
+  height: 100%;
+  background: #b8c9a9;
+  transition: width 90ms linear, background-color 120ms linear;
+}
+
+#rpm-fill.warning {
+  background: #d5b99a;
+}
+
+#rpm-fill.redline {
+  background: #e58e83;
+}
+
+#transmission-status {
+  min-height: 12px;
+  margin-top: 7px;
+  color: #aeb5b0;
+  font: 650 9px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 1.1px;
+}
+
+#transmission-status.shift {
+  color: #d5b99a;
+}
+
+#transmission-status.warning {
+  color: #e58e83;
 }
 
 #headlight-status {
@@ -248,7 +307,13 @@ body {
   #speedo {
     right: 10px;
     bottom: 10px;
+    width: 220px;
+    right: 10px;
     font-size: 18px;
+  }
+
+  #speedo-readout {
+    font-size: 16px;
   }
 
   #headlight-status {
