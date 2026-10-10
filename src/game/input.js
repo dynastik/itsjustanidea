@@ -16,7 +16,7 @@ export const KEYS = {
 };
 
 // Match the vehicle's 30 m/s max; per-gear caps still apply.
-const CITY_SPEED_CAP = 30;
+const CITY_SPEED_CAP = 999; // TEMP TEST: remove city speed cap
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 // The ONE object the vehicle reads. City fills it from WASD, highway from typing.
