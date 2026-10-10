@@ -105,14 +105,21 @@ export function createCabInterior(vehicle) {
     const wheelCurve = new THREE.CatmullRomCurve3(wheelPoints, true, 'catmullrom', 0.15);
     spin.add(new THREE.Mesh(new THREE.TubeGeometry(wheelCurve, 64, 0.022, 10, true), M.trim));
 
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.04, 20), M.panel);
-    hub.rotation.x = Math.PI / 2;
+    // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
+    const hub = box(0.115, 0.09, 0.035, M.panel, 0, 0, 0);
     spin.add(hub);
-    for (const a of [Math.PI / 2, Math.PI / 2 + 2.1, Math.PI / 2 - 2.1]) {
-      const spoke = box(0.16, 0.025, 0.025, M.trim, Math.cos(a) * 0.075, Math.sin(a) * 0.075, 0);
-      spoke.rotation.z = a;
+    const armMat = M.trim;
+    const arm = (x1, y1, x2, y2, width = 0.025) => {
+      const dx = x2 - x1, dy = y2 - y1;
+      const length = Math.hypot(dx, dy);
+      const spoke = box(width, length, 0.025, armMat, (x1 + x2) / 2, (y1 + y2) / 2, 0);
+      spoke.rotation.z = -Math.atan2(dx, dy);
       spin.add(spoke);
-    }
+    };
+    arm(-0.045, 0.025, -0.15, 0.085, 0.028);
+    arm(0.045, 0.025, 0.15, 0.085, 0.028);
+    arm(-0.035, -0.035, -0.09, -0.125, 0.026);
+    arm(0.035, -0.035, 0.09, -0.125, 0.026);
     parts.spin = spin;
     const column = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 10), M.trim);
     column.rotation.x = Math.PI / 2 + 0.5;
@@ -120,12 +127,25 @@ export function createCabInterior(vehicle) {
     add(column);
 
     // seats (driver, passenger)
-    for (const sx of [0, xR + 0.45]) {
+    const seatCenters = [0, xR + 0.45];
+    for (const sx of seatCenters) {
       add(box(0.5, 0.12, 0.5, M.seat, sx, -0.74, -0.2));
       const back = add(box(0.5, 0.62, 0.12, M.seat, sx, -0.45, -0.5));
       back.rotation.x = -0.12;
       add(box(0.26, 0.16, 0.09, M.seat, sx, -0.06, -0.55));
     }
+
+    // Low center console between the seats, with a short gear selector.
+    const consoleX = (seatCenters[0] + seatCenters[1]) / 2;
+    add(box(0.2, 0.14, 0.46, M.panel, consoleX, -0.65, -0.02));
+    add(box(0.17, 0.035, 0.28, M.trim, consoleX, -0.565, -0.015));
+    const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
+    shifterStem.position.set(consoleX, -0.49, 0.035);
+    shifterStem.rotation.x = -0.18;
+    add(shifterStem);
+    const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
+    shifterKnob.position.set(consoleX, -0.425, 0.045);
+    add(shifterKnob);
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
     add(beam(V(xC, yRoof - 0.02, 0.48), V(xC, yRoof - 0.15, 0.44), 0.02, M.trim));
