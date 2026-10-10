@@ -325,6 +325,8 @@ export function createVehicle(scene, physics, RAPIER) {
   let gearIndex = 2;
   let shiftTimer = 0;
   let shiftDuration = 0.34;
+  let throttleOffTimer = 0;
+  let coastClutch = 1;
   let shiftCueTimer = 0;
   let shiftCue = '';
   let engineRpm = 850;
@@ -398,7 +400,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const speedInGear = self.speed * (gearName === 'R' ? -1 : 1);
     const lugging = gearIndex >= 3 && speedInGear < GEAR_MIN_SPEED[gearIndex] * 0.78;
     return { gear: gearName, rpm: Math.round(engineRpm),
-      clutch: shiftTimer > 0 ? clamp(shiftTimer / shiftDuration, 0, 1) : 0,
+      clutch: Math.max(shiftTimer > 0 ? clamp(shiftTimer / shiftDuration, 0, 1) : 0, 1 - coastClutch),
       shift: shiftCueTimer > 0 ? shiftCue : '', lugging,
       overRev: engineRpm >= 4800, auto: state.mode === 'highway' };
   }
@@ -590,6 +592,17 @@ export function createVehicle(scene, physics, RAPIER) {
     const speedInGear = v * direction;
     let F = 0;
 
+    // Lift-off coasting: keep the drivetrain coupled for a short lift, then smoothly
+    // disengage the clutch so the van preserves momentum instead of engine-braking forever.
+    // Braking, throttle input, shifting, reverse, and near-stop driving all take priority.
+    const canFreewheel = gearIndex >= 2 && Math.abs(v) > 2.0 && t <= 0.04
+      && input.brake <= 0 && shiftTimer <= 0;
+    if (canFreewheel) throttleOffTimer += dt;
+    else throttleOffTimer = 0;
+    const coastClutchTarget = canFreewheel && throttleOffTimer > 0.85 ? 0 : 1;
+    coastClutch += (coastClutchTarget - coastClutch) * (1 - Math.exp(-5.5 * dt));
+    coastClutch = clamp(coastClutch, 0, 1);
+
     const gearMin = GEAR_MIN_SPEED[gearIndex] || 0;
     const ratio = GEAR_RATIOS[gearIndex] || 0;
     // Engine speed follows road speed through the selected gear ratio. Throttle can flare
@@ -598,7 +611,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const freeRevBlend = gearName === 'N'
       ? 1
       : clamp(1 - Math.max(0, speedInGear) / 2.2, 0, 1) * 0.78;
-    const rpmTarget = gearName === 'N'
+    const rpmTarget = gearName === 'N' || coastClutch < 0.98
       ? 850 + t * 3900
       : coupledRpm + t * freeRevBlend * 1150;
     const rpmResponse = shiftTimer > 0 ? 13 : (t > 0.05 ? 9 : 6);
@@ -607,12 +620,13 @@ export function createVehicle(scene, physics, RAPIER) {
 
     const lugging = gearIndex >= 3 && speedInGear < gearMin * 0.78 && t > 0.04;
     let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex] * engineTorqueAtRpm(engineRpm);
+    // Both gear changes and lift-off coasting reduce drivetrain coupling smoothly.
+    let shiftCoupling = 1;
     if (shiftTimer > 0) {
-      // Clutch take-up eases in progressively instead of restoring full drive force abruptly.
       const shiftProgress = 1 - clamp(shiftTimer / shiftDuration, 0, 1);
-      const clutchEngagement = shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
-      torque *= 0.04 + 0.96 * clutchEngagement;
+      shiftCoupling = 0.04 + 0.96 * shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
     }
+    torque *= coastClutch * shiftCoupling;
     if (lugging) {
       lugPhase += dt * Math.PI * 2 * 5.0;
       torque *= 0.18 + 0.82 * Math.max(0, Math.sin(lugPhase));
@@ -630,7 +644,7 @@ export function createVehicle(scene, physics, RAPIER) {
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
         const gearBrake = [0.075, 0, 0.095, 0.075, 0.055, 0.04, 0.028][gearIndex];
-        F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1);
+        F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
       }
     }
     if (overRevTimer > 0 && v !== 0) F -= Math.sign(v) * h.brakeForce * 0.12 * (overRevTimer / 0.42);
@@ -695,6 +709,8 @@ export function createVehicle(scene, physics, RAPIER) {
     gearIndex = 2;
     shiftTimer = 0;
     shiftDuration = 0.34;
+    throttleOffTimer = 0;
+    coastClutch = 1;
     shiftCueTimer = 0;
     shiftCue = '';
     engineRpm = 850;
