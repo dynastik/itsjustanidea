@@ -413,8 +413,10 @@ export function createCabInterior(vehicle) {
         const positions = shiftBootGeometry.attributes.position;
         const topTravel = 0.13;
         const bootTopTravel = 0.055;
-        const topX = -Math.sin(leanX) * topTravel * (bootTopTravel / topTravel);
-        const topZ = Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel);
+        const topX = Math.sign(-Math.sin(leanX) * topTravel * (bootTopTravel / topTravel))
+          * Math.max(0, Math.abs(-Math.sin(leanX) * topTravel * (bootTopTravel / topTravel)) - 0.005);
+        const topZ = Math.sign(Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel))
+          * Math.max(0, Math.abs(Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel)) - 0.005);
         for (let i = 0; i < positions.count; i++) {
           const base = i * 3;
           const isTop = shiftBootBasePositions[base + 1] > 0;
