@@ -6,11 +6,12 @@
 // a new sign), so this costs a few draw calls and no per-frame work beyond moving nothing.
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
+import { GROUND_START_Z } from './highwayLayout.js';
 
 const STEP = 160;            // metres between signs
 const SLOTS = 6;
 const AHEAD = 4;             // signs kept ahead of the vehicle, the rest behind
-const START_Z = 120;         // the highway begins here; no signs in the city
+const START_Z = GROUND_START_Z + 40; // signs line the ground highway (after the hill arc); none in the city or on the deck
 const OFFSET = ROAD_HALF_WIDTH + 3.6;
 const W = 256;
 const H = 128;
@@ -93,6 +94,7 @@ export function createSigns(scene) {
   const postMat = new THREE.MeshToonMaterial({ color: 0x6b6f75 });
   const slots = [];
   const slotK = new Int32Array(SLOTS).fill(-999999);
+  let lastAct = null;
 
   for (let i = 0; i < SLOTS; i++) {
     const canvas = document.createElement('canvas');
@@ -132,6 +134,8 @@ export function createSigns(scene) {
 
   // act: story.getAct(); night: 0..1 (signs dim a little in the dark, they are not lit)
   function update(vehicleZ, act, night) {
+    // z barely changes on the deck, so signs painted for an earlier act would stay stale: repaint all slots when the act changes
+    if (act !== lastAct) { slotK.fill(-999999); lastAct = act; }
     const k0 = Math.floor(vehicleZ / STEP);
     for (let n = -(SLOTS - AHEAD); n < AHEAD; n++) {
       const k = k0 + n;

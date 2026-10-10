@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
 import { toonGradientMap } from './toon.js';
+import { GROUND_START_Z } from './highwayLayout.js';
 
 // Highway-zone roadside props. Instanced visuals recycled around the vehicle; guardrails also get
 // real colliders, but only for the stretch near the vehicle.
 const SEG = 10;                    // metres per guardrail segment
 const SLOTS = 64;                  // segments kept alive per side (SEG * SLOTS = 640 m)
 const COLLIDER_RANGE = 80;
-const START_Z = 90;                // props begin where the highway does
+const START_Z = GROUND_START_Z;    // props line the ground highway (the deck and hill arc have their own rails, see interchange.js)
 const RAIL_OFFSET = ROAD_HALF_WIDTH + 1.6;
 const MARK_STEP = 200;
 const MARK_SLOTS = 6;
@@ -68,8 +69,9 @@ export function createProps(scene, physics, RAPIER) {
     const supportHeight = 6.6;
     // The two legs sit beyond the road edges, so neither the supports nor the crossbar obscure the lettering.
     for (const x of [-roadSpan, roadSpan]) {
-      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, supportHeight, 0.2), postMat);
-      pole.position.set(x, supportHeight / 2, 0);
+      // legs reach 3 m below the road surface so they stay planted beside the elevated deck
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, supportHeight + 3, 0.2), postMat);
+      pole.position.set(x, supportHeight / 2 - 1.5, 0);
       group.add(pole);
     }
     const crossbar = new THREE.Mesh(
@@ -90,11 +92,11 @@ export function createProps(scene, physics, RAPIER) {
     scene.add(group);
     return group;
   });
-  function showStorySign(index = -1, aheadZ = null) {
-    if (index >= 0 && Number.isFinite(aheadZ)) {
-      const frame = getRoadFrame(aheadZ);
-      storySigns[index].position.set(frame.x, frame.y, aheadZ);
-      storySigns[index].rotation.y = frame.heading;
+  // pose: { x, y, z, heading } on the drive path (world.getAheadPose); the deck and arc are not z-indexed
+  function showStorySign(index = -1, pose = null) {
+    if (index >= 0 && pose) {
+      storySigns[index].position.set(pose.x, pose.y, pose.z);
+      storySigns[index].rotation.y = pose.heading;
     }
     storySigns.forEach((sign, i) => { sign.visible = i === index; });
   }

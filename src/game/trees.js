@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
 import { toonGradientMap } from './toon.js';
-import { CITY_Z_MIN, CITY_Z_MAX } from './zones.js';
+import { CITY_Z_MIN } from './zones.js';
+import { GROUND_START_Z } from './highwayLayout.js';
 
 const TREE_SPACING = 20;
 const TREE_SLOTS = 40;
@@ -262,7 +263,7 @@ export async function createTrees(scene, physics, RAPIER) {
     const cluster = Math.floor(hk / 4);
     if (hash(cluster, side + 17) < 0.26 || hash(hk, side + 23) < 0.12) return null;
     const z = (k + 0.5 + (hash(hk, side + 2) - 0.5) * 0.35) * TREE_SPACING;
-    if (z > CITY_Z_MIN - 20 && z < CITY_Z_MAX + 20) return null; // the city has its own scenery
+    if (z > CITY_Z_MIN - 20 && z < GROUND_START_Z + 10) return null; // the city has its own scenery; the ramp, deck and hill arc are not z-indexed roads
     const offset = THREE.MathUtils.lerp(TREE_MIN_OFFSET, TREE_MAX_OFFSET, hash(hk, side + 3));
     const pose = roadSidePose(z, side, offset);
     return {

@@ -13,14 +13,16 @@
 //    highway. A lane-follower can use it instead of the z-indexed city road frame.
 import * as THREE from 'three';
 import { toonGradientMap } from './toon.js';
+import { HW, RIBBON_LIFT } from './highwayLayout.js';
 
 const lerp = THREE.MathUtils.lerp;
 const smooth01 = (t) => t * t * (3 - 2 * t);
 const yawQuat = (h) => ({ x: 0, y: Math.sin(h / 2), z: 0, w: Math.cos(h / 2) });
 
+// The highway itself (west stub, deck, hill arc, ground road) is laid out in highwayLayout.js; these are the ramp's numbers.
 export const INTERCHANGE = {
-  highwayZ: 170,     // the cross-highway runs along x at this z
-  deckRise: 4.5,     // how far above the city road end the deck sits
+  highwayZ: HW.z,    // the cross-highway runs along x at this z
+  deckRise: HW.deckRise,
   bendDx: 95,        // how far along the highway (x) the bend ends and the acceleration lane begins
   handle: 48,        // bend handle length: bigger = wider, gentler bend
   laneLen: 50,       // acceleration lane alongside the highway
@@ -28,15 +30,12 @@ export const INTERCHANGE = {
   leadLen: 12,       // straight lead-in continuing the city road
 };
 
-// opts: { halfWidth, cityEndZ, getRoadFrame(z) -> {x, y, heading}, terrainHeight(x, z) }
+// opts: { halfWidth, cityEndZ, getRoadFrame(z) -> {x, y, heading}, terrainHeight(x, z), layout (highwayLayout.js) }
 export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, opts) {
-  const { halfWidth: half, cityEndZ, getRoadFrame, terrainHeight } = opts;
+  const { halfWidth: half, cityEndZ, getRoadFrame, terrainHeight, layout } = opts;
   const C = INTERCHANGE;
-  const width = half * 2;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const startY = getRoadFrame(cityEndZ).y;
-  const deckY = startY + C.deckRise;
-  const highwayZ = C.highwayZ;
+  const highwayZ = HW.z;
 
   // ---------- helpers ----------
   function sideOf(points, i) {
@@ -77,30 +76,17 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     return { body };
   }
 
-  // ---------- the cross-highway (unchanged shape: elevated through the junction, down to ground at both ends) ----------
-  const highwayControls = [
-    [-520, startY + 0.08], [-460, startY + 0.08], [-400, startY + 0.7], [-340, startY + 2.0], [-280, deckY - 0.4],
-    [-220, deckY], [-160, deckY], [-100, deckY], [-40, deckY], [20, deckY], [80, deckY], [140, deckY],
-    [200, deckY - 0.4], [260, startY + 2.0], [320, startY + 0.7], [380, startY + 0.08], [440, startY + 0.08], [520, startY + 0.08],
-  ].map(([x, y]) => V(x, y, highwayZ));
-  const highwaySamples = new THREE.CatmullRomCurve3(highwayControls, false, 'catmullrom', 0.1).getPoints(300);
+  // ---------- the cross-highway ----------
+  // West stub (ends in a barrier) -> elevated deck -> slow descent -> arc round the big hill -> hands over to the z-indexed
+  // ground road at GROUND_START_Z. Shape and heights come from highwayLayout.js; the ribbon sits RIBBON_LIFT above the graded terrain.
+  const highwaySamples = layout.sampleCenterline().map((p) => V(p.x, p.y + RIBBON_LIFT, p.z));
   const hwSides = highwaySamples.map((_, i) => sideOf(highwaySamples, i));
-  const hwLeft = highwaySamples.map((p, i) => p.clone().addScaledVector(hwSides[i], -half)); // north edge
-  const hwRight = highwaySamples.map((p, i) => p.clone().addScaledVector(hwSides[i], half)); // south edge: faces the city/ramp
+  const hwLeft = highwaySamples.map((p, i) => p.clone().addScaledVector(hwSides[i], -half)); // north / inner edge
+  const hwRight = highwaySamples.map((p, i) => p.clone().addScaledVector(hwSides[i], half)); // south edge on the deck (faces the ramp); outer edge on the arc
   const highway = makeRibbon(hwLeft, hwRight);
 
-  function highwayYAt(x) {
-    const s = highwaySamples;
-    if (x <= s[0].x) return s[0].y;
-    if (x >= s[s.length - 1].x) return s[s.length - 1].y;
-    let lo = 0;
-    let hi = s.length - 1;
-    while (hi - lo > 1) {
-      const m = (lo + hi) >> 1;
-      if (s[m].x <= x) lo = m; else hi = m;
-    }
-    return lerp(s[lo].y, s[hi].y, (x - s[lo].x) / (s[hi].x - s[lo].x || 1));
-  }
+  // deck height at x (only used where the ramp merges, which is on the flat part)
+  const highwayYAt = (x) => layout.centerY(Math.min(x, HW.hillX)) + RIBBON_LIFT;
 
   // ---------- the ramp ----------
   const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
@@ -175,7 +161,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const taperEndX = laneEndX + C.taperLen;
   const ramp = makeRibbon(L, R);
 
-  // drive path: ramp, then on along the highway
+  // drive path: ramp, then along the deck and round the hill arc. It ends at the arc end (z = GROUND_START_Z); from there
+  // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
   const drivePath = path.concat(highwaySamples.filter((p) => p.x > taperEndX + 3).map((p) => p.clone()));
 
   // ---------- guardrails (visible + colliders), pillars ----------
@@ -198,9 +185,13 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
         z: mz + (oz / ol) * 0.12,
         yaw: Math.atan2(dx, dz),
         len: len + 0.12,
+        th: 0.16,
+        h: 0.52,
       });
     }
   }
+  // west end of the deck: a solid barrier across the road (the stub is a dead end for now)
+  railPieces.push({ body: highway.body, x: highwaySamples[0].x + 0.25, y: highwaySamples[0].y + 0.65, z: highwayZ, yaw: 0, len: half * 2 + 0.4, th: 0.5, h: 1.3 });
   // highway: north rail all the way; the city-side rail is open along the merge
   railLine(hwLeft, hwRight, highway.body, () => false);
   railLine(hwRight, hwLeft, highway.body, (i) => hwRight[i].x > P3[0] - 8 && hwRight[i].x < taperEndX + 6);
@@ -214,11 +205,11 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   railPieces.forEach((r, i) => {
     dummy.position.set(r.x, r.y, r.z);
     dummy.rotation.set(0, r.yaw, 0);
-    dummy.scale.set(0.16, 0.52, r.len);
+    dummy.scale.set(r.th, r.h, r.len);
     dummy.updateMatrix();
     rails.setMatrixAt(i, dummy.matrix);
     physics.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.08, 0.26, r.len / 2).setTranslation(r.x, r.y, r.z).setRotation(yawQuat(r.yaw)).setFriction(0.7),
+      RAPIER.ColliderDesc.cuboid(r.th / 2, r.h / 2, r.len / 2).setTranslation(r.x, r.y, r.z).setRotation(yawQuat(r.yaw)).setFriction(0.7),
       r.body
     );
   });
@@ -232,9 +223,9 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const addPillar = (x, z, topY) => {
     const base = terrainHeight(x, z);
     const h = topY - base;
-    if (h >= 2.2) pillarSpots.push([x, base + h / 2, z, h]);
+    if (h >= 0.6) pillarSpots.push([x, base + h / 2, z, h]);
   };
-  for (let i = 8; i < highwaySamples.length - 8; i += 14) {
+  for (let i = 4; i < highwaySamples.length - 4; i += 8) {
     for (const sign of [-1, 1]) {
       const p = highwaySamples[i];
       addPillar(p.x + hwSides[i].x * sign * (half + 1.1), p.z + hwSides[i].z * sign * (half + 1.1), p.y);
@@ -260,5 +251,18 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   pillars.frustumCulled = false;
   scene.add(pillars);
 
-  return { drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path };
+  // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
+  const roadXZ = [];
+  for (const p of path) roadXZ.push(p.x, p.z);
+  for (const p of highwaySamples) roadXZ.push(p.x, p.z);
+  const onRoadR2 = (half + 1.1) * (half + 1.1);
+  function onRoad(x, z) {
+    for (let i = 0; i < roadXZ.length; i += 2) {
+      const dx = x - roadXZ[i], dz = z - roadXZ[i + 1];
+      if (dx * dx + dz * dz < onRoadR2) return true;
+    }
+    return false;
+  }
+
+  return { drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad, westEndX: HW.westX };
 }

@@ -180,7 +180,7 @@ async function main() {
     const storyTarget = state.typing.target;
     if (storyTarget !== lastStoryTarget) {
       if (storyTarget === 'WELCOME TO BELLWEATHER.') {
-        props.showStorySign(Math.min(storySignCount, 1), vehicle.center.z + 70);
+        props.showStorySign(Math.min(storySignCount, 1), world.getAheadPose(vehicle.center.x, vehicle.center.z, 70));
         storySignCount = Math.min(storySignCount + 1, 2);
       } else if (storyTarget === 'He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back.') {
         props.showStorySign(-1);

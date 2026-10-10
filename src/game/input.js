@@ -111,9 +111,12 @@ export function writeHighwayInput(d, vehicle, road = null) {
   const sinceEntry = state.time - state.highwayEnteredAt;
   const learn = 1 - clamp(sinceEntry / c.learnerRampS, 0, 1); // 1 on arrival -> 0 once settled in
   const z = vehicle.center.z;
+  // ramp -> deck -> hill arc follow drivePath; once the road is z-indexed again (ground highway) follow getRoadFrame(z)
+  const usePath = !!road?.drivePath?.length && z < (road.groundStartZ ?? Infinity);
   let frame = road?.getRoadFrame(z) ?? { x: 0, heading: 0, y: 0 };
   let lateral;
-  if (road?.drivePath?.length) {
+  let curvature = 0; // heading change per metre of road (feed-forward so bends do not need a lateral error to be followed)
+  if (usePath) {
     const path = road.drivePath;
     let nearest = 0, best = Infinity;
     for (let i = 0; i < path.length; i++) {
@@ -124,14 +127,20 @@ export function writeHighwayInput(d, vehicle, road = null) {
     const a = path[Math.max(0, nearest - 1)], b = path[Math.min(path.length - 1, nearest + 1)], p = path[nearest];
     frame = { x: p.x, y: p.y, z: p.z, heading: Math.atan2(b.x - a.x, b.z - a.z) };
     lateral = (vehicle.center.x - p.x) * Math.cos(frame.heading) - (vehicle.center.z - p.z) * Math.sin(frame.heading);
+    if (nearest > 0 && nearest < path.length - 1) {
+      const ds = (Math.hypot(p.x - a.x, p.z - a.z) + Math.hypot(b.x - p.x, b.z - p.z)) / 2;
+      if (ds > 0.5) curvature = (Math.atan2(b.x - p.x, b.z - p.z) - Math.atan2(p.x - a.x, p.z - a.z)) / ds;
+    }
   } else {
     lateral = vehicle.center.x - frame.x;
+    if (road) curvature = (road.getRoadFrame(z + 4).heading - road.getRoadFrame(z - 4).heading) / 8;
   }
+  curvature = clamp(curvature, -0.05, 0.05);
 
   // Uphill = engine strain: people who are not typing lose speed on climbs, fast typists hold it.
   let strain = 0;
   if (road) {
-    const grade = road.drivePath?.length ? 0 : (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
+    const grade = usePath ? 0 : (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
     strain = clamp(grade / c.hillGradeRef, 0, 1);
   }
   const strainPenalty = strain * (1 - wpmFactor) * c.hillStrainMax;
@@ -159,7 +168,7 @@ export function writeHighwayInput(d, vehicle, road = null) {
     frame.heading - c.maxAutoHeading,
     frame.heading + c.maxAutoHeading
   );
-  const wDes = c.headingResponse * (desiredHeading - vehicle.heading);
+  const wDes = c.headingResponse * (desiredHeading - vehicle.heading) + curvature * Math.max(vehicle.speed, 0);
   const v = Math.abs(vehicle.speed);
   const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(v, 2));
   const steer = angle / vehicle.maxSteerAtSpeed(v);

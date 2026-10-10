@@ -369,3 +369,7 @@ ROADMAP.md
 ## Story modes and interchange integration
 
 Edit `story/short.md` and `story/long.md`, then run `npm run story` to regenerate `src/game/storyText.js`. Choose short or long mode in the city with **1** or **2** before entering the highway. The original narrative script is preserved in `story/story-script.md`. The separate ramp, merge lane, and cross-highway are implemented in `src/game/interchange.js`.
+
+### Highway layout (`src/game/highwayLayout.js`)
+
+Ramp -> elevated deck (short west stub ending in a barrier; `HW.westX`) -> slow descent -> quarter-circle arc round a big hill (`HW.radius`, `HW.hillHeight`) -> z-indexed ground highway from `GROUND_START_Z`, where props, trees, signs and the road strip carry on procedurally. The terrain now recentres in x as well as z. `npm run check:highway` runs the geometry checks in plain node.
