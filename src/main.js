@@ -14,7 +14,7 @@ import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput } from './game/input.js';
-import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev, advancePromptAutomatically } from './game/typing.js';
+import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
 import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
 import { createSigns } from './game/signs.js';
@@ -64,7 +64,7 @@ async function main() {
   // (and again after the ride height is measured).
   const cabin = createCabInterior(vehicle);
   vehicle.visual.add(cabin.root);
-  cabin.root.visible = false; // shown only in cab view
+  cabin.root.visible = false;
   vehicle.onModelReady(() => cabin.layout(vehicle.getLocalBounds()));
 
   const rig = createCameraRig(camera, gfx.domElement, vehicle, cabin);
@@ -77,11 +77,8 @@ async function main() {
   let prevSpeed = 0;
   let lastStoryTarget = null;
   let storySignCount = 0;
-  let autoPromptTarget = null;
-  let autoPromptTimer = 0;
   const treeLightDirection = new THREE.Vector3();
 
-  // Spawn on the road, pointing along it.
   function spawn() {
     const f = world.getRoadFrame(0);
     vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
@@ -99,14 +96,12 @@ async function main() {
     beginTypingSession();
   });
 
-  // Dev console: window.typingTelemetry.summary() / .log() / .logJson() for tuning pacing and the Phase 6 estimator.
   if (import.meta.env.DEV) {
     window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
   }
 
   function advanceClock(frac) { let t=state.worldTime+frac; if(t>=1){state.dayIndex=(state.dayIndex||0)+Math.floor(t);t%=1;} state.worldTime=t; }
 
-  // Full restart: back to the city on a bright morning with the story rewound. Also what the ending calls.
   function fullReset() {
     spawn();
     beginTypingSession({ restartStory: true });
@@ -143,9 +138,8 @@ async function main() {
       rig.setDebug(state.debug);
       vehicle.setDebugVisible(state.debug);
     },
-    // Dev-only: Tab jumps between zones. Not registered in release builds (Vite sets DEV=false there).
     devSwitchMode: import.meta.env.DEV ? () => {
-      state.zoneAuto = false; // otherwise the zone logic flips you straight back
+      state.zoneAuto = false;
       setMode(state.mode === 'city' ? 'highway' : 'city');
     } : undefined,
     setStoryMode: (mode) => { if (state.highwayEnteredAt !== -Infinity || getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
@@ -166,7 +160,7 @@ async function main() {
     const now = performance.now();
     let dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    if (state.paused) dt = 0; // everything below is dt-driven, so this freezes the sim
+    if (state.paused) dt = 0;
 
     state.time += dt;
     if (getStoryMode() === 'short') { const target=getStoryTime(state.typing.buffer.length); state.worldTime+=(target-state.worldTime)*(1-Math.exp(-dt/3)); }
@@ -178,11 +172,9 @@ async function main() {
       ending.play(fullReset);
     }
 
-    // keep terrain + props alive around the van BEFORE stepping physics, so there is always ground
     world.update(vehicle.center.x, vehicle.center.z);
     props.update(vehicle.center.z);
     // Reveal each overhead sign when its actual sign text becomes the active typing prompt.
-    // Spawn it ahead of the van so the player can see it while typing, regardless of world distance.
     const storyTarget = state.typing.target;
     if (storyTarget !== lastStoryTarget) {
       if (storyTarget === 'WELCOME TO BELLWEATHER.') {
@@ -201,22 +193,7 @@ async function main() {
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
     else input.writeHighway(driveInput, vehicle, world);
 
-    // Story captions advance at a relaxed reading pace; no typing is required on the highway.
-    if (state.mode === 'highway' && !state.storyDone) {
-      if (state.typing.target !== autoPromptTarget) {
-        autoPromptTarget = state.typing.target;
-        autoPromptTimer = 0;
-      }
-      autoPromptTimer += dt;
-      const readDuration = Math.max(4, Math.min(16, state.typing.target.length / 18));
-      if (state.typing.target && autoPromptTimer >= readDuration) {
-        advancePromptAutomatically();
-        autoPromptTarget = null;
-        autoPromptTimer = 0;
-      }
-    }
-
-    // fixed-timestep physics, render pose interpolated between steps
+    // Highway story progression is typing-driven again: prompts only advance when completed.
     accumulator += dt;
     let steps = 0;
     while (accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
@@ -226,13 +203,12 @@ async function main() {
       accumulator -= FIXED_DT;
       steps++;
     }
-    if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
+    if (steps === MAX_STEPS_PER_FRAME) accumulator = 0;
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
     state.transmission = vehicle.transmission;
     cabin.update(dt, vehicle, driveInput);
 
-    // impact detection: a big one-frame speed loss that wasn't braking
     if (dt > 0) {
       const drop = prevSpeed - vehicle.speed;
       if (prevSpeed > 4 && drop > 3) audio.bump(drop);
@@ -259,7 +235,6 @@ async function main() {
   animate();
 }
 
-// Show any startup/runtime error on screen so a white page is never a mystery again.
 let fatalShown = false;
 function showFatal(e) {
   console.error(e);
