@@ -2,7 +2,8 @@
 export const state = {
   mode: 'city',        // 'city' | 'highway'
   zoneAuto: true,      // false after a dev Tab override (until reset)
-  worldTime: 0,        // looping day clock: 0..1 is one full day, wraps forever (daycycle.js). TODO Phase 5: drive by distance/story beat
+  worldTime: 0,
+  dayIndex: 0,        // looping day clock: 0..1 is one full day, wraps forever (daycycle.js). TODO Phase 5: drive by distance/story beat
   time: 0,             // game clock in seconds; frozen while paused (typing windows use this)
   paused: false,
   storyDone: false,    // the last paragraph has been typed: the ending plays, then the run restarts
