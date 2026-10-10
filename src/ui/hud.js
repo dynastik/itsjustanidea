@@ -14,7 +14,10 @@ export function createHud() {
   const targetWordEl = $('target-word');
   const typedInputEl = $('typed-input');
   const statsEl = $('stats');
-  const speedoEl = $('speedo');
+  const speedoEl = $('speedo-readout');
+  const rpmFillEl = $('rpm-fill');
+  const rpmValueEl = $('rpm-value');
+  const transmissionStatusEl = $('transmission-status');
   const headlightEl = $('headlight-status');
   const pauseEl = $('pause-overlay');
 
@@ -39,7 +42,29 @@ export function createHud() {
     const reverse = state.speed < -0.3;
     set(headlightEl, 'headlights', state.headlightsOn ? 'HEADLIGHTS: ON (F5)' : 'HEADLIGHTS: OFF (F5)');
     const trans = state.transmission || { gear: '1', rpm: 850, auto: false };
-    set(speedoEl, 'speed', `GEAR ${trans.gear} · ${Math.round(trans.rpm)} RPM · ${Math.round(Math.abs(state.speed) * 3.6)} km/h${trans.auto ? ' · AUTO' : ''}`);
+    set(speedoEl, 'speed', `GEAR ${trans.gear} · ${Math.round(Math.abs(state.speed) * 3.6)} km/h${trans.auto ? ' · AUTO' : ''}`);
+    set(rpmValueEl, 'rpmValue', String(Math.round(trans.rpm)));
+    set(rpmFillEl.style, 'rpmWidth', `${Math.min(100, Math.max(0, trans.rpm / 5300 * 100))}%`, 'width');
+    const rpmClass = trans.rpm >= 4900 ? 'redline' : trans.rpm >= 4100 ? 'warning' : '';
+    if (rpmFillEl.className !== rpmClass) rpmFillEl.className = rpmClass;
+    let transStatus = '';
+    let transStatusClass = '';
+    if (trans.overRev) {
+      transStatus = 'REDLINE · SHIFT UP';
+      transStatusClass = 'warning';
+    } else if (trans.lugging) {
+      transStatus = 'ENGINE LUGGING · DOWNSHIFT';
+      transStatusClass = 'warning';
+    } else if (trans.shift) {
+      transStatus = `${trans.shift} · CLUTCHING`;
+      transStatusClass = 'shift';
+    } else if (trans.auto) {
+      transStatus = 'AUTOMATIC TRANSMISSION';
+    } else {
+      transStatus = 'Q DOWN · E UP · SHIFT AUTO-SELECT';
+    }
+    set(transmissionStatusEl, 'transmissionStatus', transStatus);
+    if (transmissionStatusEl.className !== transStatusClass) transmissionStatusEl.className = transStatusClass;
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 
     if (typing) {
