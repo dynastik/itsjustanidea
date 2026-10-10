@@ -44,7 +44,7 @@ export const VEHICLE_CONFIG = {
     engineForce: 16000,
     brakeForce: 22000,
     reverseForce: 7000,
-    coastForce: 140,
+    coastForce: 2,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
@@ -326,6 +326,7 @@ export function createVehicle(scene, physics, RAPIER) {
   let shiftTimer = 0;
   let shiftDuration = 0.34;
   let throttleOffTimer = 0;
+  let downshiftHoldTimer = 0;
   let coastClutch = 1;
   let shiftCueTimer = 0;
   let shiftCue = '';
@@ -343,6 +344,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const speed = Math.abs(self.speed);
     shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.34;
     if (direction < 0 && next >= 2) {
+      downshiftHoldTimer = 1.6;
       const nextSpeed = self.speed * (GEAR_NAMES[next] === 'R' ? -1 : 1);
       const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[next] / GEAR_RATIOS[2]) * 750;
       // Blip the engine toward the RPM the lower gear needs before the clutch re-engages.
@@ -380,6 +382,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const direction = target > gearIndex ? 1 : -1;
     const speed = Math.abs(self.speed);
     if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
+    if (direction < 0 && target >= 2) downshiftHoldTimer = 1.6;
     gearIndex = target;
     shiftDuration = 0.34;
     if (direction < 0 && target >= 2) {
@@ -567,6 +570,7 @@ export function createVehicle(scene, physics, RAPIER) {
     if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
     if (shiftCueTimer > 0) shiftCueTimer = Math.max(0, shiftCueTimer - dt);
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
+    if (downshiftHoldTimer > 0) downshiftHoldTimer = Math.max(0, downshiftHoldTimer - dt);
 
     // S at a standstill selects reverse; pressing W again returns to first gear.
     if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
@@ -586,8 +590,9 @@ export function createVehicle(scene, physics, RAPIER) {
     // Lift-off coasting: keep the drivetrain coupled for a short lift, then smoothly
     // disengage the clutch so the van preserves momentum instead of engine-braking forever.
     // Braking, throttle input, shifting, reverse, and near-stop driving all take priority.
+    const recentDownshift = downshiftHoldTimer > 0;
     const canFreewheel = gearIndex >= 2 && Math.abs(v) > 2.0 && t <= 0.04
-      && input.brake <= 0 && shiftTimer <= 0;
+      && input.brake <= 0 && shiftTimer <= 0 && !recentDownshift;
     if (canFreewheel) throttleOffTimer += dt;
     else throttleOffTimer = 0;
     const coastClutchTarget = canFreewheel && throttleOffTimer > 0.85 ? 0 : 1;
@@ -634,7 +639,7 @@ export function createVehicle(scene, physics, RAPIER) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
-        const gearBrake = [0.02, 0, 0.025, 0.018, 0.012, 0.008, 0.005][gearIndex];
+        const gearBrake = [0.002, 0, 0.003, 0.002, 0.0015, 0.001, 0.0005][gearIndex];
         F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
       }
     }
@@ -701,6 +706,7 @@ export function createVehicle(scene, physics, RAPIER) {
     shiftTimer = 0;
     shiftDuration = 0.34;
     throttleOffTimer = 0;
+    downshiftHoldTimer = 0;
     coastClutch = 1;
     shiftCueTimer = 0;
     shiftCue = '';
