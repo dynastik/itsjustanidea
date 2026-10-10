@@ -103,8 +103,10 @@ export function createAudio() {
       : engineRPM;
     audioRpm += (rpmTarget - audioRpm) * (1 - Math.exp(-(lugging ? 7 : 5) * dt));
 
-    // Roughly twice crank frequency gives the engine a more audible firing character.
-    const crankHz = clamp(audioRpm / 30, 28, 230);
+    // Keep the vehicle's real RPM/physics model unchanged. Gear-specific multipliers shape
+    // only the synthesized engine pitch, making each gear audibly distinct without affecting handling.
+    const pitchByGear = { R: 1.08, N: 1.18, '1': 1.42, '2': 1.22, '3': 1.0, '4': 0.86, '5': 0.74 };
+    const crankHz = clamp((audioRpm / 30) * (pitchByGear[gear] ?? 1), 28, 300);
     engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
 
     const cutoff = 550 + rev * 2300 + load * 850;
