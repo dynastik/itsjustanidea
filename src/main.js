@@ -13,7 +13,7 @@ import { createVehicle, FIXED_DT } from './game/vehicle.js';
 import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
-import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
+import { createInput, createDriveInput } from './game/input.js';
 import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
 import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
