@@ -300,7 +300,7 @@ export function createVehicle(scene, physics, RAPIER) {
   const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.69];
   // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
-  const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 1.75, 0.40];
+  const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 3.0, 0.40];
 
   function engineTorqueAtRpm(rpm) {
     // Broad diesel-ish van curve: weak below the useful band, strongest in the midrange,
