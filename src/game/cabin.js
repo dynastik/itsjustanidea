@@ -177,11 +177,13 @@ export function createCabInterior(vehicle) {
     const bridgeBackZ = consoleFrontZ - 0.08;
     const bridgeCenterZ = (bridgeBackZ + bridgeFrontZ) / 2;
     const bridgeSections = [
+      // Keep the rear joined to the narrow tunnel, then flare outward and upward
+      // into a raised wedge that meets the dashboard, matching the intended silhouette.
       { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.70, top: -0.55 },
-      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.70, top: -0.55 },
-      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.70, top: -0.55 },
-      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.70, top: -0.55 },
-      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.70, top: -0.55 },
+      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.70, top: -0.52 },
+      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.70, top: -0.46 },
+      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.70, top: -0.39 },
+      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.70, top: -0.33 },
     ];
     const bridgeVertices = [];
     const bridgeFaces = [];
