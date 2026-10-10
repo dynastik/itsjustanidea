@@ -305,6 +305,7 @@ export function createCabInterior(vehicle) {
     shiftBootGeometry = bootGeometry;
     shiftBootBasePositions = bootGeometry.attributes.position.array.slice();
     const boot = new THREE.Mesh(bootGeometry, bootLeather);
+    boot.name = 'shift-boot-only';
     boot.position.set(consoleX, -0.514, gateZ);
     add(boot);
 
