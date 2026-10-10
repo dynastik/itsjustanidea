@@ -488,6 +488,13 @@ export function createVehicle(scene, physics, RAPIER) {
     if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
 
+    if (autoShiftEnabled && gearIndex >= 2) {
+      const currentDirection = GEAR_NAMES[gearIndex] === 'R' ? -1 : 1;
+      const currentSpeed = v * currentDirection;
+      if (gearIndex < 6 && currentSpeed >= [0, 0, 4.8, 9.8, 15.2, 21.8, 99][gearIndex]) shiftGear(1, true);
+      else if (gearIndex > 2 && currentSpeed < GEAR_MIN_SPEED[gearIndex] * 0.72 && engineRpm < 1500) shiftGear(-1, true);
+    }
+
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
     const gearCap = GEAR_CAPS[gearIndex] || 0.1;
@@ -503,11 +510,6 @@ export function createVehicle(scene, physics, RAPIER) {
       : 850 + clamp((speedInGear - gearMin) / speedSpan, 0, 1) * 4200 + t * 350;
     engineRpm += (Math.min(5300, rpmTarget) - engineRpm) * (1 - Math.exp(-7 * dt));
     engineRpm = clamp(engineRpm, 750, 5300);
-
-    if (autoShiftEnabled && gearIndex >= 2) {
-      if (gearIndex < 6 && speedInGear >= [0, 0, 4.8, 9.8, 15.2, 21.8, 99][gearIndex]) shiftGear(1, true);
-      else if (gearIndex > 2 && speedInGear < GEAR_MIN_SPEED[gearIndex] * 0.72 && engineRpm < 1500) shiftGear(-1, true);
-    }
 
     const lugging = gearIndex >= 3 && speedInGear < gearMin * 0.78 && t > 0.04;
     let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex];
