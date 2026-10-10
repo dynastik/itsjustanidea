@@ -241,6 +241,7 @@ export async function createTrees(scene, physics, RAPIER) {
   const treeLods = new Int8Array(TREE_SLOTS * 2).fill(-1);
   const colliders = new Map();
   let lastTreeCenter = Number.MIN_SAFE_INTEGER;
+  let lastShuffle = 0;
 
   function setInstance(mesh, slot, x, y, z, heading, scale, heightScale = 1) {
     dummy.position.set(x, y, z);
@@ -255,26 +256,27 @@ export async function createTrees(scene, physics, RAPIER) {
     setInstance(mesh, slot, 0, HIDDEN_Y, 0, 0, 0);
   }
 
-  function treeData(k, side) {
-    if (Math.floor(hash(k, side + 1) * 12) === 0) return null;
-    const cluster = Math.floor(k / 4);
-    if (hash(cluster, side + 17) < 0.26 || hash(k, side + 23) < 0.12) return null;
-    const z = (k + 0.5 + (hash(k, side + 2) - 0.5) * 0.35) * TREE_SPACING;
+  function treeData(k, side, salt = 0) {
+    const hk = salt ? k + salt * 7919 : k;
+    if (Math.floor(hash(hk, side + 1) * 12) === 0) return null;
+    const cluster = Math.floor(hk / 4);
+    if (hash(cluster, side + 17) < 0.26 || hash(hk, side + 23) < 0.12) return null;
+    const z = (k + 0.5 + (hash(hk, side + 2) - 0.5) * 0.35) * TREE_SPACING;
     if (z > CITY_Z_MIN - 20 && z < CITY_Z_MAX + 20) return null; // the city has its own scenery
-    const offset = THREE.MathUtils.lerp(TREE_MIN_OFFSET, TREE_MAX_OFFSET, hash(k, side + 3));
+    const offset = THREE.MathUtils.lerp(TREE_MIN_OFFSET, TREE_MAX_OFFSET, hash(hk, side + 3));
     const pose = roadSidePose(z, side, offset);
     return {
       z,
       pose,
       y: terrainHeight(pose.x, pose.z),
-      scale: 0.85 + hash(k, side + 5) * 0.45,
-      heightScale: 0.9 + hash(k, side + 6) * 0.35,
-      heading: pose.heading + (hash(k, side + 7) - 0.5) * 0.5,
+      scale: 0.85 + hash(hk, side + 5) * 0.45,
+      heightScale: 0.9 + hash(hk, side + 6) * 0.35,
+      heading: pose.heading + (hash(hk, side + 7) - 0.5) * 0.5,
     };
   }
 
-  function writeTree(k, side, slot, detailSlot, detailed) {
-    const data = treeData(k, side);
+  function writeTree(k, side, slot, detailSlot, detailed, salt = 0) {
+    const data = treeData(k, side, salt);
     if (detailed) {
       hideInstance(distantTrees, slot);
       if (!data) {
@@ -310,8 +312,19 @@ export async function createTrees(scene, physics, RAPIER) {
     canopy.uniforms.uFoliageLightDirection.value.copy(direction).normalize();
   }
 
-  function update(vehicleZ) {
+  function update(vehicleZ, shuffle = 0) {
     const center = Math.floor(vehicleZ / TREE_SPACING);
+    if (shuffle !== lastShuffle) {
+      for (let n = -TREE_SLOTS / 2; n < TREE_SLOTS / 2; n++) for (const side of [-1, 1]) {
+        const slot = ((n + TREE_SLOTS / 2) * 2) + (side < 0 ? 0 : 1);
+        const detailSlot = ((n + TREE_DETAIL_RADIUS) * 2) + (side < 0 ? 0 : 1);
+        const k = center + n;
+        const behind = (k + 0.5) * TREE_SPACING < vehicleZ - 80;
+        writeTree(k, side, slot, detailSlot, Math.abs(n) <= TREE_DETAIL_RADIUS, behind ? shuffle : 0);
+        treeKeys[slot] = k * 2 + (side < 0 ? 0 : 1); treeLods[slot] = Math.abs(n) <= TREE_DETAIL_RADIUS ? 1 : 0;
+      }
+      lastShuffle = shuffle;
+    }
     for (let n = -TREE_SLOTS / 2; n < TREE_SLOTS / 2; n++) {
       const k = center + n;
       for (const side of [-1, 1]) {
