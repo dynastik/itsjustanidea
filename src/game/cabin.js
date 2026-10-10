@@ -169,14 +169,16 @@ export function createCabInterior(vehicle) {
 
     // Gradually flare the tunnel into the dash: narrow at the console, widening
     // in smooth stages toward the front instead of one abrupt, oversized block.
-    const bridgeFrontZ = consoleFrontZ + 0.34;
+    // Make the transition fuller and longer, with a moderate ramp angle:
+    // halfway between the level center tunnel and the dashboard's slight tilt.
+    const bridgeFrontZ = consoleFrontZ + 0.46;
     const bridgeBackZ = consoleFrontZ - 0.08;
     const bridgeSections = [
-      { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.68, top: -0.52 },
-      { z: consoleFrontZ + 0.02, half: consoleWidth / 2 + 0.025, bottom: -0.68, top: -0.515 },
-      { z: consoleFrontZ + 0.14, half: consoleWidth / 2 + 0.07, bottom: -0.67, top: -0.50 },
-      { z: consoleFrontZ + 0.25, half: consoleWidth / 2 + 0.105, bottom: -0.66, top: -0.49 },
-      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.12, bottom: -0.65, top: -0.48 },
+      { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.70, top: -0.55 },
+      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.695, top: -0.548 },
+      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.685, top: -0.536 },
+      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.675, top: -0.524 },
+      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.665, top: -0.512 },
     ];
     const bridgeVertices = [];
     const bridgeFaces = [];
