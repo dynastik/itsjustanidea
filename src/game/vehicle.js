@@ -527,8 +527,9 @@ export function createVehicle(scene, physics, RAPIER) {
 
     const gearMin = GEAR_MIN_SPEED[gearIndex] || 0;
     const speedSpan = Math.max(gearCap - gearMin, 1);
+    const throttleRevRange = gearIndex >= 5 ? 1700 : 350; // Let 4th/5th rev under throttle instead of flattening near 1200 RPM.
     const rpmTarget = gearName === 'N' ? 850 + t * 3900
-      : 850 + clamp((speedInGear - gearMin) / speedSpan, 0, 1) * 4200 + t * 350;
+      : 850 + clamp((speedInGear - gearMin) / speedSpan, 0, 1) * 4200 + t * throttleRevRange;
     engineRpm += (Math.min(5300, rpmTarget) - engineRpm) * (1 - Math.exp(-7 * dt));
     engineRpm = clamp(engineRpm, 750, 5300);
 
