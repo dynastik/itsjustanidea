@@ -319,6 +319,24 @@ export function createCabInterior(vehicle) {
     const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
     shifterKnob.position.y = 0.13;
     shifter.add(shifterKnob);
+
+    // Temporary glowing reference markers to identify the stick's exact points:
+    // blue = bottom/pivot, red = midpoint, white = top.
+    const marker = (color, y, radius = 0.012) => {
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 3,
+        toneMapped: false,
+      });
+      const light = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
+      light.position.set(0, y, 0);
+      shifter.add(light);
+    };
+    marker(0x168bff, 0.006, 0.014);
+    marker(0xff2020, 0.065, 0.014);
+    marker(0xffffff, 0.13, 0.014);
+
     parts.shifter = shifter;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
