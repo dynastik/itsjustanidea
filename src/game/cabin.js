@@ -157,25 +157,25 @@ export function createCabInterior(vehicle) {
       add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
-    // Three pedals mounted high and forward under the dash, angled down toward
-    // the driver's feet. Their ribbed faces point rearward at the driver (+z).
-    const pedalZ = zDash + 0.015;
-    const pedalY = -0.69;
-    const pedalXs = [-0.135, -0.025, 0.085]; // clutch, brake, accelerator
+    // Three pedals beside the middle of the console flare, in the driver's
+    // footwell. Driver is toward -z, so the ribbed faces must point toward -z.
+    const pedalZ = consoleFrontZ + 0.18;
+    const pedalY = -0.70;
+    const pedalXs = [-0.25, -0.14, -0.03]; // clutch, brake, accelerator
     const pedalTilt = -0.32;
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
       const pedalGroup = add(new THREE.Group());
       pedalGroup.position.set(px, pedalY, pedalZ);
       pedalGroup.rotation.x = pedalTilt;
-      // Support reaches forward/up under the dash; pad and ribs share one transform
-      // so the textured face is consistently on the driver's side of the pedal.
-      const support = box(0.025, 0.13, 0.025, M.trim, 0, -0.075, -0.045);
+      const support = box(0.025, 0.13, 0.025, M.trim, 0, -0.075, 0.035);
       support.rotation.x = 0.18;
       pedalGroup.add(support);
-      pedalGroup.add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.025, M.dark, 0, -0.13, 0.012));
+      // The plain pad sits behind the ribs; ribs are on the rear (-z) face,
+      // visible to the driver rather than facing the dashboard/outside.
+      pedalGroup.add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.025, M.dark, 0, -0.13, 0));
       for (const ribY of [-0.035, 0, 0.035]) {
-        pedalGroup.add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, 0, -0.13 + ribY, 0.029));
+        pedalGroup.add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, 0, -0.13 + ribY, -0.016));
       }
     }
 
