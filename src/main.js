@@ -130,6 +130,9 @@ async function main() {
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    shiftUp: () => vehicle.shiftUp(),
+    shiftDown: () => vehicle.shiftDown(),
+    toggleAutoShift: () => vehicle.toggleAutoShift(),
     toggleHeadlights,
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
@@ -208,6 +211,7 @@ async function main() {
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
+    state.transmission = vehicle.transmission;
     cabin.update(dt, vehicle, driveInput);
 
     // impact detection: a big one-frame speed loss that wasn't braking
@@ -222,6 +226,7 @@ async function main() {
       throttle: driveInput.throttle,
       offRoad: surface.offRoad,
       paused: state.paused,
+      ...vehicle.transmission,
     });
 
     city.update(state.worldTime);
