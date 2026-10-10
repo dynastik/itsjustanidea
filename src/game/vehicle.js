@@ -471,7 +471,8 @@ export function createVehicle(scene, physics, RAPIER) {
     if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
     const gearName = GEAR_NAMES[gearIndex];
     const gearCap = GEAR_CAPS[gearIndex];
-    const cap = Math.max(gearCap, 0.1) * (off ? h.offRoad.speedFactor : 1);
+    const requestedCap = Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed, gearCap || 0.1);
+    const cap = Math.max(requestedCap, 0.1) * (off ? h.offRoad.speedFactor : 1);
     const t = Math.max(0, input.throttle);
     const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
     const clutchCut = shiftTimer > 0 ? 0.12 + 0.88 * (1 - shiftTimer / 0.32) : 1;
