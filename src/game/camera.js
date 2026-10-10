@@ -132,8 +132,16 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     toggleCab() {
       if (profileName === 'cab') profileName = exteriorProfile;
       else { exteriorProfile = profileName; profileName = 'cab'; }
-      vehicle.setExteriorVisible(CAMERA_PROFILES[profileName].exteriorVisible);
-      if (cabInterior) cabInterior.root.visible = (profileName === 'cab');
+      const inBootAlignmentView = profileName === 'cab';
+      vehicle.setExteriorVisible(inBootAlignmentView ? false : CAMERA_PROFILES[profileName].exteriorVisible);
+      if (cabInterior) {
+        cabInterior.root.visible = inBootAlignmentView;
+        // F2 is temporarily an isolated boot-alignment view: hide every cabin mesh
+        // except the shift boot, and restore the full cabin when leaving F2.
+        cabInterior.root.children.forEach((child) => {
+          child.visible = !inBootAlignmentView || child.name === 'shift-boot-only';
+        });
+      }
     },
     // F3: chase <-> toy-car look (ignored in cab view)
     cycleLook() {
