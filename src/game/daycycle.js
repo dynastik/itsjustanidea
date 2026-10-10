@@ -13,6 +13,7 @@ import * as THREE from 'three';
 // 'free':  the clock loops by itself every DAY_CYCLE_SECONDS. Handy for tuning the sky without typing.
 export const CLOCK_MODE = 'story';
 export const DAY_CYCLE_SECONDS = 300;
+export const LONG_DAY_SECONDS = 900;
 
 const smooth = (a, b, x) => THREE.MathUtils.smoothstep(x, a, b);
 const clamp01 = (v) => THREE.MathUtils.clamp(v, 0, 1);
