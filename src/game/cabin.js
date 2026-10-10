@@ -309,11 +309,11 @@ export function createCabInterior(vehicle) {
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
 
-    // Five-speed H-pattern: R/1 left, 2/3 centre, 4/5 right. The stick leans
+    // Five-speed H-pattern: reverse is farther left, 1/2 use the left gate, 3/4 the centre, and 5 the right. The stick leans
     // smoothly to the selected gate, including the automatic reverse/first changes.
     if (parts.shifter) {
       const gates = {
-        R: [-0.065, -0.055],
+        R: [-0.105, 0.055],
         N: [0, 0],
         1: [-0.065, 0.055],
         2: [-0.065, -0.055],
