@@ -42,7 +42,7 @@ export const VEHICLE_CONFIG = {
   },
   handling: {
     engineForce: 16000,
-    brakeForce: 22000,
+    brakeForce: 18000,
     reverseForce: 7000,
     coastForce: 0.15,
     maxSpeed: 30,
@@ -634,12 +634,12 @@ export function createVehicle(scene, physics, RAPIER) {
 
     if (gearName !== 'N' && t > 0) F += direction * (gearName === 'R' ? h.reverseForce : h.engineForce) * torque * t * clamp(1 - speedInGear / cap, 0, 1);
     // Service brakes are deliberately weaker so downshifting and engine braking matter, while emergency braking still works.
-    if (input.brake > 0) F -= h.brakeForce * 0.58 * input.brake * moving;
+    if (input.brake > 0) F -= h.brakeForce * 0.48 * input.brake * moving;
     if (t <= 0.04 && input.brake === 0) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
-        const gearBrake = [0.004, 0, 0.012, 0.008, 0.005, 0.003, 0.0015][gearIndex];
+        const gearBrake = [0.006, 0, 0.018, 0.012, 0.008, 0.005, 0.0025][gearIndex];
         F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
       }
     }
