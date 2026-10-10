@@ -72,10 +72,10 @@ export function createHud() {
         cache.kind = t.source;
         typingPanel.classList.toggle('message', t.source === 'message');
       }
-      const html = `<span class="t-ok">${esc(t.target)}</span>`;
+      const html = `<span class="t-ok">${esc(t.target.slice(0, t.buffer.length))}</span><span>${esc(t.target.slice(t.buffer.length))}</span>`;
       set(sourceEl, 'source', getSourceLabel(t.source));
       set(targetWordEl, 'word', html, 'innerHTML');
-      set(typedInputEl, 'typed', '');
+      set(typedInputEl, 'typed', t.buffer);
       set(statsEl, 'stats', 'W/S DRIVE · Q/E SHIFT · SHIFT AUTO-SELECT · AUTO-STEER');
     }
   }
