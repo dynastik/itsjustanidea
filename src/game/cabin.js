@@ -175,10 +175,10 @@ export function createCabInterior(vehicle) {
     const bridgeBackZ = consoleFrontZ - 0.08;
     const bridgeSections = [
       { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.70, top: -0.55 },
-      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.695, top: -0.547 },
-      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.685, top: -0.538 },
-      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.675, top: -0.529 },
-      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.665, top: -0.52 },
+      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.70, top: -0.55 },
+      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.70, top: -0.55 },
+      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.70, top: -0.55 },
+      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.70, top: -0.55 },
     ];
     const bridgeVertices = [];
     const bridgeFaces = [];
@@ -223,7 +223,14 @@ export function createCabInterior(vehicle) {
     bridgeMaterial.flatShading = true;
     bridgeMaterial.side = THREE.DoubleSide;
     bridgeMaterial.needsUpdate = true;
-    const consoleBridge = add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
+    // Rotate the whole flare at the exact midpoint between the level console (0)
+    // and the dashboard (-0.12 rad), rather than approximating the angle with stepped heights.
+    const bridgePivot = new THREE.Group();
+    bridgePivot.position.set(consoleX, -0.625, consoleFrontZ + 0.19);
+    bridgePivot.rotation.x = (dash.rotation.x + 0) / 2;
+    add(bridgePivot);
+    bridgeGeometry.translate(-consoleX, 0.625, -(consoleFrontZ + 0.19));
+    bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
     // Simple gear selector near the front, with no screens or decorative accessories.
