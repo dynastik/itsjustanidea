@@ -326,7 +326,6 @@ export function createVehicle(scene, physics, RAPIER) {
     // Shift is a one-button gearbox: normally select by road speed, but allow an upshift
     // near the top of the current gear instead of getting stuck on a threshold.
     const kmh = Math.abs(self.speed) * 3.6;
-    const currentForwardGear = Math.max(0, gearIndex - 2);
     const currentCap = GEAR_CAPS[gearIndex] * 3.6;
     const nearTop = gearIndex >= 2 && gearIndex < 6 && kmh >= currentCap * 0.72;
     let target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 52 ? 4 : kmh < 72 ? 5 : 6;
