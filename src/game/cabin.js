@@ -405,9 +405,9 @@ export function createCabInterior(vehicle) {
         }
       }
 
-      // Keep the boot's bottom ring fixed to the transmission tunnel, while its
-      // top ring follows the midpoint between the fixed boot base and the stick's midpoint. This makes one simple
-      // tapered flexible surface instead of moving the boot as a separate object.
+      // Tilt the hidden shifter pivot toward the selected H-gate position.
+      // The boot's lower ring stays anchored while its top ring follows the lever's
+      // lean, with a little extra travel so the leather visibly flexes during shifts.
       const leanX = -Math.atan2(shifterTravel.x, 0.13);
       const leanZ = Math.atan2(shifterTravel.z, 0.13);
       parts.shifter.rotation.z = leanX;
@@ -415,14 +415,16 @@ export function createCabInterior(vehicle) {
 
       if (shiftBootGeometry && shiftBootBasePositions) {
         const positions = shiftBootGeometry.attributes.position;
-        const midStickX = Math.sin(leanX) * 0.0325;
-        const midStickZ = -Math.sin(leanZ) * 0.0325;
+        const topTravel = 0.13;
+        const bootTopTravel = 0.055;
+        const topX = Math.sin(leanX) * topTravel * (bootTopTravel / topTravel);
+        const topZ = -Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel);
         for (let i = 0; i < positions.count; i++) {
           const base = i * 3;
           const isTop = shiftBootBasePositions[base + 1] > 0;
-          positions.array[base] = shiftBootBasePositions[base] + (isTop ? midStickX : 0);
+          positions.array[base] = shiftBootBasePositions[base] + (isTop ? topX : 0);
           positions.array[base + 1] = shiftBootBasePositions[base + 1];
-          positions.array[base + 2] = shiftBootBasePositions[base + 2] + (isTop ? midStickZ : 0);
+          positions.array[base + 2] = shiftBootBasePositions[base + 2] + (isTop ? topZ : 0);
         }
         positions.needsUpdate = true;
         shiftBootGeometry.computeVertexNormals();
