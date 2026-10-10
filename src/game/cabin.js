@@ -146,7 +146,8 @@ export function createCabInterior(vehicle) {
     // leaving a narrow, realistic gap for the console rather than crowding both seats together.
     const seatWidth = 0.56;
     const cabinCenterX = xC;
-    const seatOffset = (0.2 + seatWidth / 2 + 0.035);
+    const consoleWidth = 0.28;
+    const seatOffset = (consoleWidth / 2 + seatWidth / 2 + 0.025);
     const seatCenters = [cabinCenterX - seatOffset, cabinCenterX + seatOffset];
     for (const sx of seatCenters) {
       add(box(seatWidth, 0.13, 0.54, M.seat, sx, -0.74, -0.2));
@@ -157,15 +158,16 @@ export function createCabInterior(vehicle) {
 
     // Full-length center tunnel, offset between the seats and blending into the lower dash.
     const consoleX = cabinCenterX;
-    const consoleFrontZ = zDash - 0.04;
+    // Dash spans roughly zDash - 0.5 to zDash. Join at its rear edge so the console
+    // emerges visibly from the dashboard instead of disappearing inside its mesh.
+    const consoleFrontZ = zDash - 0.48;
     const consoleBackZ = zBack + 0.06;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
-    const consoleWidth = 0.2;
     add(box(consoleWidth, 0.16, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
 
     // Broaden and raise the front of the tunnel so it visibly joins the dashboard.
-    const consoleBridge = add(box(consoleWidth + 0.1, 0.17, 0.34, M.panel, consoleX, -0.585, consoleFrontZ - 0.13));
+    const consoleBridge = add(box(consoleWidth + 0.1, 0.17, 0.34, M.panel, consoleX, -0.585, consoleFrontZ + 0.08));
     consoleBridge.rotation.x = -0.2;
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
