@@ -297,7 +297,7 @@ export function createVehicle(scene, physics, RAPIER) {
   const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 21.0];
   // Relative gearbox ratios. Road speed multiplied by the selected ratio drives engine RPM:
   // lower gears rev higher at the same road speed; top gear cruises at lower RPM.
-  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.69];
+  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 1.00, 0.69];
   // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
   const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 0.64, 0.40];
