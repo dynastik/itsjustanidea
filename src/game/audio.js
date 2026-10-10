@@ -5,7 +5,8 @@ export function createAudio() {
   let master, engOsc1, engOsc2, engFilter, engGain, noiseBuf;
   let windGain, windFilter, roadGain, roadFilter;
   let muted = true;//for now coz i dont want to play it rn
-  let rpm = 0.2;
+  let rpm = 850;
+  let audioRpm = 850;
 
   const GEARS = [7, 13, 20, 30]; // upper speed of each gear (m/s)
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -32,7 +33,7 @@ export function createAudio() {
     engOsc1 = ctx.createOscillator();
     engOsc1.type = 'sawtooth';
     engOsc2 = ctx.createOscillator();
-    engOsc2.type = 'square';
+    engOsc2.type = 'sawtooth';
     engFilter = ctx.createBiquadFilter();
     engFilter.type = 'lowpass';
     engFilter.Q.value = 2;
@@ -76,27 +77,25 @@ export function createAudio() {
   window.addEventListener('keydown', unlock);
   window.addEventListener('pointerdown', unlock);
 
-  function update(dt, { speed, throttle, offRoad, paused }) {
+  function update(dt, { speed, throttle, offRoad, paused, gear = '1', rpm: engineRPM = 850 }) {
     if (!ctx) return;
     const t = ctx.currentTime;
     const v = Math.abs(speed);
 
-    // fake gearbox: rpm climbs within a gear, drops on the shift
-    let lo = 0, hi = GEARS[0];
-    for (let i = 0; i < GEARS.length; i++) {
-      hi = GEARS[i];
-      if (v < hi) break;
-      lo = hi;
-    }
-    const target = 0.18 + 0.82 * clamp((v - lo) / (hi - lo), 0, 1);
-    rpm += (target - rpm) * (1 - Math.exp(-6 * dt));
-
+    // Follow the gearbox's RPM estimate instead of inventing a second speed-based gearbox.
     const load = Math.max(throttle, 0);
-    const f = 38 + rpm * 95;
-    engOsc1.frequency.setTargetAtTime(f, t, 0.05);
-    engOsc2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
-    engFilter.frequency.setTargetAtTime(250 + rpm * 900 + load * 400, t, 0.05);
-    engGain.gain.setTargetAtTime(0.05 + 0.06 * load + 0.03 * rpm, t, 0.08);
+    const lugging = gear === '5' && v < 4 && load > 0;
+    const rpmTarget = lugging ? Math.min(engineRPM, 1700) : engineRPM;
+    audioRpm += (rpmTarget - audioRpm) * (1 - Math.exp(-(lugging ? 10 : 4) * dt));
+
+    // Higher, brighter harmonics avoid the low, sputtery "fart" tone. The second oscillator
+    // is an overtone, while the filter opens with RPM/load for a revving old-race-car edge.
+    const rev = clamp((audioRpm - 700) / 6300, 0, 1);
+    const f = 105 + audioRpm * 0.052;
+    engOsc1.frequency.setTargetAtTime(f, t, 0.035);
+    engOsc2.frequency.setTargetAtTime(f * (2.65 + rev * 0.35), t, 0.025);
+    engFilter.frequency.setTargetAtTime(900 + rev * 5200 + load * 1400, t, 0.035);
+    engGain.gain.setTargetAtTime(0.025 + 0.055 * load + 0.045 * rev, t, 0.06);
 
     const vn = clamp(v / 30, 0, 1);
     windGain.gain.setTargetAtTime(0.16 * vn * vn, t, 0.1);
