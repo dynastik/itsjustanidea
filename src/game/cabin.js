@@ -172,10 +172,10 @@ export function createCabInterior(vehicle) {
       pedalGroup.position.set(px, pedalY, pedalZ);
       pedalGroup.rotation.x = pedalTilt;
       pedalGroups.push(pedalGroup);
-      const support = box(0.025, 0.30, 0.025, M.trim, 0, -0.28, 0.035);
+      const support = box(0.025, 0.30, 0.025, M.trim, 0, 0.02, 0.035);
       pedalGroup.add(support);
-      // The plain pad sits behind the ribs; ribs are on the rear (-z) face,
-      // visible to the driver rather than facing the dashboard/outside.
+      // The support rod extends upward from the pedal toward the dashboard, not down
+      // into the floor. The plain pad sits behind the ribs; ribs face the driver (-z).
       pedalGroup.add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.025, M.dark, 0, -0.13, 0));
       for (const ribY of [-0.035, 0, 0.035]) {
         pedalGroup.add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, 0, -0.13 + ribY, -0.016));
