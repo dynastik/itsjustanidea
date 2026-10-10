@@ -45,7 +45,7 @@ export const VEHICLE_CONFIG = {
     brakeForce: 22000,
     reverseForce: 7000,
     coastForce: 1800,
-    maxSpeed: 30,
+    maxSpeed: 999, // TEMP TEST: effectively remove the global speed cap
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
     steerFalloffSpeed: 20,
@@ -293,14 +293,14 @@ export function createVehicle(scene, physics, RAPIER) {
 
   // Conservative van gearbox. Speeds are m/s; forward ceilings roughly follow 20/40/60/80/100 km/h.
   const GEAR_NAMES = ['R', 'N', '1', '2', '3', '4', '5'];
-  const GEAR_CAPS = [3.0, 0, 5.6, 11.1, 16.7, 22.2, 30.0];
+  const GEAR_CAPS = [999, 0, 999, 999, 999, 999, 999]; // TEMP TEST: no forward gear speed caps
   const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 22.0];
   // Relative gearbox ratios. Road speed multiplied by the selected ratio drives engine RPM:
   // lower gears rev higher at the same road speed; top gear cruises at lower RPM.
   const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.58];
   // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
-  const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 3.0, 0.55];
+  const GEAR_FORCE = [0.84, 0, 2.0, 1.56, 1.26, 6.0, 1.10];
 
   function engineTorqueAtRpm(rpm) {
     // Broad diesel-ish van curve: weak below the useful band, strongest in the midrange,
