@@ -1,6 +1,6 @@
 // Cab interior, built from primitives and sized from the van model's bounds, so it fits whatever
 // model is loaded. The exterior is hidden in cab view, so this has to read as a complete little
-// room: floor, doors, pillars, roof, dash, wheel, seats. It is also the Phase 5 horror stage, so the
+// room: floor, doors, pillars, roof, dash, wheel, mirror, seats. It is also the Phase 5 horror stage, so the
 // pieces that will misbehave (steering wheel, mirror, air freshener, radio) are kept by name.
 import * as THREE from 'three';
 
@@ -11,8 +11,8 @@ const M = {
   trim: mat(0x141518, { roughness: 0.7 }),
   seat: mat(0x4a4f58, { roughness: 0.95 }),
   mirror: mat(0x9fb4c4, { roughness: 0.2, metalness: 0.6 }),
-  gauge: mat(0x1d8f4e, { emissive: 0x2cff88, emissiveIntensity: 0.7 }),
-  radio: mat(0x111111, { emissive: 0x3a7bd5, emissiveIntensity: 0.5 }),
+  gauge: mat(0x090b0e, { roughness: 0.65 }),
+  radio: mat(0x111111),
   fresh: mat(0x6bd36b, { roughness: 0.6 }),
 };
 
@@ -78,26 +78,38 @@ export function createCabInterior(vehicle) {
     const dash = add(box(W, 0.3, 0.5, M.dark, xC, yDashTop - 0.15, zDash - 0.25));
     dash.rotation.x = 0.12;
     add(box(0.55, 0.16, 0.14, M.trim, 0, -0.25, 0.64));                                                // instrument binnacle
+
+    // Unlit instrument faces: keep the dashboard readable without bright emissive circles.
     for (const gx of [-0.12, 0.12]) {
-      const g = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.01, 20), M.gauge);
+      const g = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.01, 24), M.gauge);
       g.rotation.x = Math.PI / 2;
       g.position.set(gx, -0.25, 0.565);
       add(g);
     }
-    parts.radioScreen = add(box(0.3, 0.07, 0.03, M.radio, xR + 0.5, -0.34, zDash - 0.08));             // radio display
+    parts.radioScreen = add(box(0.3, 0.07, 0.03, M.radio, xR + 0.5, -0.34, zDash - 0.08));             // unlit radio display
 
-    // steering wheel: the pivot is tilted, the inner group spins with the steering input
+    // Flat-bottom steering wheel with a padded rim, designed to read as a modern real-world wheel.
+    // The flattened lower arc gives it a recognizable silhouette without pretending to fix camera projection.
     const wheelPivot = add(new THREE.Group());
     wheelPivot.position.set(0, -0.3, 0.44);
     wheelPivot.rotation.x = 0.5;
     const spin = new THREE.Group();
     wheelPivot.add(spin);
-    spin.add(new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 12, 36), M.trim));
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 16), M.trim);
+    const wheelPoints = [
+      V(-0.17, -0.105, 0), V(-0.19, -0.025, 0), V(-0.17, 0.09, 0),
+      V(-0.105, 0.16, 0), V(0, 0.18, 0), V(0.105, 0.16, 0),
+      V(0.17, 0.09, 0), V(0.19, -0.025, 0), V(0.17, -0.105, 0),
+      V(0.105, -0.145, 0), V(0, -0.15, 0), V(-0.105, -0.145, 0),
+      V(-0.17, -0.105, 0),
+    ];
+    const wheelCurve = new THREE.CatmullRomCurve3(wheelPoints, true, 'catmullrom', 0.15);
+    spin.add(new THREE.Mesh(new THREE.TubeGeometry(wheelCurve, 64, 0.022, 10, true), M.trim));
+
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.04, 20), M.panel);
     hub.rotation.x = Math.PI / 2;
     spin.add(hub);
     for (const a of [Math.PI / 2, Math.PI / 2 + 2.1, Math.PI / 2 - 2.1]) {
-      const spoke = box(0.17, 0.022, 0.02, M.trim, Math.cos(a) * 0.09, Math.sin(a) * 0.09, 0);
+      const spoke = box(0.16, 0.025, 0.025, M.trim, Math.cos(a) * 0.075, Math.sin(a) * 0.075, 0);
       spoke.rotation.z = a;
       spin.add(spoke);
     }
