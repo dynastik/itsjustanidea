@@ -38,13 +38,13 @@ let pedalTilt = 0.55;
 // One shared six-position H gate. Coordinates are local console offsets (x = across,
 // z = fore/aft), so the visible gate and the stick animation cannot drift apart.
 const GEAR_GATE = {
-  R: [0.05, -0.055],
+  R: [-0.05, -0.055],
   N: [0, 0],
-  1: [-0.05, 0.055],
-  2: [-0.05, -0.055],
+  1: [0.05, 0.055],
+  2: [0.05, -0.055],
   3: [0, 0.055],
   4: [0, -0.055],
-  5: [0.05, 0.055],
+  5: [-0.05, 0.055],
 };
 
 export function createCabInterior(vehicle) {
