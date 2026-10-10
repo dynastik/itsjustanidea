@@ -159,7 +159,7 @@ export function createCabInterior(vehicle) {
 
     // Three pedals beside the middle of the console flare, in the driver's
     // footwell. Driver is toward -z, so the ribbed faces must point toward -z.
-    const pedalZ = consoleFrontZ + 0.18;
+    const pedalZ = zDash - 0.48;
     const pedalY = -0.70;
     const pedalXs = [-0.25, -0.14, -0.03]; // clutch, brake, accelerator
     const pedalTilt = -0.32;
