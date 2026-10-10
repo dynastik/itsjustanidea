@@ -309,7 +309,27 @@ export function createCabInterior(vehicle) {
     boot.position.set(consoleX, -0.514, gateZ);
     add(boot);
 
-    // Keep only the smooth shift boot visible for the F2 alignment view.
+    // Alignment references: glowing top, middle, and bottom markers remain visible in F2.
+    // They are separate named meshes so the camera can isolate them with the boot.
+    const alignmentMarkers = [
+      { name: 'shift-marker-top', y: -0.468, color: 0x35aaff },
+      { name: 'shift-marker-mid', y: -0.512, color: 0xff3434 },
+      { name: 'shift-marker-bottom', y: -0.556, color: 0xf2f2f2 },
+    ];
+    for (const marker of alignmentMarkers) {
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: marker.color,
+        emissive: marker.color,
+        emissiveIntensity: 1.8,
+        toneMapped: false,
+      });
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), glowMaterial);
+      glow.name = marker.name;
+      glow.position.set(consoleX, marker.y, gateZ);
+      add(glow);
+    }
+
+    // Keep only the smooth shift boot and its three glowing references visible for F2.
     // A hidden pivot group preserves the existing gear travel calculations.
     const shifter = add(new THREE.Group());
     shifter.position.set(consoleX, -0.49, gateZ);
