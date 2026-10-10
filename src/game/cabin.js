@@ -51,6 +51,9 @@ export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
   const parts = { spin: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
+  // Track the stick tip's projected offset and route it through the H-gate's
+  // neutral crossbar whenever the selected gear changes.
+  let shifterTravel = { x: 0, z: 0, gear: 'N', route: [] };
 
   function clear() {
     root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -340,15 +343,47 @@ export function createCabInterior(vehicle) {
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
 
-    // Lean around the fixed boot pivot to the same coordinates used to draw the gate.
-    // Neutral centres the stick; each selected gear has a distinct lateral/fore-aft notch.
+    // Route through the H gate's neutral crossbar instead of cutting diagonally
+    // between notches. Example: 2 -> centre of the 1/2 lane -> across to 3/4 lane -> 3.
     if (parts.shifter) {
-      const [x, z] = GEAR_GATE[v.transmission?.gear] ?? GEAR_GATE.N;
-      const targetX = -Math.atan2(x, 0.13);
-      const targetZ = Math.atan2(z, 0.13);
-      const smoothing = 1 - Math.exp(-14 * dt);
-      parts.shifter.rotation.z += (targetX - parts.shifter.rotation.z) * smoothing;
-      parts.shifter.rotation.x += (targetZ - parts.shifter.rotation.x) * smoothing;
+      const gear = v.transmission?.gear ?? 'N';
+      const [targetX, targetZ] = GEAR_GATE[gear] ?? GEAR_GATE.N;
+      if (gear !== shifterTravel.gear) {
+        shifterTravel.gear = gear;
+        shifterTravel.route = [
+          [shifterTravel.x, 0],
+          [targetX, 0],
+          [targetX, targetZ],
+        ].filter(([x, z], i, points) => {
+          const previous = i === 0 ? [shifterTravel.x, shifterTravel.z] : points[i - 1];
+          return Math.hypot(x - previous[0], z - previous[1]) > 0.001;
+        });
+      }
+
+      // Move at a steady tip speed so each leg is visible, while keeping the base fixed.
+      let distanceLeft = 0.24 * Math.max(0, dt);
+      while (distanceLeft > 0 && shifterTravel.route.length) {
+        const [wayX, wayZ] = shifterTravel.route[0];
+        const dx = wayX - shifterTravel.x;
+        const dz = wayZ - shifterTravel.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance <= distanceLeft || distance < 0.001) {
+          shifterTravel.x = wayX;
+          shifterTravel.z = wayZ;
+          distanceLeft -= distance;
+          shifterTravel.route.shift();
+        } else {
+          shifterTravel.x += (dx / distance) * distanceLeft;
+          shifterTravel.z += (dz / distance) * distanceLeft;
+          distanceLeft = 0;
+        }
+      }
+
+      // The tip follows the routed coordinates; rotations make it swing in an arc from the boot.
+      const leanX = -Math.atan2(shifterTravel.x, 0.13);
+      const leanZ = Math.atan2(shifterTravel.z, 0.13);
+      parts.shifter.rotation.z = leanX;
+      parts.shifter.rotation.x = leanZ;
     }
 
     if (parts.freshener) {
