@@ -56,20 +56,11 @@ export function createInput(actions) {
       return;
     }
 
-    if (state.mode === 'city' && key === 'shift') {
+    // Shift is a single clutch-like request: choose the gear appropriate to current speed.
+    // It works in both modes and never consumes story text. No background shifting occurs.
+    if (key === 'shift') {
       e.preventDefault();
-      if (!e.repeat) actions.toggleAutoShift?.();
-      return;
-    }
-    if (state.mode === 'city' && (key === 'q' || key === 'e')) {
-      e.preventDefault();
-      if (!e.repeat) (key === 'q' ? actions.shiftDown : actions.shiftUp)?.();
-      return;
-    }
-    // Arrow keys are safe in the typing section because they never consume story letters.
-    if (key === 'arrowup' || key === 'arrowdown') {
-      e.preventDefault();
-      if (!e.repeat && !state.paused) (key === 'arrowup' ? actions.shiftUp : actions.shiftDown)?.();
+      if (!e.repeat && !state.paused) actions.smartShift?.();
       return;
     }
 
