@@ -600,7 +600,7 @@ export function createVehicle(scene, physics, RAPIER) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
-        const gearBrake = [0.35, 0, 0.095, 0.075, 0.055, 0.04, 0.028][gearIndex];
+        const gearBrake = [0.075, 0, 0.095, 0.075, 0.055, 0.04, 0.028][gearIndex];
         F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1);
       }
     }
