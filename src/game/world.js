@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS, CITY_Z_MIN, CITY_Z_MAX, CITY_BAY_WIDTH, CITY_WALK_WIDTH } from './zones.js';
 import { toonGradientMap } from './toon.js';
+import { createHighwayInterchange as createInterchange } from './interchange.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
 
@@ -398,7 +399,7 @@ export function createWorld(scene, physics, RAPIER) {
   scene.add(road);
 
   // One lightweight elevated joining ramp ahead of the player; no imported models or extra lights.
-  createHighwayInterchange(scene, physics, RAPIER, road.material);
+  const interchange = createInterchange(scene, physics, RAPIER, road.material, { halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_Z_MAX, getRoadFrame, terrainHeight });
 
   // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
   // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
@@ -458,5 +459,5 @@ export function createWorld(scene, physics, RAPIER) {
     return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
   }
 
-  return { update, surfaceAt, getRoadFrame };
+  return { update, surfaceAt, getRoadFrame, drivePath: interchange.drivePath };
 }
