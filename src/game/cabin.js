@@ -96,9 +96,9 @@ export function createCabInterior(vehicle) {
     const spin = new THREE.Group();
     wheelPivot.add(spin);
     const wheelPoints = [
-      V(-0.17, -0.105, 0), V(-0.19, -0.025, 0), V(-0.17, 0.09, 0),
+      V(-0.195, -0.09, 0), V(-0.2, -0.02, 0), V(-0.19, 0.075, 0),
       V(-0.105, 0.16, 0), V(0, 0.18, 0), V(0.105, 0.16, 0),
-      V(0.17, 0.09, 0), V(0.19, -0.025, 0), V(0.17, -0.105, 0),
+      V(0.19, 0.075, 0), V(0.2, -0.02, 0), V(0.195, -0.09, 0),
       V(0.105, -0.145, 0), V(0, -0.15, 0), V(-0.105, -0.145, 0),
       V(-0.17, -0.105, 0),
     ];
@@ -126,25 +126,37 @@ export function createCabInterior(vehicle) {
     column.position.set(0, -0.34, 0.6);
     add(column);
 
-    // seats (driver, passenger)
-    const seatCenters = [0, xR + 0.45];
+    // Slightly wider seats, leaving a clear channel for the center console.
+    const seatCenters = [-0.34, 0.34];
+    const seatWidth = 0.56;
     for (const sx of seatCenters) {
-      add(box(0.5, 0.12, 0.5, M.seat, sx, -0.74, -0.2));
-      const back = add(box(0.5, 0.62, 0.12, M.seat, sx, -0.45, -0.5));
+      add(box(seatWidth, 0.13, 0.54, M.seat, sx, -0.74, -0.2));
+      const back = add(box(seatWidth, 0.64, 0.14, M.seat, sx, -0.45, -0.5));
       back.rotation.x = -0.12;
-      add(box(0.26, 0.16, 0.09, M.seat, sx, -0.06, -0.55));
+      add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
-    // Low center console between the seats, with a short gear selector.
-    const consoleX = (seatCenters[0] + seatCenters[1]) / 2;
-    add(box(0.2, 0.14, 0.46, M.panel, consoleX, -0.65, -0.02));
-    add(box(0.17, 0.035, 0.28, M.trim, consoleX, -0.565, -0.015));
+    // Full-length center console: runs from the dashboard to the back of the cabin.
+    const consoleX = 0;
+    const consoleFrontZ = zDash - 0.02;
+    const consoleBackZ = zBack + 0.06;
+    const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
+    const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
+    const consoleWidth = 0.22;
+    add(box(consoleWidth, 0.14, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
+
+    // Raised sloped transition blends the console into the lower dashboard.
+    const consoleBridge = add(box(consoleWidth + 0.04, 0.12, 0.3, M.panel, consoleX, -0.59, consoleFrontZ - 0.12));
+    consoleBridge.rotation.x = -0.22;
+    add(box(consoleWidth - 0.025, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.575, consoleCenterZ - 0.035));
+
+    // Gear selector at the forward end of the console.
     const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
-    shifterStem.position.set(consoleX, -0.49, 0.035);
+    shifterStem.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
     shifterStem.rotation.x = -0.18;
     add(shifterStem);
     const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
-    shifterKnob.position.set(consoleX, -0.425, 0.045);
+    shifterKnob.position.set(consoleX, -0.425, consoleFrontZ - 0.36);
     add(shifterKnob);
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
