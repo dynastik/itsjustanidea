@@ -144,13 +144,14 @@ export function createAudio() {
 
     // Pitch follows RPM only. Gear ratios already change RPM in the vehicle model, so applying
     // another multiplier per gear would make the same engine magically change character on each shift.
-    const limiterFlutter = engineRPM > 4900 ? 1 + 0.025 * Math.sin(t * 95) : 1;
-    // Map idle-to-redline across a deliberately broad audible range while keeping the ramp smooth.
+    const limiterFlutter = engineRPM > 4900 ? 1 + 0.035 * Math.sin(t * 95) : 1;
+    // A lower, more engine-like fundamental with a broad enough range to make each gear audible.
+    // The transmission's RPM is the source of truth, so shifts and rev-matched downshifts are heard.
     const rpmNorm = clamp((audioRpm - 700) / (5300 - 700), 0, 1);
-    const crankHz = clamp((42 + rpmNorm * 300) * limiterFlutter, 42, 360);
+    const crankHz = clamp((38 + rpmNorm * 255) * limiterFlutter, 38, 310);
     engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
 
-    const cutoff = 750 + rev * 2800 + load * 1050;
+    const cutoff = 650 + rev * 3200 + load * 1450;
     mufflerFilter.frequency.setTargetAtTime(cutoff, t, 0.055);
     exhaustResonance.frequency.setTargetAtTime(
       clamp(crankHz * 2.1, 120, 700), t, 0.07
@@ -159,9 +160,9 @@ export function createAudio() {
 
     intakeFilter.frequency.setTargetAtTime(650 + rev * 500 + load * 250, t, 0.1);
     intakeGain.gain.setTargetAtTime(0.0015 + load * 0.004 + rev * 0.0025, t, 0.1);
-    const shiftDucking = 1 - audioClutch * 0.72;
+    const shiftDucking = 1 - audioClutch * 0.88;
     engineGain.gain.setTargetAtTime(
-      (0.28 + load * 0.17 + rev * 0.09 + (lugging ? 0.035 : 0)) * shiftDucking, t, 0.07
+      (0.25 + load * 0.21 + rev * 0.11 + (lugging ? 0.045 : 0)) * shiftDucking, t, 0.055
     );
 
     const vn = clamp(v / 30, 0, 1);
