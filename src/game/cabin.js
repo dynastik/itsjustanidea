@@ -159,17 +159,18 @@ export function createCabInterior(vehicle) {
 
     // Three pedals beside the middle of the console flare, in the driver's
     // footwell. Driver is toward -z, so the ribbed faces must point toward -z.
-    const pedalZ = zDash - 0.50;
+    const pedalZ = zDash - 0.40;
     const pedalY = -0.70;
     const pedalXs = [-0.145, 0, 0.145]; // clutch, brake, accelerator, centered on the steering wheel
     const pedalTilt = 0.55;
+    const pedalGroups = [];
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
       const pedalGroup = add(new THREE.Group());
       pedalGroup.position.set(px, pedalY, pedalZ);
       pedalGroup.rotation.x = pedalTilt;
-      const support = box(0.025, 0.28, 0.025, M.trim, 0, -0.28, 0.035);
-      support.rotation.x = 0.18;
+      pedalGroups.push(pedalGroup);
+      const support = box(0.025, 0.30, 0.025, M.trim, 0, -0.28, 0.035);
       pedalGroup.add(support);
       // The plain pad sits behind the ribs; ribs are on the rear (-z) face,
       // visible to the driver rather than facing the dashboard/outside.
@@ -286,9 +287,16 @@ export function createCabInterior(vehicle) {
     if (parts.spin) parts.spin.rotation.z = -angle * 6; // left turn = counter-clockwise for the driver
   }
 
-  function update(dt, v) {
+  function update(dt, v, driveInput = {}) {
     root.position.copy(vehicle.cabEye); // follows the eye tuner
     setSteeringAngle(v.steerAngle);
+    // Accelerator (right) and brake (middle) pivot toward a more upright position
+    // while pressed, with a smoothed return when released.
+    const pedalTargets = [0, clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
+    for (let i = 0; i < pedalGroups.length; i++) {
+      const target = pedalTilt + pedalTargets[i] * 0.35;
+      pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
+    }
     if (parts.freshener) {
       const target = clamp(-v.steerAngle * v.speed * v.speed * 0.025, -0.9, 0.9);
       parts.freshener.rotation.z += (target - parts.freshener.rotation.z) * (1 - Math.exp(-5 * dt));
