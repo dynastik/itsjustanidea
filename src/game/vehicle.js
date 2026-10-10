@@ -322,9 +322,27 @@ export function createVehicle(scene, physics, RAPIER) {
     return true;
   }
 
+  function smartShift() {
+    // One press selects the gear suited to the current road speed. No background auto-shifting.
+    const kmh = Math.abs(self.speed) * 3.6;
+    const target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 56 ? 4 : kmh < 78 ? 5 : 6;
+    if (target === gearIndex) {
+      // If already in the ideal gear, keep it. A button press should not cause a fake shift.
+      return false;
+    }
+    const direction = target > gearIndex ? 1 : -1;
+    const speed = Math.abs(self.speed);
+    if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
+    gearIndex = target;
+    shiftTimer = 0.24;
+    lugPhase = 0;
+    autoShiftEnabled = false;
+    return true;
+  }
+
   function transmission() {
     return { gear: GEAR_NAMES[gearIndex], rpm: Math.round(engineRpm),
-      clutch: shiftTimer > 0 ? clamp(shiftTimer / 0.38, 0, 1) : 0, auto: autoShiftEnabled };
+      clutch: shiftTimer > 0 ? clamp(shiftTimer / 0.38, 0, 1) : 0, auto: false };
   }
 
   const self = {
@@ -340,6 +358,7 @@ export function createVehicle(scene, physics, RAPIER) {
     updateVisual,
     reset,
     maxSteerAtSpeed,
+    smartShift,
     shiftUp: () => shiftGear(1),
     shiftDown: () => shiftGear(-1),
     toggleAutoShift: () => { autoShiftEnabled = !autoShiftEnabled; return autoShiftEnabled; },
@@ -488,18 +507,14 @@ export function createVehicle(scene, physics, RAPIER) {
     if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
 
-    if (autoShiftEnabled && gearIndex >= 2) {
-      const currentDirection = GEAR_NAMES[gearIndex] === 'R' ? -1 : 1;
-      const currentSpeed = v * currentDirection;
-      if (gearIndex < 6 && currentSpeed >= [0, 0, 4.8, 9.8, 15.2, 21.8, 99][gearIndex]) shiftGear(1, true);
-      else if (gearIndex > 2 && currentSpeed < GEAR_MIN_SPEED[gearIndex] * 0.72 && engineRpm < 1500) shiftGear(-1, true);
-    }
-
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
     const gearCap = GEAR_CAPS[gearIndex] || 0.1;
     const cap = Math.max(0.1, Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed, gearCap)) * (off ? h.offRoad.speedFactor : 1);
-    const t = clamp(input.throttle, 0, 1);
+    // S at a standstill selects reverse; pressing W again returns to first gear.
+    if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
+    else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
+    const t = clamp(Math.abs(input.throttle), 0, 1);
     const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
     const speedInGear = v * direction;
     let F = 0;
@@ -523,7 +538,7 @@ export function createVehicle(scene, physics, RAPIER) {
       torque *= Math.sin(limiterPhase) > 0.05 ? 0.16 : 0.72;
     } else limiterPhase = 0;
 
-    if (gearName !== 'N' && t > 0) F += direction * h.engineForce * torque * t * clamp(1 - speedInGear / cap, 0, 1);
+    if (gearName !== 'N' && t > 0) F += direction * (gearName === 'R' ? h.reverseForce : h.engineForce) * torque * t * clamp(1 - speedInGear / cap, 0, 1);
     if (input.brake > 0) F -= h.brakeForce * input.brake * moving;
     if (t === 0 && input.brake === 0) F -= h.coastForce * moving;
     if (overRevTimer > 0 && v !== 0) F -= Math.sign(v) * h.brakeForce * 0.12 * (overRevTimer / 0.42);
