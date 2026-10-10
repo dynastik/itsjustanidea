@@ -32,6 +32,8 @@ function beam(a, b, t, m) {
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+let pedalGroups = [];
+let pedalTilt = 0.55;
 
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
@@ -162,8 +164,8 @@ export function createCabInterior(vehicle) {
     const pedalZ = zDash - 0.40;
     const pedalY = -0.70;
     const pedalXs = [-0.145, 0, 0.145]; // clutch, brake, accelerator, centered on the steering wheel
-    const pedalTilt = 0.55;
-    const pedalGroups = [];
+    pedalTilt = 0.55;
+    pedalGroups = [];
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
       const pedalGroup = add(new THREE.Group());
