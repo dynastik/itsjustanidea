@@ -28,16 +28,14 @@ export function createAudio() {
     master.gain.value = 0;
     master.connect(ctx.destination);
 
-    // A restrained, harmonic-rich engine tone. Keep the crank fundamental audible rather than
-    // using the firing-event rate as the perceived pitch; that was the main source of the fart-like buzz.
+    // Use a stronger second harmonic so the engine has a recognizable, audible motor tone
+    // instead of a nearly inaudible sub-bass rumble at idle.
     engineOsc = ctx.createOscillator();
-    const real = new Float32Array([0, 1, 0.22, 0.10, 0.045, 0.02, 0.01]);
+    const real = new Float32Array([0, 1, 0.30, 0.15, 0.07, 0.035, 0.018]);
     const imag = new Float32Array([0, 0.04, -0.025, 0.015, -0.008, 0.004, -0.002]);
     const pulseWave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
     engineOsc.setPeriodicWave(pulseWave);
 
-    // Low-pass muffler removes the harsh buzzy top end. A gentle peaking filter adds
-    // a little exhaust body without turning the whole engine into a resonant whistle.
     mufflerFilter = ctx.createBiquadFilter();
     mufflerFilter.type = 'lowpass';
     mufflerFilter.Q.value = 0.75;
@@ -53,7 +51,6 @@ export function createAudio() {
     engineGain.connect(master);
     engineOsc.start();
 
-    // Shared noise source for intake/valvetrain, wind, road and impact texture.
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -101,43 +98,39 @@ export function createAudio() {
     const lugging = gear === '5' && v < 4 && load > 0.05;
     audioClutch += (clamp(clutch, 0, 1) - audioClutch) * (1 - Math.exp(-18 * dt));
 
-    // Smooth RPM from the actual transmission. Let low-gear revs rise faster than a lugging
-    // fifth-gear launch, but keep enough movement that the engine audibly struggles.
     const rpmTarget = lugging
       ? Math.min(engineRPM, 1500 + load * 180)
       : engineRPM;
     audioRpm += (rpmTarget - audioRpm) * (1 - Math.exp(-(lugging ? 7 : 5) * dt));
 
-    // Crank-speed pitch rises with RPM. Harmonics and filtering provide the engine character.
-    const crankHz = clamp(audioRpm / 60, 14, 115);
-    engineOsc.frequency.setTargetAtTime(crankHz, t, 0.065);
+    // Roughly twice crank frequency gives the engine a more audible firing character.
+    const crankHz = clamp(audioRpm / 30, 28, 230);
+    engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
 
-    const cutoff = 380 + rev * 1850 + load * 650;
+    const cutoff = 550 + rev * 2300 + load * 850;
     mufflerFilter.frequency.setTargetAtTime(cutoff, t, 0.055);
     exhaustResonance.frequency.setTargetAtTime(
-      clamp(crankHz * 4.2, 100, 480), t, 0.09
+      clamp(crankHz * 2.1, 120, 700), t, 0.07
     );
-    exhaustResonance.gain.setTargetAtTime(0.5 + load * 1.4 + rev * 0.8, t, 0.09);
+    exhaustResonance.gain.setTargetAtTime(1 + load * 1.8 + rev * 1.1, t, 0.09);
 
-    // Keep intake noise far below the tonal engine, otherwise it reads as broadband hiss.
     intakeFilter.frequency.setTargetAtTime(650 + rev * 500 + load * 250, t, 0.1);
-    intakeGain.gain.setTargetAtTime(0.0007 + load * 0.002 + rev * 0.001, t, 0.1);
-    const shiftDucking = 1 - audioClutch * 0.82;
+    intakeGain.gain.setTargetAtTime(0.001 + load * 0.0025 + rev * 0.0015, t, 0.1);
+    const shiftDucking = 1 - audioClutch * 0.72;
     engineGain.gain.setTargetAtTime(
-      (0.075 + load * 0.045 + rev * 0.025 + (lugging ? 0.01 : 0)) * shiftDucking, t, 0.08
+      (0.17 + load * 0.09 + rev * 0.045 + (lugging ? 0.02 : 0)) * shiftDucking, t, 0.07
     );
 
     const vn = clamp(v / 30, 0, 1);
-    windGain.gain.setTargetAtTime(0.065 * vn * vn, t, 0.12);
+    windGain.gain.setTargetAtTime(0.075 * vn * vn, t, 0.12);
     windFilter.frequency.setTargetAtTime(300 + v * 38, t, 0.12);
 
-    roadGain.gain.setTargetAtTime(clamp(v / 20, 0, 1) * (offRoad ? 0.085 : 0.018), t, 0.12);
+    roadGain.gain.setTargetAtTime(clamp(v / 20, 0, 1) * (offRoad ? 0.09 : 0.022), t, 0.12);
     roadFilter.frequency.setTargetAtTime(offRoad ? 1250 : 420, t, 0.12);
 
-    master.gain.setTargetAtTime(paused || muted ? 0 : 0.52, t, 0.06);
+    master.gain.setTargetAtTime(paused || muted ? 0 : 0.8, t, 0.06);
   }
 
-  // Collision thump. intensity is approximately m/s of speed lost in one frame.
   function bump(intensity) {
     if (!ctx || muted) return;
     const t = ctx.currentTime;
