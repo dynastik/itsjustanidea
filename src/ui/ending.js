@@ -1,5 +1,7 @@
 // The ending: after the last message the screen fades to black, there is a brief silence, then
 // "Next driver, please." and the whole thing starts again from the morning (onDone does the full reset).
+import { ENDING_LINE } from '../game/storyText.js';
+
 export function createEnding() {
   const el = document.createElement('div');
   el.id = 'ending';
@@ -18,7 +20,7 @@ export function createEnding() {
       running = true;
       el.classList.add('on');                       // fade to black (CSS transition, 2.5 s)
       await wait(5000);                             // the fade, then a brief silence
-      line.textContent = 'Next driver, please.';
+      line.textContent = ENDING_LINE;
       line.classList.add('on');
       await wait(5500);
       onDone();                                     // reset happens behind the black
