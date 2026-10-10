@@ -44,7 +44,7 @@ export const VEHICLE_CONFIG = {
     engineForce: 16000,
     brakeForce: 22000,
     reverseForce: 7000,
-    coastForce: 1800,
+    coastForce: 140,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
@@ -572,16 +572,7 @@ export function createVehicle(scene, physics, RAPIER) {
     if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
     else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
 
-    // Highway transmission is fully automatic; city driving keeps the manual Shift control.
-    // Separate up/down thresholds provide hysteresis so the gearbox doesn't hunt at boundaries.
-    if (state.mode === 'highway' && gearIndex >= 2 && shiftTimer <= 0) {
-      const speed = Math.abs(v);
-      if (gearIndex < GEAR_NAMES.length - 1 && speed >= GEAR_CAPS[gearIndex] * 0.80 && speed >= GEAR_MIN_SPEED[gearIndex + 1] * 0.78) {
-        shiftGear(1, true);
-      } else if (gearIndex > 2 && speed < GEAR_MIN_SPEED[gearIndex] * 0.72) {
-        shiftGear(-1, true);
-      }
-    }
+    // Both zones use the manual gearbox; highway steering is automated, not shifting.
 
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
@@ -643,7 +634,7 @@ export function createVehicle(scene, physics, RAPIER) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
-        const gearBrake = [0.075, 0, 0.095, 0.075, 0.055, 0.04, 0.028][gearIndex];
+        const gearBrake = [0.02, 0, 0.025, 0.018, 0.012, 0.008, 0.005][gearIndex];
         F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
       }
     }
