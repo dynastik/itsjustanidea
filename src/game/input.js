@@ -105,10 +105,7 @@ export function createInput(actions) {
       d.throttle = 0;
       d.brake = 0;
       if (held.w) d.throttle = 1;
-      else if (held.s) {
-        if (speed > 0.3) d.brake = 1;
-        else d.throttle = -1;
-      }
+      else if (held.s) d.brake = 1;
       d.speedCap = CITY_SPEED_CAP;
     },
   };
