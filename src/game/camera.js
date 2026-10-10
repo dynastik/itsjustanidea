@@ -10,7 +10,7 @@ export const CAMERA_PROFILES = {
     tilt: 1.0,
   },
   cab: {
-    fov: 80, fovSpeedGain: 0.15, fovSpeedRef: 30,
+    fov: 70, fovSpeedGain: 0, fovSpeedRef: 30,
     exteriorVisible: false,
   },
   // "Toy car" diorama look: high, far, narrow FOV, a little follow lag, softer tilt-shift.
@@ -97,7 +97,9 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     const c = vehicle.center;
 
     if (profileName === 'cab') {
-      pos.copy(vehicle.cabEye).applyQuaternion(vehicle.quaternion).add(c);
+      // Move the eye slightly rearward in the van's local space. This changes framing without
+      // altering the exterior camera or distorting cabin meshes to compensate for perspective.
+      pos.copy(vehicle.cabEye).add(new THREE.Vector3(0, 0, -0.12)).applyQuaternion(vehicle.quaternion).add(c);
       dir.set(0, 0, 1).applyQuaternion(vehicle.quaternion).applyAxisAngle(up, yaw);
       dir.y -= pitch * 0.8;
       dir.normalize();

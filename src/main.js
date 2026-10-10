@@ -208,7 +208,7 @@ async function main() {
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
-    cabin.update(dt, vehicle);
+    cabin.update(dt, vehicle, driveInput);
 
     // impact detection: a big one-frame speed loss that wasn't braking
     if (dt > 0) {

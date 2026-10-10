@@ -1,51 +1,175 @@
+:root {
+  color-scheme: dark;
+  --ui-ink: #f1eee7;
+  --ui-muted: #a7aaa8;
+  --ui-line: rgba(225, 229, 222, 0.16);
+  --ui-panel: rgba(8, 12, 16, 0.76);
+  --ui-accent: #c5d5bd;
+  --ui-warm: #d5b99a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   overflow: hidden;
-  font-family: monospace;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ui-ink);
 }
 
 #ui-overlay {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  color: white;
-  text-shadow: 0 0 4px black;
-  font-size: 18px;
+  top: 18px;
+  left: 18px;
+  max-width: min(700px, calc(100vw - 36px));
+  color: var(--ui-ink);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  font-size: 13px;
   z-index: 10;
   pointer-events: none;
 }
 
-#typing-panel {
-  margin-top: 10px;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 10px 14px;
-  border-radius: 6px;
-  width: 640px;
-  max-width: calc(100vw - 32px);
-  box-sizing: border-box;
+#mode-label {
+  display: inline-block;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: 4px;
+  background: rgba(8, 12, 16, 0.66);
+  color: #d9ded7;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.7px;
+  line-height: 1.2;
 }
 
-#prompt-source { font-size: 11px; letter-spacing: 3px; color: #9ab; margin-bottom: 2px; }
-#target-word { font: 20px/1.5 Georgia, 'Times New Roman', serif; letter-spacing: 0.3px; margin-bottom: 4px; white-space: pre-wrap; min-height: 3em; }
-#typing-panel.message #target-word { font: 24px/1.4 monospace; letter-spacing: 3px; }
-#typing-panel.message #prompt-source { color: #d88; }
-#typed-input { display: none; }
-.t-ok { color: #4caf50; }
-.t-cur { color: #fff; background: rgba(255, 255, 255, 0.28); }
-.t-rest { color: #ddd; }
-.t-err { color: #f44336; }
-#typed-input { font-size: 16px; color: #aaa; min-height: 20px; }
-#stats { font-size: 14px; margin-top: 6px; color: #ccc; }
-#hint { margin-top: 10px; font-size: 12px; color: #ddd; }
+#typing-panel {
+  margin-top: 12px;
+  padding: 15px 18px 13px;
+  width: 640px;
+  max-width: calc(100vw - 36px);
+  border: 1px solid rgba(225, 229, 222, 0.19);
+  border-left: 2px solid rgba(197, 213, 189, 0.72);
+  border-radius: 5px;
+  background: var(--ui-panel);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.2);
+}
+
+#prompt-source {
+  margin-bottom: 8px;
+  color: #b3c1ad;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 2.2px;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+#target-word {
+  min-height: 4.5em;
+  margin-bottom: 8px;
+  color: #e3e2dc;
+  font: 19px/1.65 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.08px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-shadow: none;
+}
+
+#typing-panel.message {
+  border-left-color: rgba(213, 185, 154, 0.9);
+  background: rgba(13, 10, 10, 0.82);
+}
+
+#typing-panel.message #prompt-source {
+  color: #d5b99a;
+}
+
+#typing-panel.message #target-word {
+  font: 21px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.25px;
+}
+
+#typed-input {
+  display: none;
+  font-size: 14px;
+  color: var(--ui-muted);
+  min-height: 20px;
+}
+
+.t-ok {
+  color: #a9c6a1;
+}
+
+.t-cur {
+  color: #fff;
+  background: rgba(213, 185, 154, 0.32);
+  border-bottom: 1px solid #e4c8a8;
+  border-radius: 1px;
+}
+
+.t-rest {
+  color: #9c9f9b;
+}
+
+.t-err {
+  color: #f0a19a;
+  text-decoration: underline;
+  text-decoration-color: rgba(240, 161, 154, 0.7);
+  text-underline-offset: 3px;
+}
+
+#stats {
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(225, 229, 222, 0.12);
+  color: #aeb3ae;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.7px;
+}
+
+#hint {
+  position: fixed;
+  left: 18px;
+  bottom: 16px;
+  max-width: min(900px, calc(100vw - 36px));
+  margin-top: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(225, 229, 222, 0.12);
+  border-radius: 4px;
+  background: rgba(8, 12, 16, 0.6);
+  color: #c2c5bf;
+  font: 10px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.15px;
+  text-shadow: 0 1px 5px #000;
+}
 
 #speedo {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  bottom: 19px;
   z-index: 10;
-  color: white;
-  font-size: 28px;
-  text-shadow: 0 0 6px black;
+  padding: 10px 12px;
+  border: 1px solid rgba(225, 229, 222, 0.16);
+  border-radius: 4px;
+  background: rgba(8, 12, 16, 0.62);
+  color: #eee9dd;
+  font: 600 22px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 6px #000;
+  pointer-events: none;
+}
+
+#headlight-status {
+  position: fixed;
+  right: 21px;
+  bottom: 63px;
+  z-index: 10;
+  color: #e8dfc8;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 1.2px;
+  text-shadow: 0 1px 6px #000;
   pointer-events: none;
 }
 
@@ -53,12 +177,15 @@ body {
   position: fixed;
   inset: 0;
   z-index: 20;
+  display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  color: white;
-  font-size: 48px;
-  letter-spacing: 8px;
+  background: rgba(3, 5, 8, 0.64);
+  color: #f1eee7;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 7px;
+  text-shadow: 0 2px 18px #000;
   pointer-events: none;
 }
 
@@ -74,25 +201,66 @@ body {
   align-items: center;
   justify-content: center;
 }
-#ending.on { opacity: 1; }
+
+#ending.on {
+  opacity: 1;
+}
+
 #ending-line {
   color: #ddd;
-  font: 28px Georgia, 'Times New Roman', serif;
+  font: 28px Georgia, "Times New Roman", serif;
   letter-spacing: 3px;
   opacity: 0;
   transition: opacity 1.5s ease;
 }
-#ending-line.on { opacity: 1; }
 
+#ending-line.on {
+  opacity: 1;
+}
 
-#headlight-status {
-  position: fixed;
-  right: 20px;
-  bottom: 58px;
-  z-index: 10;
-  color: #e8dfc8;
-  font: 11px monospace;
-  letter-spacing: 1.5px;
-  text-shadow: 0 0 5px black;
-  pointer-events: none;
+@media (max-width: 600px) {
+  #ui-overlay {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+  }
+
+  #typing-panel {
+    max-width: calc(100vw - 20px);
+    padding: 12px 13px 11px;
+  }
+
+  #target-word {
+    font-size: 17px;
+  }
+
+  #typing-panel.message #target-word {
+    font-size: 18px;
+  }
+
+  #hint {
+    left: 10px;
+    bottom: 10px;
+    max-width: calc(100vw - 20px);
+    font-size: 9px;
+  }
+
+  #speedo {
+    right: 10px;
+    bottom: 10px;
+    font-size: 18px;
+  }
+
+  #headlight-status {
+    right: 11px;
+    bottom: 53px;
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #ending,
+  #ending-line {
+    transition: none;
+  }
 }
