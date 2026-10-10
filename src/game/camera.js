@@ -132,21 +132,13 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     toggleCab() {
       if (profileName === 'cab') profileName = exteriorProfile;
       else { exteriorProfile = profileName; profileName = 'cab'; }
-      const inBootAlignmentView = profileName === 'cab';
-      vehicle.setExteriorVisible(inBootAlignmentView ? false : CAMERA_PROFILES[profileName].exteriorVisible);
+      const inCabView = profileName === 'cab';
+      vehicle.setExteriorVisible(inCabView ? false : CAMERA_PROFILES[profileName].exteriorVisible);
       if (cabInterior) {
-        cabInterior.root.visible = inBootAlignmentView;
-        // F2 is an isolated boot-alignment view: show the boot and its top/mid/bottom
-        // glowing references, while hiding the rest of the cabin and the van body.
-        const alignmentParts = new Set([
-          'shift-boot-only',
-          'shift-marker-top',
-          'shift-marker-mid',
-          'shift-marker-bottom',
-        ]);
-        cabInterior.root.children.forEach((child) => {
-          child.visible = !inBootAlignmentView || alignmentParts.has(child.name);
-        });
+        // Restore the complete cabin in F2; keep the boot and its glowing references
+        // as part of the scene instead of isolating them from the rest of the interior.
+        cabInterior.root.visible = inCabView;
+        cabInterior.root.children.forEach((child) => { child.visible = true; });
       }
     },
     // F3: chase <-> toy-car look (ignored in cab view)
