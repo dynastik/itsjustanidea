@@ -108,7 +108,7 @@ export function createCabInterior(vehicle) {
     // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
     // Rounded rectangular horn pad, with genuinely softened corners rather than a sharp box.
     const hubShape = new THREE.Shape();
-    const topHalf = 0.088, bottomHalf = 0.042, topY = 0.062, bottomY = -0.062, corner = 0.018;
+    const topHalf = 0.068, bottomHalf = 0.032, topY = 0.048, bottomY = -0.048, corner = 0.014;
     // Upside-down rounded trapezium: broad top edge, tapered sides, narrower bottom.
     hubShape.moveTo(-topHalf + corner, topY);
     hubShape.lineTo(topHalf - corner, topY);
@@ -203,7 +203,9 @@ export function createCabInterior(vehicle) {
     bridgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bridgeVertices, 3));
     bridgeGeometry.setIndex(bridgeFaces);
     bridgeGeometry.computeVertexNormals();
-    const consoleBridge = add(new THREE.Mesh(bridgeGeometry, M.panel));
+    const bridgeMaterial = M.panel.clone();
+    bridgeMaterial.side = THREE.DoubleSide;
+    const consoleBridge = add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
     // Simple gear selector near the front, with no screens or decorative accessories.
