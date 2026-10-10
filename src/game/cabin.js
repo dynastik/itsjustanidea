@@ -38,7 +38,7 @@ let pedalTilt = 0.55;
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
-  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null };
+  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
 
   function clear() {
     root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -264,13 +264,17 @@ export function createCabInterior(vehicle) {
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
     // Simple gear selector near the front, with no screens or decorative accessories.
+    const shifterPivot = new THREE.Group();
+    shifterPivot.position.set(consoleX, -0.51, consoleFrontZ - 0.36);
+    add(shifterPivot);
     const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
-    shifterStem.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
+    shifterStem.position.y = 0.065;
     shifterStem.rotation.x = -0.18;
-    add(shifterStem);
+    shifterPivot.add(shifterStem);
     const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
-    shifterKnob.position.set(consoleX, -0.425, consoleFrontZ - 0.36);
-    add(shifterKnob);
+    shifterKnob.position.y = 0.13;
+    shifterPivot.add(shifterKnob);
+    parts.shifter = shifterPivot;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
     add(beam(V(xC, yRoof - 0.02, 0.48), V(xC, yRoof - 0.15, 0.44), 0.02, M.trim));
@@ -294,10 +298,17 @@ export function createCabInterior(vehicle) {
     setSteeringAngle(v.steerAngle);
     // Accelerator (right) and brake (middle) pivot toward a more upright position
     // while pressed, with a smoothed return when released.
-    const pedalTargets = [0, clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
+    const pedalTargets = [clamp(driveInput.clutch ?? 0, 0, 1), clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
     for (let i = 0; i < pedalGroups.length; i++) {
       const target = pedalTilt - pedalTargets[i] * 0.35;
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
+    }
+    if (parts.shifter) {
+      const gear = driveInput.gear ?? '1';
+      const targetX = gear === 'R' ? -0.34 : gear === 'N' ? 0 : ({ '1': -0.16, '2': 0.16, '3': -0.16, '4': 0.16, '5': 0.0 }[gear] ?? 0);
+      const targetZ = gear === 'R' ? 0.07 : gear === 'N' ? 0 : ({ '1': 0.08, '2': 0.08, '3': -0.04, '4': -0.04, '5': -0.13 }[gear] ?? 0);
+      parts.shifter.rotation.x += (targetX - parts.shifter.rotation.x) * (1 - Math.exp(-14 * dt));
+      parts.shifter.rotation.z += (targetZ - parts.shifter.rotation.z) * (1 - Math.exp(-14 * dt));
     }
     if (parts.freshener) {
       const target = clamp(-v.steerAngle * v.speed * v.speed * 0.025, -0.9, 0.9);
