@@ -308,35 +308,10 @@ export function createCabInterior(vehicle) {
     boot.position.set(consoleX, -0.514, gateZ);
     add(boot);
 
-    // Fixed pivot at the boot: the stem and knob rotate around this point, never slide.
+    // Keep only the smooth shift boot visible for the F2 alignment view.
+    // A hidden pivot group preserves the existing gear travel calculations.
     const shifter = add(new THREE.Group());
     shifter.position.set(consoleX, -0.49, gateZ);
-    const shifterBoot = box(0.044, 0.012, 0.044, M.dark, 0, -0.065, 0);
-    shifter.add(shifterBoot);
-    const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
-    shifterStem.position.y = 0.065;
-    shifter.add(shifterStem);
-    const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
-    shifterKnob.position.y = 0.13;
-    shifter.add(shifterKnob);
-
-    // Temporary glowing reference markers to identify the stick's exact points:
-    // blue = bottom/pivot, red = midpoint, white = top.
-    const marker = (color, y, radius = 0.012) => {
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 3,
-        toneMapped: false,
-      });
-      const light = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
-      light.position.set(0, y, 0);
-      shifter.add(light);
-    };
-    marker(0x168bff, 0.006, 0.014);
-    marker(0xff2020, 0.065, 0.014);
-    marker(0xffffff, 0.13, 0.014);
-
     parts.shifter = shifter;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
