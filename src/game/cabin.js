@@ -392,7 +392,7 @@ export function createCabInterior(vehicle) {
       }
 
       // Keep the boot's bottom ring fixed to the transmission tunnel, while its
-      // top ring follows the lower end of the stem. This makes one simple
+      // top ring follows the midpoint between the fixed boot base and the stick's midpoint. This makes one simple
       // tapered flexible surface instead of moving the boot as a separate object.
       const leanX = -Math.atan2(shifterTravel.x, 0.13);
       const leanZ = Math.atan2(shifterTravel.z, 0.13);
@@ -401,8 +401,8 @@ export function createCabInterior(vehicle) {
 
       if (shiftBootGeometry && shiftBootBasePositions) {
         const positions = shiftBootGeometry.attributes.position;
-        const midStickX = Math.sin(leanX) * 0.018;
-        const midStickZ = -Math.sin(leanZ) * 0.018;
+        const midStickX = Math.sin(leanX) * 0.065;
+        const midStickZ = -Math.sin(leanZ) * 0.065;
         for (let i = 0; i < positions.count; i++) {
           const base = i * 3;
           const isTop = shiftBootBasePositions[base + 1] > 0;
