@@ -54,8 +54,6 @@ export function createCabInterior(vehicle) {
   // Track the stick tip's projected offset and route it through the H-gate's
   // neutral crossbar whenever the selected gear changes.
   let shifterTravel = { x: 0, z: 0, gear: 'N', route: [] };
-  let shiftBootGeometry = null;
-  let shiftBootBasePositions = null;
 
   function clear() {
     root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -301,9 +299,8 @@ export function createCabInterior(vehicle) {
     // Simple smooth leather shift boot. Its lower edge stays fixed to the console;
     // the top edge flexes with the stick as it moves through the H-pattern.
     const bootLeather = mat(0x211e1b, { roughness: 1 });
-    shiftBootGeometry = new THREE.CylinderGeometry(0.025, 0.052, 0.085, 10, 1, false);
-    shiftBootBasePositions = shiftBootGeometry.attributes.position.array.slice();
-    const boot = new THREE.Mesh(shiftBootGeometry, bootLeather);
+    const bootGeometry = new THREE.CylinderGeometry(0.025, 0.052, 0.085, 10, 1, false);
+    const boot = new THREE.Mesh(bootGeometry, bootLeather);
     boot.position.set(consoleX, -0.514, gateZ);
     add(boot);
 
@@ -388,20 +385,6 @@ export function createCabInterior(vehicle) {
           shifterTravel.z += (dz / distance) * distanceLeft;
           distanceLeft = 0;
         }
-      }
-
-      // Flex the boot's upper rim toward the moving stick while its base stays planted.
-      if (shiftBootGeometry && shiftBootBasePositions) {
-        const positions = shiftBootGeometry.attributes.position;
-        for (let i = 0; i < positions.count; i++) {
-          const base = i * 3;
-          const isTopRing = shiftBootBasePositions[base + 1] > 0;
-          positions.array[base] = shiftBootBasePositions[base] + (isTopRing ? shifterTravel.x : 0);
-          positions.array[base + 1] = shiftBootBasePositions[base + 1];
-          positions.array[base + 2] = shiftBootBasePositions[base + 2] + (isTopRing ? shifterTravel.z : 0);
-        }
-        positions.needsUpdate = true;
-        shiftBootGeometry.computeVertexNormals();
       }
 
       // The tip follows the routed coordinates; rotations make it swing in an arc from the boot.
