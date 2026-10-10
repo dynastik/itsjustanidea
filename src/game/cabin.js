@@ -313,7 +313,7 @@ export function createCabInterior(vehicle) {
     // lean together through the H-pattern while the boot flexes around the base.
     const shifter = add(new THREE.Group());
     shifter.name = 'manual-shifter-pivot';
-    shifter.position.set(consoleX, -0.515, gateZ);
+    shifter.position.set(consoleX, -0.505, gateZ);
     const shaft = new THREE.Mesh(
       new THREE.CylinderGeometry(0.008, 0.011, 0.145, 10),
       mat(0x777b80, { metalness: 0.72, roughness: 0.3 }),
@@ -383,7 +383,7 @@ export function createCabInterior(vehicle) {
       }
 
       // Move at a steady tip speed so each leg is visible, while keeping the base fixed.
-      let distanceLeft = 0.24 * Math.max(0, dt);
+      let distanceLeft = 0.45 * Math.max(0, dt);
       while (distanceLeft > 0 && shifterTravel.route.length) {
         const [wayX, wayZ] = shifterTravel.route[0];
         const dx = wayX - shifterTravel.x;
