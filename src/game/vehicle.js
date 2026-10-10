@@ -323,13 +323,20 @@ export function createVehicle(scene, physics, RAPIER) {
   }
 
   function smartShift() {
-    // One press selects the gear suited to the current road speed. No background auto-shifting.
+    // Shift is a one-button gearbox: normally select by road speed, but allow an upshift
+    // near the top of the current gear instead of getting stuck on a threshold.
     const kmh = Math.abs(self.speed) * 3.6;
-    const target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 56 ? 4 : kmh < 78 ? 5 : 6;
-    if (target === gearIndex) {
-      // If already in the ideal gear, keep it. A button press should not cause a fake shift.
-      return false;
-    }
+    const currentForwardGear = Math.max(0, gearIndex - 2);
+    const currentCap = GEAR_CAPS[gearIndex] * 3.6;
+    const nearTop = gearIndex >= 2 && gearIndex < 6 && kmh >= currentCap * 0.72;
+    let target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 52 ? 4 : kmh < 72 ? 5 : 6;
+
+    // If we're already in the speed-appropriate gear but near its ceiling, the next
+    // Shift press upshifts. This lets 3rd -> 4th happen around 43 km/h rather than
+    // requiring the player to reach the exact next speed band first.
+    if (target === gearIndex && nearTop) target = Math.min(6, gearIndex + 1);
+    if (target === gearIndex) return false;
+
     const direction = target > gearIndex ? 1 : -1;
     const speed = Math.abs(self.speed);
     if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
