@@ -291,6 +291,26 @@ export function createVehicle(scene, physics, RAPIER) {
   const prevQuat = new THREE.Quaternion();
   const curQuat = new THREE.Quaternion();
 
+  // Lightweight manual gearbox: R, N, then five forward gears.
+  const GEAR_NAMES = ['R', 'N', '1', '2', '3', '4', '5'];
+  const GEAR_CAPS = [3, 0, 6, 11, 17, 24, 30]; // m/s
+  const GEAR_FORCE = [0.42, 0, 1, 0.78, 0.62, 0.49, 0.40];
+  let gearIndex = 2;
+  let shiftTimer = 0;
+  let engineRpm = 850;
+  function shiftGear(direction) {
+    const next = clamp(gearIndex + direction, 0, GEAR_NAMES.length - 1);
+    if (next === gearIndex) return false;
+    const nextName = GEAR_NAMES[next];
+    if (nextName === 'R' && Math.abs(self.speed) > 1.1) return false;
+    gearIndex = next;
+    shiftTimer = 0.32;
+    return true;
+  }
+  function transmission() {
+    return { gear: GEAR_NAMES[gearIndex], rpm: Math.round(engineRpm), clutch: shiftTimer > 0 ? clamp(shiftTimer / 0.32, 0, 1) : 0 };
+  }
+
   const self = {
     cfg,
     visual,
@@ -304,6 +324,9 @@ export function createVehicle(scene, physics, RAPIER) {
     updateVisual,
     reset,
     maxSteerAtSpeed,
+    shiftUp: () => shiftGear(1),
+    shiftDown: () => shiftGear(-1),
+    get transmission() { return transmission(); },
     nudgeModel(dy) { cfg.modelYTrim += dy; applyModelOffset(); return cfg.modelYTrim; },
     getLocalBounds,
     onModelReady(cb) { readyCallbacks.push(cb); if (ready) cb(); },
@@ -445,21 +468,30 @@ export function createVehicle(scene, physics, RAPIER) {
     ctrl.setWheelSteering(0, self.steerAngle * cal.steerSign);
     ctrl.setWheelSteering(1, self.steerAngle * cal.steerSign);
 
-    const cap = Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed) * (off ? h.offRoad.speedFactor : 1);
-    const t = input.throttle;
+    if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
+    const gearName = GEAR_NAMES[gearIndex];
+    const gearCap = GEAR_CAPS[gearIndex];
+    const cap = Math.max(gearCap, 0.1) * (off ? h.offRoad.speedFactor : 1);
+    const t = Math.max(0, input.throttle);
     const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
+    const clutchCut = shiftTimer > 0 ? 0.12 + 0.88 * (1 - shiftTimer / 0.32) : 1;
     let F = 0;
 
-    if (t > 0) {
-      F += h.engineForce * t * clamp(1 - v / cap, 0, 1);
-    } else if (t < 0) {
-      if (v > 0.5) F -= h.brakeForce * -t;
-      else F -= h.reverseForce * -t * clamp(1 - -v / h.reverseMaxSpeed, 0, 1);
+    if (gearName !== 'N' && t > 0) {
+      const direction = gearName === 'R' ? -1 : 1;
+      const speedAlongGear = v * direction;
+      F += direction * h.engineForce * GEAR_FORCE[gearIndex] * t * clamp(1 - speedAlongGear / cap, 0, 1) * clutchCut;
     }
     if (input.brake > 0) F -= h.brakeForce * input.brake * moving;
     if (t === 0 && input.brake === 0) F -= h.coastForce * moving;
-    if (v > cap) F -= h.brakeForce * 0.25 * clamp((v - cap) / 3, 0, 1);
+    const gearSpeed = gearName === 'R' ? -v : v;
+    if (gearName !== 'N' && gearSpeed > cap) F -= h.brakeForce * 0.25 * clamp((gearSpeed - cap) / 3, 0, 1);
     if (off) F -= h.offRoad.dragForce * moving;
+
+    const rpmTarget = gearName === 'N'
+      ? 850 + t * 1800
+      : 850 + clamp(Math.abs(v) / Math.max(cap, 1), 0, 1) * 3900 + t * 550;
+    engineRpm += (rpmTarget - engineRpm) * (1 - Math.exp(-5 * dt));
 
     const perWheel = (F / 4) * cal.engineSign;
     for (let i = 0; i < 4; i++) ctrl.setWheelEngineForce(i, perWheel);
@@ -516,6 +548,9 @@ export function createVehicle(scene, physics, RAPIER) {
   }
 
   function reset(y = cfg.spawnHeight, heading = 0) {
+    gearIndex = 2;
+    shiftTimer = 0;
+    engineRpm = 850;
     body.setTranslation({ x: 0, y, z: 0 }, true);
     body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
