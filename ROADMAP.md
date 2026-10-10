@@ -364,3 +364,8 @@ public/
 CREDITS.md
 ROADMAP.md
 ```
+
+
+## Story modes and interchange integration
+
+Edit `story/short.md` and `story/long.md`, then run `npm run story` to regenerate `src/game/storyText.js`. Choose short or long mode in the city with **1** or **2** before entering the highway. The original narrative script is preserved in `story/story-script.md`. The separate ramp, merge lane, and cross-highway are implemented in `src/game/interchange.js`.

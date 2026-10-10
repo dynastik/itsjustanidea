@@ -44,6 +44,12 @@ export function createInput(actions) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
 
+    if (state.mode === 'city' && !e.repeat && (key === '1' || key === '2')) {
+      e.preventDefault();
+      actions.setStoryMode?.(key === '1' ? 'short' : 'long');
+      return;
+    }
+
     if (key === 'r' && state.mode === 'city') {
       e.preventDefault();
       if (!e.repeat) actions.reset();
@@ -105,12 +111,27 @@ export function writeHighwayInput(d, vehicle, road = null) {
   const sinceEntry = state.time - state.highwayEnteredAt;
   const learn = 1 - clamp(sinceEntry / c.learnerRampS, 0, 1); // 1 on arrival -> 0 once settled in
   const z = vehicle.center.z;
-  const frame = road?.getRoadFrame(z) ?? { x: 0, heading: 0, y: 0 };
+  let frame = road?.getRoadFrame(z) ?? { x: 0, heading: 0, y: 0 };
+  let lateral;
+  if (road?.drivePath?.length) {
+    const path = road.drivePath;
+    let nearest = 0, best = Infinity;
+    for (let i = 0; i < path.length; i++) {
+      const dx = vehicle.center.x - path[i].x, dz = vehicle.center.z - path[i].z;
+      const dist = dx * dx + dz * dz;
+      if (dist < best) { best = dist; nearest = i; }
+    }
+    const a = path[Math.max(0, nearest - 1)], b = path[Math.min(path.length - 1, nearest + 1)], p = path[nearest];
+    frame = { x: p.x, y: p.y, z: p.z, heading: Math.atan2(b.x - a.x, b.z - a.z) };
+    lateral = (vehicle.center.x - p.x) * Math.cos(frame.heading) - (vehicle.center.z - p.z) * Math.sin(frame.heading);
+  } else {
+    lateral = vehicle.center.x - frame.x;
+  }
 
   // Uphill = engine strain: people who are not typing lose speed on climbs, fast typists hold it.
   let strain = 0;
   if (road) {
-    const grade = (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
+    const grade = road.drivePath?.length ? 0 : (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
     strain = clamp(grade / c.hillGradeRef, 0, 1);
   }
   const strainPenalty = strain * (1 - wpmFactor) * c.hillStrainMax;
@@ -132,7 +153,7 @@ export function writeHighwayInput(d, vehicle, road = null) {
 
   // Desired heading points back at the lane centre; invert the bicycle model so loop gain stays
   // constant at any speed. Uses the vehicle's speed-sensitive max steer.
-  const lateral = vehicle.center.x - (frame.x + drift);
+  lateral += drift;
   const desiredHeading = clamp(
     frame.heading - lateral * c.centeringGain,
     frame.heading - c.maxAutoHeading,

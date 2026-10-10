@@ -79,7 +79,7 @@ export function createClouds(scene) {
       for (let dx = -RADIUS; dx <= RADIUS; dx++) {
         const gx = cellX + dx;
         const gz = cellZ + dz;
-        if (hash(gx, gz) < 0.76) continue;
+        if (hash(gx, gz) < 0.73) continue;
 
         const cloudX = (gx + 0.5 + (hash(gx, gz, 1) - 0.5) * 0.56) * CELL - driftX;
         const cloudZ = (gz + 0.5 + (hash(gx, gz, 2) - 0.5) * 0.56) * CELL - driftZ;

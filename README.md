@@ -23,3 +23,14 @@ is uploaded by the workflow; it does not need to be committed.
 
 The Vite build uses relative asset paths, so it works both at the repository's
 GitHub Pages URL and on a custom domain.
+
+## Story
+
+The story the player types lives in `story/short.md` and `story/long.md`. After editing them run:
+
+```sh
+npm run story
+```
+
+This regenerates `src/game/storyText.js` (committed, so a plain `npm run dev` does not need it). In the city, press **1** for the
+short story or **2** for the long one before driving onto the highway.

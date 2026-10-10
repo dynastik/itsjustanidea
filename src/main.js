@@ -15,8 +15,9 @@ import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
 import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
-import { getStoryTime } from './game/story.js';
-import { CLOCK_MODE, DAY_CYCLE_SECONDS, wrapTime } from './game/daycycle.js';
+import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
+import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
+import { createSigns } from './game/signs.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
 import { createEnding } from './ui/ending.js';
@@ -38,6 +39,7 @@ async function main() {
   const props = createProps(scene, physics, RAPIER);
   const trees = await createTrees(scene, physics, RAPIER);
   const city = createCity(scene, physics, RAPIER);
+  const signs = createSigns(scene);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
   // Manual forward-facing headlights. They are attached to the van, and the player toggles them with F5.
@@ -100,12 +102,15 @@ async function main() {
     window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
   }
 
+  function advanceClock(frac) { let t=state.worldTime+frac; if(t>=1){state.dayIndex=(state.dayIndex||0)+Math.floor(t);t%=1;} state.worldTime=t; }
+
   // Full restart: back to the city on a bright morning with the story rewound. Also what the ending calls.
   function fullReset() {
     spawn();
     beginTypingSession({ restartStory: true });
     input.clearHeld();
     state.worldTime = 0;
+    state.dayIndex = 0;
     state.headlightsOn = false;
     lastStoryTarget = null;
     storySignCount = 0;
@@ -137,10 +142,8 @@ async function main() {
       state.zoneAuto = false; // otherwise the zone logic flips you straight back
       setMode(state.mode === 'city' ? 'highway' : 'city');
     } : undefined,
-    // Dev-only: F6 jumps to the next act of the story (or, in free clock mode, 1/8 of a day forward).
-    skipTime: import.meta.env.DEV
-      ? () => { if (CLOCK_MODE === 'story') skipActDev(); else state.worldTime = wrapTime(state.worldTime + 0.125); }
-      : undefined,
+    setStoryMode: (mode) => { if (state.highwayEnteredAt !== -Infinity || getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
+    skipTime: import.meta.env.DEV ? () => { if (getStoryMode() === 'short') skipActDev(); else advanceClock(0.125); } : undefined,
     reset: fullReset,
   });
 
@@ -160,13 +163,8 @@ async function main() {
     if (state.paused) dt = 0; // everything below is dt-driven, so this freezes the sim
 
     state.time += dt;
-    if (CLOCK_MODE === 'story') {
-      // the sky follows how far through the story you have typed (eased, so a finished paragraph never snaps it)
-      const target = getStoryTime(state.typing.buffer.length);
-      state.worldTime += (target - state.worldTime) * (1 - Math.exp(-dt / 3));
-    } else {
-      state.worldTime = wrapTime(state.worldTime + dt / DAY_CYCLE_SECONDS); // free-running loop
-    }
+    if (getStoryMode() === 'short') { const target=getStoryTime(state.typing.buffer.length); state.worldTime+=(target-state.worldTime)*(1-Math.exp(-dt/3)); }
+    else if(state.mode==='highway'&&!state.storyDone) advanceClock(dt/LONG_DAY_SECONDS);
     updateZoneMode();
     director.update(vehicle.center.z);
     if (state.storyDone && !ending.active) {
@@ -189,7 +187,9 @@ async function main() {
       }
       lastStoryTarget = storyTarget;
     }
-    trees.update(vehicle.center.z);
+    const act=getAct(), wrongWorld=act==='wrong'||act==='horror'||act==='finale';
+    trees.update(vehicle.center.z,wrongWorld?1+Math.floor(state.time/12):0);
+    signs.update(vehicle.center.z,act,dayFactors(state.worldTime).night);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);

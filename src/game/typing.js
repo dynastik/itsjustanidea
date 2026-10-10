@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { pickPrompt, resetStory, skipToNextAct } from './story.js';
+import { pickPrompt, resetStory, skipToNextAct, isCaseInsensitive } from './story.js';
 
 // Highway tuning lives here so typing feel is tweaked in one place.
 export const HIGHWAY_CONFIG = {
@@ -87,14 +87,15 @@ export function handleTypingKey(key) {
   if (sessionStart === null) sessionStart = state.time;
 
   const expected = t.target[t.buffer.length];
-  const ok = key === expected;
+  const insensitive = isCaseInsensitive(t.source);
+  const ok = insensitive ? key.toLowerCase() === expected.toLowerCase() : key === expected;
   keystrokes.push(ok);
   if (keystrokes.length > ACCURACY_WINDOW) keystrokes.shift();
   keyLog.push({ t: state.time, key, expected, ok });
   if (keyLog.length > KEYLOG_MAX) keyLog.shift();
 
   if (ok) {
-    t.buffer += key;
+    t.buffer += insensitive ? expected : key;
     charTimes.push(state.time);
     wrongStreak = 0;
   } else {
