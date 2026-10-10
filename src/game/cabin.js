@@ -106,8 +106,24 @@ export function createCabInterior(vehicle) {
     spin.add(new THREE.Mesh(new THREE.TubeGeometry(wheelCurve, 64, 0.022, 10, true), M.trim));
 
     // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
-    const hub = box(0.115, 0.09, 0.035, M.panel, 0, 0, 0);
-    spin.add(hub);
+    // Rounded rectangular horn pad, with genuinely softened corners rather than a sharp box.
+    const hubShape = new THREE.Shape();
+    const hw = 0.073, hh = 0.052, hr = 0.025;
+    hubShape.moveTo(-hw + hr, -hh);
+    hubShape.lineTo(hw - hr, -hh);
+    hubShape.quadraticCurveTo(hw, -hh, hw, -hh + hr);
+    hubShape.lineTo(hw, hh - hr);
+    hubShape.quadraticCurveTo(hw, hh, hw - hr, hh);
+    hubShape.lineTo(-hw + hr, hh);
+    hubShape.quadraticCurveTo(-hw, hh, -hw, hh - hr);
+    hubShape.lineTo(-hw, -hh + hr);
+    hubShape.quadraticCurveTo(-hw, -hh, -hw + hr, -hh);
+    const hubGeometry = new THREE.ExtrudeGeometry(hubShape, {
+      depth: 0.025, bevelEnabled: true, bevelSegments: 2,
+      steps: 1, bevelSize: 0.006, bevelThickness: 0.004, curveSegments: 6,
+    });
+    hubGeometry.translate(0, 0, -0.012);
+    spin.add(new THREE.Mesh(hubGeometry, M.panel));
     const armMat = M.trim;
     const arm = (x1, y1, x2, y2, width = 0.025) => {
       const dx = x2 - x1, dy = y2 - y1;
@@ -126,11 +142,11 @@ export function createCabInterior(vehicle) {
     column.position.set(0, -0.34, 0.6);
     add(column);
 
-    // Keep the driver seat aligned with the existing steering wheel (x=0).
-    // Place the passenger seat farther across the cabin instead of deriving both from the eye origin.
+    // Driver seat stays aligned with the wheel. Passenger seat sits across the cabin,
+    // leaving a narrow, realistic gap for the console rather than crowding both seats together.
     const seatWidth = 0.56;
     const driverSeatX = 0;
-    const passengerSeatX = xR + 0.34;
+    const passengerSeatX = Math.min(xL - seatWidth / 2, 0.82);
     const seatCenters = [driverSeatX, passengerSeatX];
     for (const sx of seatCenters) {
       add(box(seatWidth, 0.13, 0.54, M.seat, sx, -0.74, -0.2));
@@ -139,21 +155,21 @@ export function createCabInterior(vehicle) {
       add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
-    // Full-length center console sits between the seat centers, not under the steering wheel.
+    // Full-length center tunnel, offset between the seats and blending into the lower dash.
     const consoleX = (driverSeatX + passengerSeatX) / 2;
-    const consoleFrontZ = zDash - 0.02;
+    const consoleFrontZ = zDash - 0.04;
     const consoleBackZ = zBack + 0.06;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
     const consoleWidth = 0.2;
-    add(box(consoleWidth, 0.14, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
+    add(box(consoleWidth, 0.16, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
 
-    // Raised front transition connects the console to the dashboard.
-    const consoleBridge = add(box(consoleWidth + 0.04, 0.12, 0.3, M.panel, consoleX, -0.59, consoleFrontZ - 0.12));
-    consoleBridge.rotation.x = -0.22;
-    add(box(consoleWidth - 0.025, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.575, consoleCenterZ - 0.035));
+    // Broaden and raise the front of the tunnel so it visibly joins the dashboard.
+    const consoleBridge = add(box(consoleWidth + 0.1, 0.17, 0.34, M.panel, consoleX, -0.585, consoleFrontZ - 0.13));
+    consoleBridge.rotation.x = -0.2;
+    add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
-    // Gear selector at the forward end of the console.
+    // Simple gear selector near the front, with no screens or decorative accessories.
     const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
     shifterStem.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
     shifterStem.rotation.x = -0.18;
