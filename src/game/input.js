@@ -56,6 +56,13 @@ export function createInput(actions) {
       return;
     }
 
+    // Arrow keys are safe in both modes: unlike E/Q they never steal letters from the typing game.
+    if (key === 'arrowup' || key === 'arrowdown') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) (key === 'arrowup' ? actions.shiftUp : actions.shiftDown)?.();
+      return;
+    }
+
     if (key in hotkeys) {
       e.preventDefault();
       if (key === KEYS.cabView) clearHeld();
@@ -93,10 +100,7 @@ export function createInput(actions) {
       d.throttle = 0;
       d.brake = 0;
       if (held.w) d.throttle = 1;
-      else if (held.s) {
-        if (speed > 0.3) d.brake = 1;
-        else d.throttle = -1;
-      }
+      if (held.s) d.brake = 1;
       d.speedCap = CITY_SPEED_CAP;
     },
   };

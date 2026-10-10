@@ -145,6 +145,8 @@ async function main() {
     setStoryMode: (mode) => { if (state.highwayEnteredAt !== -Infinity || getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
     skipTime: import.meta.env.DEV ? () => { if (getStoryMode() === 'short') skipActDev(); else advanceClock(0.125); } : undefined,
     reset: fullReset,
+    shiftUp: () => vehicle.shiftUp(),
+    shiftDown: () => vehicle.shiftDown(),
   });
 
   function updateZoneMode() {
@@ -208,6 +210,11 @@ async function main() {
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
+    const transmission = vehicle.transmission;
+    state.transmission = transmission;
+    driveInput.gear = transmission.gear;
+    driveInput.rpm = transmission.rpm;
+    driveInput.clutch = transmission.clutch;
     cabin.update(dt, vehicle, driveInput);
 
     // impact detection: a big one-frame speed loss that wasn't braking
@@ -220,6 +227,9 @@ async function main() {
     audio.update(dt, {
       speed: vehicle.speed,
       throttle: driveInput.throttle,
+      gear: transmission.gear,
+      rpm: transmission.rpm,
+      clutch: transmission.clutch,
       offRoad: surface.offRoad,
       paused: state.paused,
     });
