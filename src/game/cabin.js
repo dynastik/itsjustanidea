@@ -162,7 +162,7 @@ export function createCabInterior(vehicle) {
     const pedalZ = zDash - 0.48;
     const pedalY = -0.70;
     const pedalXs = [-0.25, -0.14, -0.03]; // clutch, brake, accelerator
-    const pedalTilt = 0.32;
+    const pedalTilt = 0.55;
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
       const pedalGroup = add(new THREE.Group());
