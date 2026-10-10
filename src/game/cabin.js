@@ -175,10 +175,10 @@ export function createCabInterior(vehicle) {
     const bridgeBackZ = consoleFrontZ - 0.08;
     const bridgeSections = [
       { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.70, top: -0.55 },
-      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.695, top: -0.544 },
-      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.685, top: -0.523 },
-      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.675, top: -0.502 },
-      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.665, top: -0.48 },
+      { z: consoleFrontZ + 0.04, half: consoleWidth / 2 + 0.035, bottom: -0.695, top: -0.547 },
+      { z: consoleFrontZ + 0.18, half: consoleWidth / 2 + 0.09, bottom: -0.685, top: -0.538 },
+      { z: consoleFrontZ + 0.32, half: consoleWidth / 2 + 0.14, bottom: -0.675, top: -0.529 },
+      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.17, bottom: -0.665, top: -0.52 },
     ];
     const bridgeVertices = [];
     const bridgeFaces = [];
