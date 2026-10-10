@@ -157,22 +157,25 @@ export function createCabInterior(vehicle) {
       add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
-    // Three foot pedals tucked under the dashboard, close to the steering wheel
-    // rather than disappearing toward the rear of the footwell.
-    const pedalZ = zDash - 0.10;
-    const pedalY = -0.805;
+    // Three pedals mounted high and forward under the dash, angled down toward
+    // the driver's feet. Their ribbed faces point rearward at the driver (+z).
+    const pedalZ = zDash + 0.015;
+    const pedalY = -0.69;
     const pedalXs = [-0.135, -0.025, 0.085]; // clutch, brake, accelerator
+    const pedalTilt = -0.32;
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
-      // Short angled support arm, with a dark rubber-faced pedal pad.
-      const support = add(box(0.025, 0.13, 0.025, M.trim, px, -0.69, pedalZ - 0.045));
-      support.rotation.x = -0.22;
-      const pad = add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.035, M.dark, px, pedalY, pedalZ));
-      pad.rotation.x = -0.18;
-      // Small raised rubber ribs make each pad read as a pedal instead of a plain block.
+      const pedalGroup = add(new THREE.Group());
+      pedalGroup.position.set(px, pedalY, pedalZ);
+      pedalGroup.rotation.x = pedalTilt;
+      // Support reaches forward/up under the dash; pad and ribs share one transform
+      // so the textured face is consistently on the driver's side of the pedal.
+      const support = box(0.025, 0.13, 0.025, M.trim, 0, -0.075, -0.045);
+      support.rotation.x = 0.18;
+      pedalGroup.add(support);
+      pedalGroup.add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.025, M.dark, 0, -0.13, 0.012));
       for (const ribY of [-0.035, 0, 0.035]) {
-        const rib = add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, px, pedalY + ribY, pedalZ + 0.020));
-        rib.rotation.x = -0.18;
+        pedalGroup.add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, 0, -0.13 + ribY, 0.029));
       }
     }
 
