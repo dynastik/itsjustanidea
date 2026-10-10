@@ -595,7 +595,8 @@ export function createVehicle(scene, physics, RAPIER) {
     } else limiterPhase = 0;
 
     if (gearName !== 'N' && t > 0) F += direction * (gearName === 'R' ? h.reverseForce : h.engineForce) * torque * t * clamp(1 - speedInGear / cap, 0, 1);
-    if (input.brake > 0) F -= h.brakeForce * input.brake * moving;
+    // Service brakes are deliberately weaker so downshifting and engine braking matter, while emergency braking still works.
+    if (input.brake > 0) F -= h.brakeForce * 0.58 * input.brake * moving;
     if (t <= 0.04 && input.brake === 0) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
