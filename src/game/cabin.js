@@ -157,6 +157,25 @@ export function createCabInterior(vehicle) {
       add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
+    // Three foot pedals tucked under the dashboard, close to the steering wheel
+    // rather than disappearing toward the rear of the footwell.
+    const pedalZ = zDash - 0.10;
+    const pedalY = -0.805;
+    const pedalXs = [-0.135, -0.025, 0.085]; // clutch, brake, accelerator
+    for (let i = 0; i < pedalXs.length; i++) {
+      const px = pedalXs[i];
+      // Short angled support arm, with a dark rubber-faced pedal pad.
+      const support = add(box(0.025, 0.13, 0.025, M.trim, px, -0.69, pedalZ - 0.045));
+      support.rotation.x = -0.22;
+      const pad = add(box(i === 1 ? 0.085 : 0.072, 0.12, 0.035, M.dark, px, pedalY, pedalZ));
+      pad.rotation.x = -0.18;
+      // Small raised rubber ribs make each pad read as a pedal instead of a plain block.
+      for (const ribY of [-0.035, 0, 0.035]) {
+        const rib = add(box(i === 1 ? 0.062 : 0.052, 0.008, 0.006, M.trim, px, pedalY + ribY, pedalZ + 0.020));
+        rib.rotation.x = -0.18;
+      }
+    }
+
     // Full-length center tunnel, offset between the seats and blending into the lower dash.
     const consoleX = cabinCenterX;
     // Dash spans roughly zDash - 0.5 to zDash. Join at its rear edge so the console
