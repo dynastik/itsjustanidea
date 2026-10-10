@@ -300,7 +300,7 @@ export function createVehicle(scene, physics, RAPIER) {
   const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.72, 0.69];
   // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
-  const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 0.64, 0.40];
+  const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 0.90, 0.40];
 
   function engineTorqueAtRpm(rpm) {
     // Broad diesel-ish van curve: weak below the useful band, strongest in the midrange,
@@ -343,6 +343,11 @@ export function createVehicle(scene, physics, RAPIER) {
     const currentCap = GEAR_CAPS[gearIndex] * 3.6;
     const nearTop = gearIndex >= 2 && gearIndex < 6 && kmh >= currentCap * 0.72;
     let target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 52 ? 4 : kmh < 72 ? 5 : 6;
+
+    // Add hysteresis around the 3rd/4th boundary so repeated Shift presses don't
+    // bounce between gears when speed hovers around 52 km/h.
+    if (gearIndex === 5 && kmh >= 47 && kmh < 72) target = 5;
+    if (gearIndex === 4 && kmh > 57 && kmh < 72) target = 5;
 
     // If we're already in the speed-appropriate gear but near its ceiling, the next
     // Shift press upshifts. This lets 3rd -> 4th happen around 43 km/h rather than
