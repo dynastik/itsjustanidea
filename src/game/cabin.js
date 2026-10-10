@@ -309,30 +309,26 @@ export function createCabInterior(vehicle) {
     boot.position.set(consoleX, -0.514, gateZ);
     add(boot);
 
-    // Alignment references: glowing top, middle, and bottom markers remain visible in F2.
-    // They are separate named meshes so the camera can isolate them with the boot.
-    const alignmentMarkers = [
-      { name: 'shift-marker-top', y: -0.468, color: 0x35aaff },
-      { name: 'shift-marker-mid', y: -0.512, color: 0xff3434 },
-      { name: 'shift-marker-bottom', y: -0.556, color: 0xf2f2f2 },
-    ];
-    for (const marker of alignmentMarkers) {
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: marker.color,
-        emissive: marker.color,
-        emissiveIntensity: 1.8,
-        toneMapped: false,
-      });
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), glowMaterial);
-      glow.name = marker.name;
-      glow.position.set(consoleX, marker.y, gateZ);
-      add(glow);
-    }
-
-    // Keep only the smooth shift boot and its three glowing references visible for F2.
-    // A hidden pivot group preserves the existing gear travel calculations.
+    // Visible manual shifter. The pivot is at the base so the shaft and knob
+    // lean together through the H-pattern while the boot flexes around the base.
     const shifter = add(new THREE.Group());
+    shifter.name = 'manual-shifter-pivot';
     shifter.position.set(consoleX, -0.49, gateZ);
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.011, 0.145, 10),
+      mat(0x777b80, { metalness: 0.72, roughness: 0.3 }),
+    );
+    shaft.name = 'shift-lever-shaft';
+    shaft.position.y = 0.073;
+    shifter.add(shaft);
+    const knob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.027, 16, 12),
+      mat(0x171719, { roughness: 0.42 }),
+    );
+    knob.name = 'shift-knob';
+    knob.scale.set(1, 0.92, 0.92);
+    knob.position.y = 0.15;
+    shifter.add(knob);
     parts.shifter = shifter;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
