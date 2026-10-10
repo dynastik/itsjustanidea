@@ -44,7 +44,7 @@ export const VEHICLE_CONFIG = {
     engineForce: 16000,
     brakeForce: 22000,
     reverseForce: 7000,
-    coastForce: 0,
+    coastForce: 0.15,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
@@ -639,7 +639,7 @@ export function createVehicle(scene, physics, RAPIER) {
       F -= h.coastForce * moving;
       // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
       if (gearName !== 'N' && Math.abs(v) > 0.5) {
-        const gearBrake = [0.0002, 0, 0.0003, 0.0002, 0.00015, 0.0001, 0.00005][gearIndex];
+        const gearBrake = [0.004, 0, 0.012, 0.008, 0.005, 0.003, 0.0015][gearIndex];
         F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
       }
     }
