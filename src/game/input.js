@@ -75,7 +75,8 @@ export function createInput(actions) {
 
     if (key in hotkeys) {
       e.preventDefault();
-      if (key === KEYS.cabView) clearHeld();
+      // Don't carry a held accelerator into debug mode (or back out of it).
+      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
       if (!e.repeat) hotkeys[key]();
       return;
     }
