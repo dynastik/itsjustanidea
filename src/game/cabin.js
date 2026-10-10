@@ -199,12 +199,28 @@ export function createCabInterior(vehicle) {
     const last = (bridgeSections.length - 1) * 4;
     bridgeFaces.push(0, 1, 3, 0, 3, 2);
     bridgeFaces.push(last, last + 2, last + 3, last, last + 3, last + 1);
+    // Use flat face normals and one constant material. Shared smooth normals made
+    // the flare catch light as a false-looking color gradient; only its geometry
+    // should taper, not its apparent color.
+    const bridgePositions = [];
+    for (let i = 0; i < bridgeFaces.length; i += 3) {
+      for (let j = 0; j < 3; j++) {
+        const vertex = bridgeFaces[i + j] * 3;
+        bridgePositions.push(
+          bridgeVertices[vertex],
+          bridgeVertices[vertex + 1],
+          bridgeVertices[vertex + 2],
+        );
+      }
+    }
     const bridgeGeometry = new THREE.BufferGeometry();
-    bridgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bridgeVertices, 3));
-    bridgeGeometry.setIndex(bridgeFaces);
+    bridgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bridgePositions, 3));
     bridgeGeometry.computeVertexNormals();
     const bridgeMaterial = M.panel.clone();
+    bridgeMaterial.color.set(0x33363d);
+    bridgeMaterial.flatShading = true;
     bridgeMaterial.side = THREE.DoubleSide;
+    bridgeMaterial.needsUpdate = true;
     const consoleBridge = add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
