@@ -324,7 +324,7 @@ export function createVehicle(scene, physics, RAPIER) {
   }
   let gearIndex = 2;
   let shiftTimer = 0;
-  let shiftDuration = 0.34;
+  let shiftDuration = 0.38;
   let throttleOffTimer = 0;
   let downshiftHoldTimer = 0;
   let coastClutch = 1;
@@ -342,7 +342,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const nextName = GEAR_NAMES[next];
     if (nextName === 'R' && Math.abs(self.speed) > 1.1) return false;
     const speed = Math.abs(self.speed);
-    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.34;
+    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.38;
     if (direction < 0 && next >= 2) {
       downshiftHoldTimer = 1.6;
       const nextSpeed = self.speed * (GEAR_NAMES[next] === 'R' ? -1 : 1);
@@ -384,7 +384,7 @@ export function createVehicle(scene, physics, RAPIER) {
     if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
     if (direction < 0 && target >= 2) downshiftHoldTimer = 1.6;
     gearIndex = target;
-    shiftDuration = 0.34;
+    shiftDuration = 0.38;
     if (direction < 0 && target >= 2) {
       const nextSpeed = self.speed * (GEAR_NAMES[target] === 'R' ? -1 : 1);
       const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[target] / GEAR_RATIOS[2]) * 750;
@@ -403,7 +403,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const speedInGear = self.speed * (gearName === 'R' ? -1 : 1);
     const lugging = gearIndex >= 3 && speedInGear < GEAR_MIN_SPEED[gearIndex] * 0.78;
     return { gear: gearName, rpm: Math.round(engineRpm),
-      clutch: Math.max(shiftTimer > 0 ? clamp(shiftTimer / shiftDuration, 0, 1) : 0, 1 - coastClutch),
+      clutch: Math.max(shiftTimer > 0 ? 1 : 0, 1 - coastClutch),
       shift: shiftCueTimer > 0 ? shiftCue : '', lugging,
       overRev: engineRpm >= 4800, auto: false };
   }
