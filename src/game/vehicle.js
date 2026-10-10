@@ -293,11 +293,11 @@ export function createVehicle(scene, physics, RAPIER) {
 
   // Conservative van gearbox. Speeds are m/s; forward ceilings roughly follow 20/40/60/80/100 km/h.
   const GEAR_NAMES = ['R', 'N', '1', '2', '3', '4', '5'];
-  const GEAR_CAPS = [3.0, 0, 5.6, 11.1, 16.7, 22.2, 27.8];
-  const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 21.0];
+  const GEAR_CAPS = [3.0, 0, 5.6, 11.1, 16.7, 22.2, 30.0];
+  const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 22.0];
   // Relative gearbox ratios. Road speed multiplied by the selected ratio drives engine RPM:
   // lower gears rev higher at the same road speed; top gear cruises at lower RPM.
-  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.69];
+  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.58];
   // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
   const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 3.0, 0.40];
@@ -367,7 +367,7 @@ export function createVehicle(scene, physics, RAPIER) {
 
   function transmission() {
     return { gear: GEAR_NAMES[gearIndex], rpm: Math.round(engineRpm),
-      clutch: shiftTimer > 0 ? clamp(shiftTimer / 0.38, 0, 1) : 0, auto: false };
+      clutch: shiftTimer > 0 ? clamp(shiftTimer / 0.38, 0, 1) : 0, auto: state.mode === 'highway' };
   }
 
   const self = {
@@ -535,6 +535,18 @@ export function createVehicle(scene, physics, RAPIER) {
     // S at a standstill selects reverse; pressing W again returns to first gear.
     if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
     else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
+
+    // Highway transmission is fully automatic; city driving keeps the manual Shift control.
+    // Separate up/down thresholds provide hysteresis so the gearbox doesn't hunt at boundaries.
+    if (state.mode === 'highway' && gearIndex >= 2 && shiftTimer <= 0) {
+      const speed = Math.abs(v);
+      if (gearIndex < GEAR_NAMES.length - 1 && speed >= GEAR_CAPS[gearIndex] * 0.80 && speed >= GEAR_MIN_SPEED[gearIndex + 1] * 0.78) {
+        shiftGear(1, true);
+      } else if (gearIndex > 2 && speed < GEAR_MIN_SPEED[gearIndex] * 0.72) {
+        shiftGear(-1, true);
+      }
+    }
+
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
     const gearCap = GEAR_CAPS[gearIndex] || 0.1;
