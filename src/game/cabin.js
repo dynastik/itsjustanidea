@@ -145,9 +145,9 @@ export function createCabInterior(vehicle) {
     // Driver seat stays aligned with the wheel. Passenger seat sits across the cabin,
     // leaving a narrow, realistic gap for the console rather than crowding both seats together.
     const seatWidth = 0.56;
-    const driverSeatX = 0;
-    const passengerSeatX = Math.min(xL - seatWidth / 2, 0.82);
-    const seatCenters = [driverSeatX, passengerSeatX];
+    const cabinCenterX = xC;
+    const seatOffset = (0.2 + seatWidth / 2 + 0.035);
+    const seatCenters = [cabinCenterX - seatOffset, cabinCenterX + seatOffset];
     for (const sx of seatCenters) {
       add(box(seatWidth, 0.13, 0.54, M.seat, sx, -0.74, -0.2));
       const back = add(box(seatWidth, 0.64, 0.14, M.seat, sx, -0.45, -0.5));
@@ -156,7 +156,7 @@ export function createCabInterior(vehicle) {
     }
 
     // Full-length center tunnel, offset between the seats and blending into the lower dash.
-    const consoleX = (driverSeatX + passengerSeatX) / 2;
+    const consoleX = cabinCenterX;
     const consoleFrontZ = zDash - 0.04;
     const consoleBackZ = zBack + 0.06;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
