@@ -275,18 +275,18 @@ export function createCabInterior(vehicle) {
     bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
-    // Recessed three-lane H gate on the console. The dark channel is continuous
-    // through the crossbar, with slim metallic edges to make it read as a real slot.
+    // True H-pattern gate: three straight parallel lanes joined only by a
+    // single horizontal cross-slot at the centre, not an X-shaped crossing.
     const gateZ = consoleFrontZ - 0.36;
-    add(box(0.18, 0.012, 0.17, M.gauge, consoleX, -0.571, gateZ));
+    add(box(0.18, 0.012, 0.17, M.panel, consoleX, -0.571, gateZ));
     const gateRailMat = mat(0x858a91, { metalness: 0.65, roughness: 0.38 });
     const gateSurfaceY = -0.562;
-    // Three parallel channels and their centre cross-connection form the H.
+    // The dark inset channels read as one connected H cut into the console plate.
     for (const laneX of [-0.05, 0, 0.05]) {
-      add(box(0.016, 0.003, 0.132, M.trim, consoleX + laneX, gateSurfaceY, gateZ));
+      add(box(0.012, 0.003, 0.132, M.gauge, consoleX + laneX, gateSurfaceY, gateZ));
     }
-    add(box(0.116, 0.003, 0.016, M.trim, consoleX, gateSurfaceY, gateZ));
-    // Raised fine rails define the lanes without closing off the connecting slot.
+    add(box(0.116, 0.003, 0.012, M.gauge, consoleX, gateSurfaceY, gateZ));
+    // Four slim rails keep the three lanes parallel; the cross-slot remains open.
     for (const railX of [-0.075, -0.025, 0.025, 0.075]) {
       add(box(0.0035, 0.004, 0.14, gateRailMat, consoleX + railX, -0.558, gateZ));
     }
