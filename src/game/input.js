@@ -56,6 +56,23 @@ export function createInput(actions) {
       return;
     }
 
+    if (state.mode === 'city' && key === 'shift') {
+      e.preventDefault();
+      if (!e.repeat) actions.toggleAutoShift?.();
+      return;
+    }
+    if (state.mode === 'city' && (key === 'q' || key === 'e')) {
+      e.preventDefault();
+      if (!e.repeat) (key === 'q' ? actions.shiftDown : actions.shiftUp)?.();
+      return;
+    }
+    // Arrow keys are safe in the typing section because they never consume story letters.
+    if (key === 'arrowup' || key === 'arrowdown') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) (key === 'arrowup' ? actions.shiftUp : actions.shiftDown)?.();
+      return;
+    }
+
     if (key in hotkeys) {
       e.preventDefault();
       if (key === KEYS.cabView) clearHeld();
