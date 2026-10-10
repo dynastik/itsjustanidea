@@ -302,13 +302,15 @@ export function createVehicle(scene, physics, RAPIER) {
   // this curve keeps the existing handling force scale stable while giving taller gears less pull.
   const GEAR_FORCE = [0.42, 0, 1.0, 0.84, 0.72, 0.62, 0.55];
 
+  const ENGINE_TORQUE_CURVE = [
+    [750, 0.48], [950, 0.66], [1250, 0.88], [1550, 1.0],
+    [2400, 0.98], [3200, 0.91], [4000, 0.78], [4600, 0.59], [5000, 0.38], [5300, 0.30],
+  ];
+
   function engineTorqueAtRpm(rpm) {
     // Diesel-ish torque curve: builds from idle, peaks in the useful low-mid range,
     // holds briefly, then falls away as the engine approaches the limiter.
-    const points = [
-      [750, 0.48], [950, 0.66], [1250, 0.88], [1550, 1.0],
-      [2400, 0.98], [3200, 0.91], [4000, 0.78], [4600, 0.59], [5000, 0.38], [5300, 0.30],
-    ];
+    const points = ENGINE_TORQUE_CURVE;
     if (rpm <= points[0][0]) return points[0][1];
     for (let i = 1; i < points.length; i++) {
       const [r1, t1] = points[i - 1];
