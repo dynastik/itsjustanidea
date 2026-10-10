@@ -13,8 +13,8 @@ import { createVehicle, FIXED_DT } from './game/vehicle.js';
 import { createCameraRig } from './game/camera.js';
 import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
-import { createInput, createDriveInput, writeHighwayInput } from './game/input.js';
-import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
+import { createInput, createDriveInput } from './game/input.js';
+import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev, advancePromptAutomatically } from './game/typing.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
 import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
 import { createSigns } from './game/signs.js';
@@ -77,6 +77,8 @@ async function main() {
   let prevSpeed = 0;
   let lastStoryTarget = null;
   let storySignCount = 0;
+  let autoPromptTarget = null;
+  let autoPromptTimer = 0;
   const treeLightDirection = new THREE.Vector3();
 
   // Spawn on the road, pointing along it.
@@ -130,6 +132,10 @@ async function main() {
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    smartShift: () => vehicle.smartShift(),
+    shiftUp: () => vehicle.shiftUp(),
+    shiftDown: () => vehicle.shiftDown(),
+    toggleAutoShift: () => vehicle.toggleAutoShift(),
     toggleHeadlights,
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
@@ -193,7 +199,22 @@ async function main() {
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
     if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
-    else writeHighwayInput(driveInput, vehicle, world);
+    else input.writeHighway(driveInput, vehicle, world);
+
+    // Story captions advance at a relaxed reading pace; no typing is required on the highway.
+    if (state.mode === 'highway' && !state.storyDone) {
+      if (state.typing.target !== autoPromptTarget) {
+        autoPromptTarget = state.typing.target;
+        autoPromptTimer = 0;
+      }
+      autoPromptTimer += dt;
+      const readDuration = Math.max(4, Math.min(16, state.typing.target.length / 18));
+      if (state.typing.target && autoPromptTimer >= readDuration) {
+        advancePromptAutomatically();
+        autoPromptTarget = null;
+        autoPromptTimer = 0;
+      }
+    }
 
     // fixed-timestep physics, render pose interpolated between steps
     accumulator += dt;
@@ -208,6 +229,7 @@ async function main() {
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0; // don't spiral after a hitch
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
+    state.transmission = vehicle.transmission;
     cabin.update(dt, vehicle, driveInput);
 
     // impact detection: a big one-frame speed loss that wasn't braking
@@ -222,6 +244,7 @@ async function main() {
       throttle: driveInput.throttle,
       offRoad: surface.offRoad,
       paused: state.paused,
+      ...vehicle.transmission,
     });
 
     city.update(state.worldTime);

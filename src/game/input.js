@@ -1,8 +1,7 @@
 import { state } from './state.js';
-import { HIGHWAY_CONFIG, getWpm, getAccuracy, getInstability, getWheelJerk } from './typing.js';
-import { HANDOFF_SPEED_S } from './zones.js';
+import { HIGHWAY_CONFIG } from './typing.js';
 
-// Non-printable keys on purpose: the highway types letters, capitals, spaces and punctuation.
+// Driving controls are shared; highway steering is automated.
 export const KEYS = {
   debug: '`',
   devModeSwitch: 'tab',
@@ -15,10 +14,11 @@ export const KEYS = {
   pause: 'escape',
 };
 
-const CITY_SPEED_CAP = 16;
+// Match the vehicle's 30 m/s max; per-gear caps still apply.
+const CITY_SPEED_CAP = 30;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-// The ONE object the vehicle reads. City fills it from WASD, highway from typing.
+// The ONE object the vehicle reads. City uses WASD steering; highway follows the road automatically.
 // Phase 5 horror injects wheel pull / brake lag by modifying it before vehicle.step().
 // steer: -1 (right) .. +1 (left) | throttle: -1 (reverse) .. 1 | brake: 0..1
 export function createDriveInput() {
@@ -56,24 +56,35 @@ export function createInput(actions) {
       return;
     }
 
+    // Q/E shift down/up in both zones; Shift quick-selects a speed-appropriate gear.
+    if (key === 'q' || key === 'e') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) {
+        if (key === 'q') actions.shiftDown?.();
+        else actions.shiftUp?.();
+      }
+      return;
+    }
+
+    // Shift quick-selects a gear in either zone.
+    if (key === 'shift') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) actions.smartShift?.();
+      return;
+    }
+
     if (key in hotkeys) {
       e.preventDefault();
-      if (key === KEYS.cabView) clearHeld();
+      // Don't carry a held accelerator into debug mode (or back out of it).
+      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
       if (!e.repeat) hotkeys[key]();
       return;
     }
 
     if (e.repeat || state.paused) return;
 
-    if (state.mode === 'city') {
-      if (key in held) held[key] = true;
-    } else if (e.key === 'Backspace') {
-      e.preventDefault();
-      actions.typeBackspace?.();
-    } else if (e.key.length === 1) {
-      e.preventDefault(); // stops ' and / opening Firefox quick-find, space scrolling, etc.
-      actions.typeKey(e.key); // literal char: capitals, spaces and punctuation all count now
-    }
+    // W/S drive in both zones. A/D only affect city steering; highway steering is automatic.
+    if (key in held) held[key] = true;
   });
 
   window.addEventListener('keyup', (e) => {
@@ -88,15 +99,13 @@ export function createInput(actions) {
 
   return {
     clearHeld,
+    writeHighway(d, vehicle, road) { writeHighwayInput(d, vehicle, road, held); },
     writeCity(d, speed) {
       d.steer = (held.a ? 1 : 0) - (held.d ? 1 : 0);
       d.throttle = 0;
       d.brake = 0;
       if (held.w) d.throttle = 1;
-      else if (held.s) {
-        if (speed > 0.3) d.brake = 1;
-        else d.throttle = -1;
-      }
+      else if (held.s) d.brake = 1;
       d.speedCap = CITY_SPEED_CAP;
     },
   };
@@ -105,17 +114,14 @@ export function createInput(actions) {
 // Highway: hands-off. Lane-follow steering + throttle chasing a WPM x accuracy target speed.
 // Speed model: WPM sustains speed (and holds it up hills), accuracy buys stability. Wrong keys yank the
 // wheel, sloppy typing makes the lane wander. The first seconds are forgiving (see learnerRampS).
-export function writeHighwayInput(d, vehicle, road = null) {
+export function writeHighwayInput(d, vehicle, road = null, held = {}) {
   const c = HIGHWAY_CONFIG;
-  const wpmFactor = clamp(getWpm() / c.wpmForMaxSpeed, 0, 1);
-  const sinceEntry = state.time - state.highwayEnteredAt;
-  const learn = 1 - clamp(sinceEntry / c.learnerRampS, 0, 1); // 1 on arrival -> 0 once settled in
   const z = vehicle.center.z;
-  // ramp -> deck -> hill arc follow drivePath; once the road is z-indexed again (ground highway) follow getRoadFrame(z)
+  // Follow the sampled ramp path, then the road's regular frame beyond the ramp.
   const usePath = !!road?.drivePath?.length && z < (road.groundStartZ ?? Infinity);
   let frame = road?.getRoadFrame(z) ?? { x: 0, heading: 0, y: 0 };
   let lateral;
-  let curvature = 0; // heading change per metre of road (feed-forward so bends do not need a lateral error to be followed)
+  let curvature = 0;
   if (usePath) {
     const path = road.drivePath;
     let nearest = 0, best = Infinity;
@@ -137,41 +143,18 @@ export function writeHighwayInput(d, vehicle, road = null) {
   }
   curvature = clamp(curvature, -0.05, 0.05);
 
-  // Uphill = engine strain: people who are not typing lose speed on climbs, fast typists hold it.
-  let strain = 0;
-  if (road) {
-    const grade = usePath ? 0 : (road.getRoadFrame(z + 3).y - road.getRoadFrame(z - 3).y) / 6;
-    strain = clamp(grade / c.hillGradeRef, 0, 1);
-  }
-  const strainPenalty = strain * (1 - wpmFactor) * c.hillStrainMax;
-  const typedTarget = (c.minSpeed + (c.maxSpeed - c.minSpeed) * wpmFactor) * getAccuracy() * (1 - strainPenalty);
-
-  // Handoff from the city: carry the speed you arrived with, easing it down to what your typing earns.
-  // (Type to keep your speed: tutorial by osmosis.) The learner floor keeps a beginner rolling a bit longer.
-  const ease = clamp(sinceEntry / HANDOFF_SPEED_S, 0, 1);
-  const carry = state.highwayEntrySpeed * (1 - ease * ease * (3 - 2 * ease));
-  const target = Math.max(typedTarget, carry, c.learnerFloorSpeed * learn);
-  const err = target - vehicle.speed;
-  d.throttle = clamp(err * c.throttleGain, 0, 1);
-  d.brake = clamp(-err * c.throttleGain, 0, 1);
+  // W accelerates, S brakes. Steering follows the lane and anticipates road curvature.
+  d.throttle = held.w ? 1 : 0;
+  d.brake = held.s ? 1 : 0;
   d.speedCap = c.maxSpeed;
 
-  // Sloppy typing makes the lane wander (slow, smooth, never off the road at full instability).
-  const instability = getInstability() * (1 - 0.6 * learn);
-  const drift = instability * c.driftAmp * Math.sin(state.time * c.driftSpeed + 1.7 * Math.sin(state.time * 0.31));
-
-  // Desired heading points back at the lane centre; invert the bicycle model so loop gain stays
-  // constant at any speed. Uses the vehicle's speed-sensitive max steer.
-  lateral += drift;
   const desiredHeading = clamp(
     frame.heading - lateral * c.centeringGain,
     frame.heading - c.maxAutoHeading,
     frame.heading + c.maxAutoHeading
   );
   const wDes = c.headingResponse * (desiredHeading - vehicle.heading) + curvature * Math.max(vehicle.speed, 0);
-  const v = Math.abs(vehicle.speed);
-  const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(v, 2));
-  const steer = angle / vehicle.maxSteerAtSpeed(v);
-  // every wrong key yanks the wheel (halved while you are still learning)
-  d.steer = clamp(steer + getWheelJerk() * c.jerkSteer * (1 - 0.5 * learn), -1, 1);
+  const speed = Math.abs(vehicle.speed);
+  const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(speed, 2));
+  d.steer = clamp(angle / vehicle.maxSteerAtSpeed(speed), -1, 1);
 }

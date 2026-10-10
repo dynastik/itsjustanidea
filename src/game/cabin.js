@@ -35,10 +35,27 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 let pedalGroups = [];
 let pedalTilt = 0.55;
 
+// One shared six-position H gate. Coordinates are local console offsets (x = across,
+// z = fore/aft), so the visible gate and the stick animation cannot drift apart.
+const GEAR_GATE = {
+  R: [-0.05, -0.055],
+  N: [0, 0],
+  1: [0.05, 0.055],
+  2: [0.05, -0.055],
+  3: [0, 0.055],
+  4: [0, -0.055],
+  5: [-0.05, 0.055],
+};
+
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
-  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null };
+  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
+  // Track the stick tip's projected offset and route it through the H-gate's
+  // neutral crossbar whenever the selected gear changes.
+  let shifterTravel = { x: 0, z: 0, gear: 'N', route: [] };
+  let shiftBootGeometry = null;
+  let shiftBootBasePositions = null;
 
   function clear() {
     root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -263,14 +280,56 @@ export function createCabInterior(vehicle) {
     bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
-    // Simple gear selector near the front, with no screens or decorative accessories.
-    const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
-    shifterStem.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
-    shifterStem.rotation.x = -0.18;
-    add(shifterStem);
-    const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
-    shifterKnob.position.set(consoleX, -0.425, consoleFrontZ - 0.36);
-    add(shifterKnob);
+    // True H-pattern gate: three straight parallel lanes joined only by a
+    // single horizontal cross-slot at the centre, not an X-shaped crossing.
+    const gateZ = consoleFrontZ - 0.36;
+    add(box(0.18, 0.012, 0.17, M.panel, consoleX, -0.571, gateZ));
+    const gateRailMat = mat(0x858a91, { metalness: 0.65, roughness: 0.38 });
+    const gateSurfaceY = -0.562;
+    // The dark inset channels read as one connected H cut into the console plate.
+    for (const laneX of [-0.05, 0, 0.05]) {
+      add(box(0.012, 0.003, 0.132, M.gauge, consoleX + laneX, gateSurfaceY, gateZ));
+    }
+    add(box(0.116, 0.003, 0.012, M.gauge, consoleX, gateSurfaceY, gateZ));
+    // Four slim rails keep the three lanes parallel; the cross-slot remains open.
+    for (const railX of [-0.075, -0.025, 0.025, 0.075]) {
+      add(box(0.0035, 0.004, 0.14, gateRailMat, consoleX + railX, -0.558, gateZ));
+    }
+    for (const railZ of [-0.071, 0.071]) {
+      add(box(0.154, 0.004, 0.0035, gateRailMat, consoleX, -0.558, gateZ + railZ));
+    }
+    // Simple smooth leather shift boot. Its lower edge stays fixed to the console;
+    // the top edge flexes with the stick as it moves through the H-pattern.
+    const bootLeather = mat(0x211e1b, { roughness: 1 });
+    const bootGeometry = new THREE.CylinderGeometry(0.025, 0.052, 0.085, 10, 1, false);
+    shiftBootGeometry = bootGeometry;
+    shiftBootBasePositions = bootGeometry.attributes.position.array.slice();
+    const boot = new THREE.Mesh(bootGeometry, bootLeather);
+    boot.name = 'shift-boot-only';
+    boot.position.set(consoleX, -0.514, gateZ);
+    add(boot);
+
+    // Visible manual shifter. The pivot is at the base so the shaft and knob
+    // lean together through the H-pattern while the boot flexes around the base.
+    const shifter = add(new THREE.Group());
+    shifter.name = 'manual-shifter-pivot';
+    shifter.position.set(consoleX, -0.505, gateZ);
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.011, 0.145, 10),
+      mat(0x777b80, { metalness: 0.72, roughness: 0.3 }),
+    );
+    shaft.name = 'shift-lever-shaft';
+    shaft.position.y = 0.073;
+    shifter.add(shaft);
+    const knob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.027, 16, 12),
+      mat(0x171719, { roughness: 0.42 }),
+    );
+    knob.name = 'shift-knob';
+    knob.scale.set(1, 0.92, 0.92);
+    knob.position.y = 0.15;
+    shifter.add(knob);
+    parts.shifter = shifter;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
     add(beam(V(xC, yRoof - 0.02, 0.48), V(xC, yRoof - 0.15, 0.44), 0.02, M.trim));
@@ -294,11 +353,82 @@ export function createCabInterior(vehicle) {
     setSteeringAngle(v.steerAngle);
     // Accelerator (right) and brake (middle) pivot toward a more upright position
     // while pressed, with a smoothed return when released.
-    const pedalTargets = [0, clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
+    // Transmission.clutch is the actual simulated disengagement amount: 1 = pedal down,
+    // 0 = clutch fully coupled. Drive the left pedal from that value, not player throttle.
+    const pedalTargets = [
+      clamp(v.transmission?.clutch ?? 0, 0, 1),
+      clamp(driveInput.brake ?? 0, 0, 1),
+      clamp(driveInput.throttle ?? 0, 0, 1),
+    ];
     for (let i = 0; i < pedalGroups.length; i++) {
       const target = pedalTilt - pedalTargets[i] * 0.35;
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
+
+    // Route through the H gate's neutral crossbar instead of cutting diagonally
+    // between notches. Example: 2 -> centre of the 1/2 lane -> across to 3/4 lane -> 3.
+    if (parts.shifter) {
+      const gear = v.transmission?.gear ?? 'N';
+      const [targetX, targetZ] = GEAR_GATE[gear] ?? GEAR_GATE.N;
+      if (gear !== shifterTravel.gear) {
+        shifterTravel.gear = gear;
+        shifterTravel.route = [
+          [shifterTravel.x, 0],
+          [targetX, 0],
+          [targetX, targetZ],
+        ].filter(([x, z], i, points) => {
+          const previous = i === 0 ? [shifterTravel.x, shifterTravel.z] : points[i - 1];
+          return Math.hypot(x - previous[0], z - previous[1]) > 0.001;
+        });
+      }
+
+      // Move at a steady tip speed so each leg is visible, while keeping the base fixed.
+      let distanceLeft = 0.45 * Math.max(0, dt);
+      while (distanceLeft > 0 && shifterTravel.route.length) {
+        const [wayX, wayZ] = shifterTravel.route[0];
+        const dx = wayX - shifterTravel.x;
+        const dz = wayZ - shifterTravel.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance <= distanceLeft || distance < 0.001) {
+          shifterTravel.x = wayX;
+          shifterTravel.z = wayZ;
+          distanceLeft -= distance;
+          shifterTravel.route.shift();
+        } else {
+          shifterTravel.x += (dx / distance) * distanceLeft;
+          shifterTravel.z += (dz / distance) * distanceLeft;
+          distanceLeft = 0;
+        }
+      }
+
+      // Tilt the hidden shifter pivot toward the selected H-gate position.
+      // The boot's lower ring stays anchored while its top ring follows the lever's
+      // lean, with a little extra travel so the leather visibly flexes during shifts.
+      const leanX = -Math.atan2(shifterTravel.x, 0.13);
+      const leanZ = Math.atan2(shifterTravel.z, 0.13);
+      parts.shifter.rotation.z = leanX;
+      parts.shifter.rotation.x = leanZ;
+
+      if (shiftBootGeometry && shiftBootBasePositions) {
+        const positions = shiftBootGeometry.attributes.position;
+        const topTravel = 0.13;
+        const bootTopTravel = 0.055;
+        const topX = Math.sign(-Math.sin(leanX) * topTravel * (bootTopTravel / topTravel))
+          * Math.max(0, Math.abs(-Math.sin(leanX) * topTravel * (bootTopTravel / topTravel)) - 0.005);
+        const topZ = Math.sign(Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel))
+          * Math.max(0, Math.abs(Math.sin(leanZ) * topTravel * (bootTopTravel / topTravel)) - 0.005);
+        for (let i = 0; i < positions.count; i++) {
+          const base = i * 3;
+          const isTop = shiftBootBasePositions[base + 1] > 0;
+          positions.array[base] = shiftBootBasePositions[base] + (isTop ? topX : 0);
+          positions.array[base + 1] = shiftBootBasePositions[base + 1];
+          positions.array[base + 2] = shiftBootBasePositions[base + 2] + (isTop ? topZ : 0);
+        }
+        positions.needsUpdate = true;
+        shiftBootGeometry.computeVertexNormals();
+      }
+    }
+
     if (parts.freshener) {
       const target = clamp(-v.steerAngle * v.speed * v.speed * 0.025, -0.9, 0.9);
       parts.freshener.rotation.z += (target - parts.freshener.rotation.z) * (1 - Math.exp(-5 * dt));

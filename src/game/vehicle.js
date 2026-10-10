@@ -22,7 +22,7 @@ export const VEHICLE_CONFIG = {
   body: {
     mass: 1200,
     comOffsetY: -0.35,
-    linearDamping: 0.05,
+    linearDamping: 0.025,
     angularDamping: 0.8,
   },
   suspension: {
@@ -42,9 +42,9 @@ export const VEHICLE_CONFIG = {
   },
   handling: {
     engineForce: 16000,
-    brakeForce: 22000,
+    brakeForce: 18000,
     reverseForce: 7000,
-    coastForce: 1800,
+    coastForce: 0,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
@@ -291,6 +291,123 @@ export function createVehicle(scene, physics, RAPIER) {
   const prevQuat = new THREE.Quaternion();
   const curQuat = new THREE.Quaternion();
 
+  // Conservative van gearbox. Speeds are m/s; forward ceilings roughly follow 20/40/60/80/100 km/h.
+  const GEAR_NAMES = ['R', 'N', '1', '2', '3', '4', '5'];
+  const GEAR_CAPS = [3.0, 0, 5.6, 11.1, 16.7, 22.2, 30.0];
+  const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 22.0];
+  // Relative gearbox ratios. Road speed multiplied by the selected ratio drives engine RPM:
+  // lower gears rev higher at the same road speed; top gear cruises at lower RPM.
+  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.58];
+  // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
+  // this curve keeps the existing handling force scale stable while giving taller gears less pull.
+  const GEAR_FORCE = [0.42, 0, 1.0, 0.84, 0.72, 0.62, 0.55];
+
+  const ENGINE_TORQUE_CURVE = [
+    [750, 0.48], [950, 0.66], [1250, 0.88], [1550, 1.0],
+    [2400, 0.98], [3200, 0.91], [4000, 0.78], [4600, 0.59], [5000, 0.38], [5300, 0.30],
+  ];
+
+  function engineTorqueAtRpm(rpm) {
+    // Diesel-ish torque curve: builds from idle, peaks in the useful low-mid range,
+    // holds briefly, then falls away as the engine approaches the limiter.
+    const points = ENGINE_TORQUE_CURVE;
+    if (rpm <= points[0][0]) return points[0][1];
+    for (let i = 1; i < points.length; i++) {
+      const [r1, t1] = points[i - 1];
+      const [r2, t2] = points[i];
+      if (rpm <= r2) {
+        const x = clamp((rpm - r1) / (r2 - r1), 0, 1);
+        return t1 + (t2 - t1) * x;
+      }
+    }
+    return points[points.length - 1][1];
+  }
+  let gearIndex = 2;
+  let shiftTimer = 0;
+  let shiftDuration = 0.40;
+  let throttleOffTimer = 0;
+  let downshiftHoldTimer = 0;
+  let coastClutch = 1;
+  let shiftCueTimer = 0;
+  let shiftCue = '';
+  let engineRpm = 850;
+  let autoShiftEnabled = false;
+  let lugPhase = 0;
+  let overRevTimer = 0;
+  let limiterPhase = 0;
+
+  function shiftGear(direction, automatic = false) {
+    const next = clamp(gearIndex + direction, 0, GEAR_NAMES.length - 1);
+    if (next === gearIndex) return false;
+    const nextName = GEAR_NAMES[next];
+    if (nextName === 'R' && Math.abs(self.speed) > 1.1) return false;
+    const speed = Math.abs(self.speed);
+    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.40;
+    if (direction < 0 && next >= 2) {
+      downshiftHoldTimer = 1.6;
+      const nextSpeed = self.speed * (GEAR_NAMES[next] === 'R' ? -1 : 1);
+      const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[next] / GEAR_RATIOS[2]) * 750;
+      // Blip the engine toward the RPM the lower gear needs before the clutch re-engages.
+      engineRpm = clamp(engineRpm + Math.max(0, targetRpm - engineRpm) * 0.72, 750, 5300);
+    }
+    shiftTimer = shiftDuration;
+    shiftCue = direction > 0 ? 'UPSHIFT' : 'DOWNSHIFT';
+    shiftCueTimer = 0.72;
+    if (direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78) lugPhase = 0.2;
+    if (direction < 0 && next >= 2 && speed > GEAR_CAPS[next] * 0.82) overRevTimer = 0.42;
+    gearIndex = next;
+    if (!automatic) autoShiftEnabled = false;
+    return true;
+  }
+
+  function smartShift() {
+    // Shift is a one-button gearbox: normally select by road speed, but allow an upshift
+    // near the top of the current gear instead of getting stuck on a threshold.
+    const kmh = Math.abs(self.speed) * 3.6;
+    const currentCap = GEAR_CAPS[gearIndex] * 3.6;
+    const nearTop = gearIndex >= 2 && gearIndex < 6 && kmh >= currentCap * 0.72;
+    let target = kmh < 18 ? 2 : kmh < 36 ? 3 : kmh < 52 ? 4 : kmh < 72 ? 5 : 6;
+
+    // Add hysteresis around the 3rd/4th boundary so repeated Shift presses don't
+    // bounce between gears when speed hovers around 52 km/h.
+    if (gearIndex === 5 && kmh >= 47 && kmh < 72) target = 5;
+    if (gearIndex === 4 && kmh > 57 && kmh < 72) target = 5;
+
+    // If we're already in the speed-appropriate gear but near its ceiling, the next
+    // Shift press upshifts. This lets 3rd -> 4th happen around 43 km/h rather than
+    // requiring the player to reach the exact next speed band first.
+    if (target === gearIndex && nearTop) target = Math.min(6, gearIndex + 1);
+    if (target === gearIndex) return false;
+
+    const direction = target > gearIndex ? 1 : -1;
+    const speed = Math.abs(self.speed);
+    if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
+    if (direction < 0 && target >= 2) downshiftHoldTimer = 1.6;
+    gearIndex = target;
+    shiftDuration = 0.38;
+    if (direction < 0 && target >= 2) {
+      const nextSpeed = self.speed * (GEAR_NAMES[target] === 'R' ? -1 : 1);
+      const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[target] / GEAR_RATIOS[2]) * 750;
+      engineRpm = clamp(engineRpm + Math.max(0, targetRpm - engineRpm) * 0.72, 750, 5300);
+    }
+    shiftTimer = shiftDuration;
+    shiftCue = direction > 0 ? 'UPSHIFT' : 'DOWNSHIFT';
+    shiftCueTimer = 0.72;
+    lugPhase = 0;
+    autoShiftEnabled = false;
+    return true;
+  }
+
+  function transmission() {
+    const gearName = GEAR_NAMES[gearIndex];
+    const speedInGear = self.speed * (gearName === 'R' ? -1 : 1);
+    const lugging = gearIndex >= 3 && speedInGear < GEAR_MIN_SPEED[gearIndex] * 0.78;
+    return { gear: gearName, rpm: Math.round(engineRpm),
+      clutch: Math.max(shiftTimer > 0 ? 1 : 0, 1 - coastClutch),
+      shift: shiftCueTimer > 0 ? shiftCue : '', lugging,
+      overRev: engineRpm >= 4800, auto: false };
+  }
+
   const self = {
     cfg,
     visual,
@@ -304,6 +421,11 @@ export function createVehicle(scene, physics, RAPIER) {
     updateVisual,
     reset,
     maxSteerAtSpeed,
+    smartShift,
+    shiftUp: () => shiftGear(1),
+    shiftDown: () => shiftGear(-1),
+    toggleAutoShift: () => { autoShiftEnabled = !autoShiftEnabled; return autoShiftEnabled; },
+    get transmission() { return transmission(); },
     nudgeModel(dy) { cfg.modelYTrim += dy; applyModelOffset(); return cfg.modelYTrim; },
     getLocalBounds,
     onModelReady(cb) { readyCallbacks.push(cb); if (ready) cb(); },
@@ -445,20 +567,80 @@ export function createVehicle(scene, physics, RAPIER) {
     ctrl.setWheelSteering(0, self.steerAngle * cal.steerSign);
     ctrl.setWheelSteering(1, self.steerAngle * cal.steerSign);
 
-    const cap = Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed) * (off ? h.offRoad.speedFactor : 1);
-    const t = input.throttle;
+    if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
+    if (shiftCueTimer > 0) shiftCueTimer = Math.max(0, shiftCueTimer - dt);
+    if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
+    if (downshiftHoldTimer > 0) downshiftHoldTimer = Math.max(0, downshiftHoldTimer - dt);
+
+    // Both zones use the manual gearbox; highway steering is automated, not shifting.
+
+    const gearName = GEAR_NAMES[gearIndex];
+    const direction = gearName === 'R' ? -1 : 1;
+    const gearCap = GEAR_CAPS[gearIndex] || 0.1;
+    const cap = Math.max(0.1, Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed, gearCap)) * (off ? h.offRoad.speedFactor : 1);
+    const t = clamp(Math.abs(input.throttle), 0, 1);
     const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
+    const speedInGear = v * direction;
     let F = 0;
 
-    if (t > 0) {
-      F += h.engineForce * t * clamp(1 - v / cap, 0, 1);
-    } else if (t < 0) {
-      if (v > 0.5) F -= h.brakeForce * -t;
-      else F -= h.reverseForce * -t * clamp(1 - -v / h.reverseMaxSpeed, 0, 1);
+    // Lift-off coasting: keep the drivetrain coupled for a short lift, then smoothly
+    // disengage the clutch so the van preserves momentum instead of engine-braking forever.
+    // Braking, throttle input, shifting, reverse, and near-stop driving all take priority.
+    const recentDownshift = downshiftHoldTimer > 0;
+    const canFreewheel = gearIndex >= 2 && Math.abs(v) > 2.0 && t <= 0.04
+      && input.brake <= 0 && shiftTimer <= 0 && !recentDownshift;
+    if (canFreewheel) throttleOffTimer += dt;
+    else throttleOffTimer = 0;
+    const coastClutchTarget = canFreewheel && throttleOffTimer > 0.85 ? 0 : 1;
+    coastClutch += (coastClutchTarget - coastClutch) * (1 - Math.exp(-5.5 * dt));
+    coastClutch = clamp(coastClutch, 0, 1);
+
+    const gearMin = GEAR_MIN_SPEED[gearIndex] || 0;
+    const ratio = GEAR_RATIOS[gearIndex] || 0;
+    // Engine speed follows road speed through the selected gear ratio. Throttle can flare
+    // the engine a little at very low road speed, but no longer adds a fixed RPM bonus in every gear.
+    const coupledRpm = 850 + Math.max(0, speedInGear) * (ratio / GEAR_RATIOS[2]) * 750;
+    const freeRevBlend = gearName === 'N'
+      ? 1
+      : clamp(1 - Math.max(0, speedInGear) / 2.2, 0, 1) * 0.78;
+    const rpmTarget = gearName === 'N' || coastClutch < 0.98
+      ? 850 + t * 3900
+      : coupledRpm + t * freeRevBlend * 1150;
+    const rpmResponse = shiftTimer > 0 ? 13 : (t > 0.05 ? 9 : 6);
+    engineRpm += (clamp(rpmTarget, 750, 5300) - engineRpm) * (1 - Math.exp(-rpmResponse * dt));
+    engineRpm = clamp(engineRpm, 750, 5300);
+
+    const lugging = gearIndex >= 3 && speedInGear < gearMin * 0.78 && t > 0.04;
+    let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex] * engineTorqueAtRpm(engineRpm);
+    // Both gear changes and lift-off coasting reduce drivetrain coupling smoothly.
+    let shiftCoupling = 1;
+    if (shiftTimer > 0) {
+      const shiftProgress = 1 - clamp(shiftTimer / shiftDuration, 0, 1);
+      shiftCoupling = 0.04 + 0.96 * shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
     }
-    if (input.brake > 0) F -= h.brakeForce * input.brake * moving;
-    if (t === 0 && input.brake === 0) F -= h.coastForce * moving;
-    if (v > cap) F -= h.brakeForce * 0.25 * clamp((v - cap) / 3, 0, 1);
+    torque *= coastClutch * shiftCoupling;
+    if (lugging) {
+      lugPhase += dt * Math.PI * 2 * 5.0;
+      torque *= 0.18 + 0.82 * Math.max(0, Math.sin(lugPhase));
+    } else if (gearIndex < 3 || t <= 0.04) lugPhase = 0;
+    if (engineRpm >= 5000 && t > 0 && gearName !== 'N') {
+      limiterPhase += dt * Math.PI * 2 * 14;
+      torque *= Math.sin(limiterPhase) > 0.05 ? 0.16 : 0.72;
+    } else limiterPhase = 0;
+
+    if (gearName !== 'N' && t > 0) F += direction * (gearName === 'R' ? h.reverseForce : h.engineForce) * torque * t * clamp(1 - speedInGear / cap, 0, 1);
+    // Service brakes are deliberately weaker so downshifting and engine braking matter, while emergency braking still works.
+    if (input.brake > 0) F -= h.brakeForce * 0.48 * input.brake * moving;
+    if (t <= 0.04 && input.brake === 0) {
+      F -= h.coastForce * moving;
+      // Engine braking: lower gears resist rolling speed more strongly; neutral coasts freely.
+      if (gearName !== 'N' && Math.abs(v) > 0.5) {
+        const gearBrake = [0.006, 0, 0.018, 0.012, 0.008, 0.005, 0.0025][gearIndex];
+        F -= Math.sign(v) * h.engineForce * gearBrake * clamp(Math.abs(v) / 5, 0.2, 1) * coastClutch * shiftCoupling;
+      }
+    }
+    if (overRevTimer > 0 && v !== 0) F -= Math.sign(v) * h.brakeForce * 0.12 * (overRevTimer / 0.42);
+    if (gearName !== 'N' && speedInGear > cap) F -= direction * h.brakeForce * 0.30 * clamp((speedInGear - cap) / 2.5, 0, 1);
     if (off) F -= h.offRoad.dragForce * moving;
 
     const perWheel = (F / 4) * cal.engineSign;
@@ -516,6 +698,19 @@ export function createVehicle(scene, physics, RAPIER) {
   }
 
   function reset(y = cfg.spawnHeight, heading = 0) {
+    gearIndex = 2;
+    shiftTimer = 0;
+    shiftDuration = 0.40;
+    throttleOffTimer = 0;
+    downshiftHoldTimer = 0;
+    coastClutch = 1;
+    shiftCueTimer = 0;
+    shiftCue = '';
+    engineRpm = 850;
+    autoShiftEnabled = false;
+    lugPhase = 0;
+    overRevTimer = 0;
+    limiterPhase = 0;
     body.setTranslation({ x: 0, y, z: 0 }, true);
     body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);

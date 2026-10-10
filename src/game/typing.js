@@ -194,3 +194,11 @@ export function getTelemetry() {
 export function getKeyLog() {
   return keyLog.slice();
 }
+
+
+// Advance the current story/sign prompt without requiring player typing.
+export function advancePromptAutomatically() {
+  if (!state.typing.target) return;
+  state.typing.wordsCompleted++;
+  pickNewWord();
+}

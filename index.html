@@ -17,10 +17,17 @@
         <div id="typed-input"></div>
         <div id="stats">WPM: 0 | Accuracy: 100%</div>
       </div>
-      <div id="hint">City: WASD | Highway: type (Backspace ok) | 1/2: story short/long (before the highway) | Tab: dev mode | F2: cab | F3: camera | R: reset (city) | F4: reset | F6: next act (dev) | F9: mute | F5: headlights | Esc: pause | `: debug | drag: look</div>
+      <div id="hint">City: WASD | Q/E: down/up shift | Shift: speed-select gear | Highway: type | 1/2: story mode | F2: cab | F3: camera | R/F4: reset | F6: next act (dev) | F9: mute | F5: headlights | Esc: pause | `: debug | drag: look</div>
     </div>
     <div id="headlight-status">HEADLIGHTS: OFF (F5)</div>
-    <div id="speedo">0 km/h</div>
+    <div id="speedo">
+      <div id="speedo-readout">GEAR 1 · 850 RPM · 0 km/h</div>
+      <div id="rpm-label">ENGINE RPM <span id="rpm-value">850</span></div>
+      <div id="rpm-track" aria-label="Engine RPM">
+        <div id="rpm-fill"></div>
+      </div>
+      <div id="transmission-status" aria-live="polite"></div>
+    </div>
     <div id="pause-overlay" style="display: none;">PAUSED</div>
     <script type="module" src="/src/main.js"></script>
   </body>
