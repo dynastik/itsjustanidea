@@ -22,7 +22,7 @@ export const VEHICLE_CONFIG = {
   body: {
     mass: 1200,
     comOffsetY: -0.35,
-    linearDamping: 0.002,
+    linearDamping: 0.12,
     angularDamping: 0.8,
   },
   suspension: {
@@ -44,7 +44,7 @@ export const VEHICLE_CONFIG = {
     engineForce: 16000,
     brakeForce: 18000,
     reverseForce: 7000,
-    coastForce: 0.15,
+    coastForce: 1.2,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
