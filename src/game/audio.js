@@ -4,7 +4,7 @@ export function createAudio() {
   let ctx = null;
   let master, engineOsc, mufflerFilter, exhaustResonance, engineGain;
   let intakeFilter, intakeGain, windGain, windFilter, roadGain, roadFilter, noiseBuf;
-  let muted = true; // Keep the project's existing default; press the mute toggle to enable audio.
+  let muted = false; // Audio is enabled by default; F9 toggles mute.
   let audioRpm = 850;
   let audioClutch = 0;
 
