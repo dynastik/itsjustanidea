@@ -295,7 +295,21 @@ export function createVehicle(scene, physics, RAPIER) {
   const GEAR_NAMES = ['R', 'N', '1', '2', '3', '4', '5'];
   const GEAR_CAPS = [3.0, 0, 5.6, 11.1, 16.7, 22.2, 27.8];
   const GEAR_MIN_SPEED = [0, 0, 0, 5.0, 10.0, 15.5, 21.0];
+  // Relative gearbox ratios. Road speed multiplied by the selected ratio drives engine RPM:
+  // lower gears rev higher at the same road speed; top gear cruises at lower RPM.
+  const GEAR_RATIOS = [3.4, 0, 3.4, 1.72, 1.15, 0.86, 0.69];
+  // Relative wheel-torque multiplication after gearing. The ratio itself shapes RPM;
+  // this curve keeps the existing handling force scale stable while giving taller gears less pull.
   const GEAR_FORCE = [0.42, 0, 1.0, 0.78, 0.63, 0.50, 0.40];
+
+  function engineTorqueAtRpm(rpm) {
+    // Broad diesel-ish van curve: weak below the useful band, strongest in the midrange,
+    // then falling away as the engine approaches the limiter.
+    if (rpm < 1100) return 0.58 + 0.42 * clamp((rpm - 750) / 350, 0, 1);
+    if (rpm < 2600) return 1.0;
+    if (rpm < 4200) return 1.0 - 0.18 * ((rpm - 2600) / 1600);
+    return 0.82 - 0.42 * clamp((rpm - 4200) / 1000, 0, 1);
+  }
   let gearIndex = 2;
   let shiftTimer = 0;
   let engineRpm = 850;
@@ -526,16 +540,23 @@ export function createVehicle(scene, physics, RAPIER) {
     let F = 0;
 
     const gearMin = GEAR_MIN_SPEED[gearIndex] || 0;
-    const speedSpan = Math.max(gearCap - gearMin, 1);
-    const throttleRevRange = gearIndex >= 5 ? 1700 : 350; // Let 4th/5th rev under throttle instead of flattening near 1200 RPM.
-    const rpmTarget = gearName === 'N' ? 850 + t * 3900
-      : 850 + clamp((speedInGear - gearMin) / speedSpan, 0, 1) * 4200 + t * throttleRevRange;
-    engineRpm += (Math.min(5300, rpmTarget) - engineRpm) * (1 - Math.exp(-7 * dt));
+    const ratio = GEAR_RATIOS[gearIndex] || 0;
+    // Engine speed follows road speed through the selected gear ratio. Throttle can flare
+    // the engine a little at very low road speed, but no longer adds a fixed RPM bonus in every gear.
+    const coupledRpm = 850 + Math.max(0, speedInGear) * (ratio / GEAR_RATIOS[2]) * 750;
+    const freeRevBlend = gearName === 'N'
+      ? 1
+      : clamp(1 - Math.max(0, speedInGear) / 2.2, 0, 1) * 0.78;
+    const rpmTarget = gearName === 'N'
+      ? 850 + t * 3900
+      : coupledRpm + t * freeRevBlend * 1150;
+    const rpmResponse = shiftTimer > 0 ? 13 : (t > 0.05 ? 9 : 6);
+    engineRpm += (clamp(rpmTarget, 750, 5300) - engineRpm) * (1 - Math.exp(-rpmResponse * dt));
     engineRpm = clamp(engineRpm, 750, 5300);
 
     const lugging = gearIndex >= 3 && speedInGear < gearMin * 0.78 && t > 0.04;
-    let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex];
-    if (shiftTimer > 0) torque *= 0.22 + 0.78 * (1 - shiftTimer / 0.38);
+    let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex] * engineTorqueAtRpm(engineRpm);
+    if (shiftTimer > 0) torque *= 0.12 + 0.88 * (1 - shiftTimer / 0.38);
     if (lugging) {
       lugPhase += dt * Math.PI * 2 * 5.0;
       torque *= 0.18 + 0.82 * Math.max(0, Math.sin(lugPhase));
