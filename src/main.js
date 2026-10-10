@@ -229,6 +229,7 @@ async function main() {
       throttle: driveInput.throttle,
       gear: transmission.gear,
       rpm: transmission.rpm,
+      clutch: transmission.clutch,
       offRoad: surface.offRoad,
       paused: state.paused,
     });
