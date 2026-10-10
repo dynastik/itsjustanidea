@@ -296,7 +296,7 @@ export function createCabInterior(vehicle) {
     // while pressed, with a smoothed return when released.
     const pedalTargets = [0, clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
     for (let i = 0; i < pedalGroups.length; i++) {
-      const target = pedalTilt + pedalTargets[i] * 0.35;
+      const target = pedalTilt - pedalTargets[i] * 0.35;
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
     if (parts.freshener) {
