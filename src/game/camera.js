@@ -10,7 +10,7 @@ export const CAMERA_PROFILES = {
     tilt: 1.0,
   },
   cab: {
-    fov: 80, fovSpeedGain: 0.15, fovSpeedRef: 30,
+    fov: 70, fovSpeedGain: 0, fovSpeedRef: 30,
     exteriorVisible: false,
   },
   // "Toy car" diorama look: high, far, narrow FOV, a little follow lag, softer tilt-shift.
