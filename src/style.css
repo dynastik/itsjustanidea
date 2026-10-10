@@ -161,6 +161,18 @@ body {
   pointer-events: none;
 }
 
+#transmission-status {
+  position: fixed;
+  right: 21px;
+  bottom: 91px;
+  z-index: 10;
+  color: #cbd3c7;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 1.2px;
+  text-shadow: 0 1px 6px #000;
+  pointer-events: none;
+}
+
 #headlight-status {
   position: fixed;
   right: 21px;
@@ -249,6 +261,12 @@ body {
     right: 10px;
     bottom: 10px;
     font-size: 18px;
+  }
+
+  #transmission-status {
+    right: 11px;
+    bottom: 78px;
+    font-size: 9px;
   }
 
   #headlight-status {
