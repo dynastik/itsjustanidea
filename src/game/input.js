@@ -14,13 +14,9 @@ export const KEYS = {
   pause: 'escape',
 };
 
-// Match the vehicle's 30 m/s max; per-gear caps still apply.
 const CITY_SPEED_CAP = 30;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-// The ONE object the vehicle reads. City uses WASD steering; highway follows the road automatically.
-// Phase 5 horror injects wheel pull / brake lag by modifying it before vehicle.step().
-// steer: -1 (right) .. +1 (left) | throttle: -1 (reverse) .. 1 | brake: 0..1
 export function createDriveInput() {
   return { steer: 0, throttle: 0, brake: 0, speedCap: CITY_SPEED_CAP };
 }
@@ -56,7 +52,28 @@ export function createInput(actions) {
       return;
     }
 
-    // Q/E shift down/up in both zones; Shift quick-selects a speed-appropriate gear.
+    if (key in hotkeys) {
+      e.preventDefault();
+      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
+      if (!e.repeat) hotkeys[key]();
+      return;
+    }
+
+    // Highway letters belong to the typing mechanic, including Q/E and uppercase characters.
+    // Route them before gear shortcuts so story text can contain every letter.
+    if (state.mode === 'highway') {
+      if (state.paused || e.repeat) return;
+      if (key === 'backspace') {
+        e.preventDefault();
+        actions.typeBackspace?.();
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        actions.typeKey?.(e.key);
+      }
+      return;
+    }
+
+    // Q/E shift down/up in the city; Shift quick-selects a speed-appropriate gear.
     if (key === 'q' || key === 'e') {
       e.preventDefault();
       if (!e.repeat && !state.paused) {
@@ -69,25 +86,6 @@ export function createInput(actions) {
     if (key === 'shift') {
       e.preventDefault();
       if (!e.repeat && !state.paused) actions.smartShift?.();
-      return;
-    }
-
-    if (key in hotkeys) {
-      e.preventDefault();
-      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
-      if (!e.repeat) hotkeys[key]();
-      return;
-    }
-
-    if (state.mode === 'highway') {
-      if (state.paused || e.repeat) return;
-      if (key === 'backspace') {
-        e.preventDefault();
-        actions.typeBackspace?.();
-      } else if (e.key.length === 1) {
-        e.preventDefault();
-        actions.typeKey?.(e.key);
-      }
       return;
     }
 
