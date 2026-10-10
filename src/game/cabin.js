@@ -126,9 +126,12 @@ export function createCabInterior(vehicle) {
     column.position.set(0, -0.34, 0.6);
     add(column);
 
-    // Slightly wider seats, leaving a clear channel for the center console.
-    const seatCenters = [-0.34, 0.34];
+    // Keep the driver seat aligned with the existing steering wheel (x=0).
+    // Place the passenger seat farther across the cabin instead of deriving both from the eye origin.
     const seatWidth = 0.56;
+    const driverSeatX = 0;
+    const passengerSeatX = xR + 0.34;
+    const seatCenters = [driverSeatX, passengerSeatX];
     for (const sx of seatCenters) {
       add(box(seatWidth, 0.13, 0.54, M.seat, sx, -0.74, -0.2));
       const back = add(box(seatWidth, 0.64, 0.14, M.seat, sx, -0.45, -0.5));
@@ -136,16 +139,16 @@ export function createCabInterior(vehicle) {
       add(box(0.31, 0.17, 0.1, M.seat, sx, -0.055, -0.55));
     }
 
-    // Full-length center console: runs from the dashboard to the back of the cabin.
-    const consoleX = 0;
+    // Full-length center console sits between the seat centers, not under the steering wheel.
+    const consoleX = (driverSeatX + passengerSeatX) / 2;
     const consoleFrontZ = zDash - 0.02;
     const consoleBackZ = zBack + 0.06;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
-    const consoleWidth = 0.22;
+    const consoleWidth = 0.2;
     add(box(consoleWidth, 0.14, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
 
-    // Raised sloped transition blends the console into the lower dashboard.
+    // Raised front transition connects the console to the dashboard.
     const consoleBridge = add(box(consoleWidth + 0.04, 0.12, 0.3, M.panel, consoleX, -0.59, consoleFrontZ - 0.12));
     consoleBridge.rotation.x = -0.22;
     add(box(consoleWidth - 0.025, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.575, consoleCenterZ - 0.035));
