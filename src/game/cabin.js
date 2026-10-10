@@ -35,6 +35,18 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 let pedalGroups = [];
 let pedalTilt = 0.55;
 
+// One shared six-position H gate. Coordinates are local console offsets (x = across,
+// z = fore/aft), so the visible gate and the stick animation cannot drift apart.
+const GEAR_GATE = {
+  R: [0.05, -0.055],
+  N: [0, 0],
+  1: [-0.05, 0.055],
+  2: [-0.05, -0.055],
+  3: [0, 0.055],
+  4: [0, -0.055],
+  5: [0.05, 0.055],
+};
+
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
@@ -263,12 +275,31 @@ export function createCabInterior(vehicle) {
     bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
-    // Gear stick pivots at its boot and leans into the selected H-pattern gate.
+    // Recessed three-lane H gate on the console. The dark channel is continuous
+    // through the crossbar, with slim metallic edges to make it read as a real slot.
+    const gateZ = consoleFrontZ - 0.36;
+    add(box(0.18, 0.012, 0.17, M.gauge, consoleX, -0.571, gateZ));
+    const gateRailMat = mat(0x858a91, { metalness: 0.65, roughness: 0.38 });
+    const gateSurfaceY = -0.562;
+    // Three parallel channels and their centre cross-connection form the H.
+    for (const laneX of [-0.05, 0, 0.05]) {
+      add(box(0.016, 0.003, 0.132, M.trim, consoleX + laneX, gateSurfaceY, gateZ));
+    }
+    add(box(0.116, 0.003, 0.016, M.trim, consoleX, gateSurfaceY, gateZ));
+    // Raised fine rails define the lanes without closing off the connecting slot.
+    for (const railX of [-0.075, -0.025, 0.025, 0.075]) {
+      add(box(0.0035, 0.004, 0.14, gateRailMat, consoleX + railX, -0.558, gateZ));
+    }
+    for (const railZ of [-0.071, 0.071]) {
+      add(box(0.154, 0.004, 0.0035, gateRailMat, consoleX, -0.558, gateZ + railZ));
+    }
+    // Fixed pivot at the boot: the stem and knob rotate around this point, never slide.
     const shifter = add(new THREE.Group());
-    shifter.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
+    shifter.position.set(consoleX, -0.49, gateZ);
+    const shifterBoot = box(0.044, 0.012, 0.044, M.dark, 0, -0.065, 0);
+    shifter.add(shifterBoot);
     const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
     shifterStem.position.y = 0.065;
-    shifterStem.rotation.x = -0.18;
     shifter.add(shifterStem);
     const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
     shifterKnob.position.y = 0.13;
@@ -309,19 +340,10 @@ export function createCabInterior(vehicle) {
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
 
-    // Five-speed H-pattern: reverse is farther left, 1/2 use the left gate, 3/4 the centre, and 5 the right. The stick leans
-    // smoothly to the selected gate, including the automatic reverse/first changes.
+    // Lean around the fixed boot pivot to the same coordinates used to draw the gate.
+    // Neutral centres the stick; each selected gear has a distinct lateral/fore-aft notch.
     if (parts.shifter) {
-      const gates = {
-        R: [-0.105, 0.055],
-        N: [0, 0],
-        1: [-0.065, 0.055],
-        2: [-0.065, -0.055],
-        3: [0, 0.055],
-        4: [0, -0.055],
-        5: [0.065, 0.055],
-      };
-      const [x, z] = gates[v.transmission?.gear] ?? gates.N;
+      const [x, z] = GEAR_GATE[v.transmission?.gear] ?? GEAR_GATE.N;
       const targetX = -Math.atan2(x, 0.13);
       const targetZ = Math.atan2(z, 0.13);
       const smoothing = 1 - Math.exp(-14 * dt);
