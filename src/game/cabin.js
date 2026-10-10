@@ -76,7 +76,7 @@ export function createCabInterior(vehicle) {
 
     // dash
     const dash = add(box(W, 0.3, 0.5, M.dark, xC, yDashTop - 0.15, zDash - 0.25));
-    dash.rotation.x = 0.12;
+    dash.rotation.x = -0.12;
     add(box(0.55, 0.16, 0.14, M.trim, 0, -0.25, 0.64));                                                // instrument binnacle
 
     // Unlit instrument faces: keep the dashboard readable without bright emissive circles.
@@ -108,7 +108,7 @@ export function createCabInterior(vehicle) {
     // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
     // Rounded rectangular horn pad, with genuinely softened corners rather than a sharp box.
     const hubShape = new THREE.Shape();
-    const hw = 0.073, hh = 0.052, hr = 0.025;
+    const hw = 0.082, hh = 0.06, hr = 0.03;
     hubShape.moveTo(-hw + hr, -hh);
     hubShape.lineTo(hw - hr, -hh);
     hubShape.quadraticCurveTo(hw, -hh, hw, -hh + hr);
@@ -119,10 +119,10 @@ export function createCabInterior(vehicle) {
     hubShape.lineTo(-hw, -hh + hr);
     hubShape.quadraticCurveTo(-hw, -hh, -hw + hr, -hh);
     const hubGeometry = new THREE.ExtrudeGeometry(hubShape, {
-      depth: 0.025, bevelEnabled: true, bevelSegments: 2,
-      steps: 1, bevelSize: 0.006, bevelThickness: 0.004, curveSegments: 6,
+      depth: 0.045, bevelEnabled: true, bevelSegments: 3,
+      steps: 1, bevelSize: 0.009, bevelThickness: 0.007, curveSegments: 8,
     });
-    hubGeometry.translate(0, 0, -0.012);
+    hubGeometry.translate(0, 0, -0.022);
     spin.add(new THREE.Mesh(hubGeometry, M.panel));
     const armMat = M.trim;
     const arm = (x1, y1, x2, y2, width = 0.025) => {
@@ -161,14 +161,21 @@ export function createCabInterior(vehicle) {
     // Dash spans roughly zDash - 0.5 to zDash. Join at its rear edge so the console
     // emerges visibly from the dashboard instead of disappearing inside its mesh.
     const consoleFrontZ = zDash - 0.48;
-    const consoleBackZ = zBack + 0.06;
+    const consoleBackZ = zBack + 0.015;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
     add(box(consoleWidth, 0.16, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
 
     // Broaden and raise the front of the tunnel so it visibly joins the dashboard.
-    const consoleBridge = add(box(consoleWidth + 0.1, 0.17, 0.34, M.panel, consoleX, -0.585, consoleFrontZ + 0.08));
+    // Tapered shoulder flares toward the dash for a smoother, wider connection.
+    const bridgeWidth = consoleWidth + 0.24;
+    const consoleBridge = add(box(bridgeWidth, 0.19, 0.42, M.panel, consoleX, -0.575, consoleFrontZ + 0.13));
     consoleBridge.rotation.x = -0.2;
+    // Rounded transition caps soften the otherwise blocky console-to-dash join.
+    const bridgeCap = new THREE.Mesh(new THREE.SphereGeometry(bridgeWidth * 0.28, 12, 8), M.panel);
+    bridgeCap.scale.set(1, 0.48, 0.72);
+    bridgeCap.position.set(consoleX, -0.585, consoleFrontZ + 0.31);
+    add(bridgeCap);
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
     // Simple gear selector near the front, with no screens or decorative accessories.
