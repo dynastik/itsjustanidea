@@ -7,6 +7,7 @@ export function createAudio() {
   let muted = false; // Audio is enabled by default; F9 toggles mute.
   let audioRpm = 850;
   let audioClutch = 0;
+  let lastGear = null;
 
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -89,9 +90,48 @@ export function createAudio() {
   window.addEventListener('keydown', unlock);
   window.addEventListener('pointerdown', unlock);
 
+  function shiftSound(upshift) {
+    if (!ctx || muted || !noiseBuf) return;
+    const t = ctx.currentTime;
+    // A short, restrained gear-engagement clack, tucked under the engine rather than a cartoon clang.
+    const src = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    src.buffer = noiseBuf;
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(upshift ? 1050 : 1450, t);
+    filter.Q.value = 1.1;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(0.075, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.095);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    src.start(t);
+    src.stop(t + 0.11);
+
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(upshift ? 175 : 235, t);
+    o.frequency.exponentialRampToValueAtTime(upshift ? 105 : 145, t + 0.075);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(0.055, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    o.connect(og);
+    og.connect(master);
+    o.start(t);
+    o.stop(t + 0.095);
+  }
+
   function update(dt, { speed, throttle, offRoad, paused, gear = '1', rpm: engineRPM = 850, clutch = 0 }) {
     if (!ctx) return;
     const t = ctx.currentTime;
+    if (lastGear !== null && gear !== lastGear) {
+      const order = ['R', 'N', '1', '2', '3', '4', '5'];
+      shiftSound(order.indexOf(gear) >= order.indexOf(lastGear));
+    }
+    lastGear = gear;
     const v = Math.abs(speed);
     const load = clamp(throttle, 0, 1);
     const rev = clamp((engineRPM - 700) / 5800, 0, 1);
