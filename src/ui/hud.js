@@ -15,6 +15,7 @@ export function createHud() {
   const typedInputEl = $('typed-input');
   const statsEl = $('stats');
   const speedoEl = $('speedo');
+  const transmissionEl = $('transmission-status');
   const headlightEl = $('headlight-status');
   const pauseEl = $('pause-overlay');
 
@@ -39,6 +40,8 @@ export function createHud() {
     const reverse = state.speed < -0.3;
     set(headlightEl, 'headlights', state.headlightsOn ? 'HEADLIGHTS: ON (F5)' : 'HEADLIGHTS: OFF (F5)');
     set(speedoEl, 'speed', `${reverse ? 'R ' : ''}${Math.round(Math.abs(state.speed) * 3.6)} km/h`);
+    const transmission = state.transmission ?? { gear: '1', rpm: 850 };
+    set(transmissionEl, 'transmission', `GEAR ${transmission.gear} · ${transmission.rpm} RPM`);
     set(pauseEl.style, 'pause', state.paused ? 'flex' : 'none', 'display');
 
     if (typing) {
