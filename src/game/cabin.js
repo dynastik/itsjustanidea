@@ -162,13 +162,13 @@ export function createCabInterior(vehicle) {
     const pedalZ = zDash - 0.48;
     const pedalY = -0.70;
     const pedalXs = [-0.25, -0.14, -0.03]; // clutch, brake, accelerator
-    const pedalTilt = -0.32;
+    const pedalTilt = 0.32;
     for (let i = 0; i < pedalXs.length; i++) {
       const px = pedalXs[i];
       const pedalGroup = add(new THREE.Group());
       pedalGroup.position.set(px, pedalY, pedalZ);
       pedalGroup.rotation.x = pedalTilt;
-      const support = box(0.025, 0.13, 0.025, M.trim, 0, -0.075, 0.035);
+      const support = box(0.025, 0.20, 0.025, M.trim, 0, -0.10, 0.035);
       support.rotation.x = 0.18;
       pedalGroup.add(support);
       // The plain pad sits behind the ribs; ribs are on the rear (-z) face,
