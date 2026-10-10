@@ -108,7 +108,7 @@ export function createCabInterior(vehicle) {
     // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
     // Rounded rectangular horn pad, with genuinely softened corners rather than a sharp box.
     const hubShape = new THREE.Shape();
-    const topHalf = 0.115, bottomHalf = 0.055, topY = 0.08, bottomY = -0.08, corner = 0.025;
+    const topHalf = 0.088, bottomHalf = 0.042, topY = 0.062, bottomY = -0.062, corner = 0.018;
     // Upside-down rounded trapezium: broad top edge, tapered sides, narrower bottom.
     hubShape.moveTo(-topHalf + corner, topY);
     hubShape.lineTo(topHalf - corner, topY);
@@ -161,22 +161,49 @@ export function createCabInterior(vehicle) {
     const consoleX = cabinCenterX;
     // Dash spans roughly zDash - 0.5 to zDash. Join at its rear edge so the console
     // emerges visibly from the dashboard instead of disappearing inside its mesh.
-    const consoleFrontZ = zDash - 0.60;
+    const consoleFrontZ = zDash - 0.66;
     const consoleBackZ = zBack + 0.015;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
     add(box(consoleWidth, 0.16, consoleLength, M.panel, consoleX, -0.66, consoleCenterZ));
 
-    // Broaden and raise the front of the tunnel so it visibly joins the dashboard.
-    // Tapered shoulder flares toward the dash for a smoother, wider connection.
-    const bridgeWidth = consoleWidth + 0.24;
-    const consoleBridge = add(box(bridgeWidth, 0.19, 0.42, M.panel, consoleX, -0.575, consoleFrontZ + 0.13));
-    consoleBridge.rotation.x = -0.2;
-    // Rounded transition caps soften the otherwise blocky console-to-dash join.
-    const bridgeCap = new THREE.Mesh(new THREE.SphereGeometry(bridgeWidth * 0.28, 12, 8), M.panel);
-    bridgeCap.scale.set(1, 0.48, 0.72);
-    bridgeCap.position.set(consoleX, -0.585, consoleFrontZ + 0.31);
-    add(bridgeCap);
+    // Gradually flare the tunnel into the dash: narrow at the console, widening
+    // in smooth stages toward the front instead of one abrupt, oversized block.
+    const bridgeFrontZ = consoleFrontZ + 0.34;
+    const bridgeBackZ = consoleFrontZ - 0.08;
+    const bridgeSections = [
+      { z: bridgeBackZ, half: consoleWidth / 2, bottom: -0.68, top: -0.52 },
+      { z: consoleFrontZ + 0.02, half: consoleWidth / 2 + 0.025, bottom: -0.68, top: -0.515 },
+      { z: consoleFrontZ + 0.14, half: consoleWidth / 2 + 0.07, bottom: -0.67, top: -0.50 },
+      { z: consoleFrontZ + 0.25, half: consoleWidth / 2 + 0.105, bottom: -0.66, top: -0.49 },
+      { z: bridgeFrontZ, half: consoleWidth / 2 + 0.12, bottom: -0.65, top: -0.48 },
+    ];
+    const bridgeVertices = [];
+    const bridgeFaces = [];
+    for (const section of bridgeSections) {
+      bridgeVertices.push(
+        consoleX - section.half, section.bottom, section.z,
+        consoleX + section.half, section.bottom, section.z,
+        consoleX - section.half, section.top, section.z,
+        consoleX + section.half, section.top, section.z,
+      );
+    }
+    for (let i = 0; i < bridgeSections.length - 1; i++) {
+      const a = i * 4, b = a + 4;
+      // bottom, top, left side, right side
+      bridgeFaces.push(a, b, b + 1, a, b + 1, a + 1);
+      bridgeFaces.push(a + 2, a + 3, b + 3, a + 2, b + 3, b + 2);
+      bridgeFaces.push(a, a + 2, b + 2, a, b + 2, b);
+      bridgeFaces.push(a + 1, b + 1, b + 3, a + 1, b + 3, a + 3);
+    }
+    const last = (bridgeSections.length - 1) * 4;
+    bridgeFaces.push(0, 1, 3, 0, 3, 2);
+    bridgeFaces.push(last, last + 2, last + 3, last, last + 3, last + 1);
+    const bridgeGeometry = new THREE.BufferGeometry();
+    bridgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bridgeVertices, 3));
+    bridgeGeometry.setIndex(bridgeFaces);
+    bridgeGeometry.computeVertexNormals();
+    const consoleBridge = add(new THREE.Mesh(bridgeGeometry, M.panel));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
     // Simple gear selector near the front, with no screens or decorative accessories.
