@@ -303,16 +303,26 @@ export function createVehicle(scene, physics, RAPIER) {
   const GEAR_FORCE = [0.42, 0, 1.0, 0.84, 0.72, 0.62, 0.55];
 
   function engineTorqueAtRpm(rpm) {
-    // Broad diesel-ish van curve: weak below the useful band, strongest in the midrange,
-    // then falling away as the engine approaches the limiter.
-    if (rpm < 1100) return 0.58 + 0.42 * clamp((rpm - 750) / 350, 0, 1);
-    if (rpm < 2600) return 1.0;
-    if (rpm < 4200) return 1.0 - 0.18 * ((rpm - 2600) / 1600);
-    return 0.82 - 0.42 * clamp((rpm - 4200) / 1000, 0, 1);
+    // Diesel-ish torque curve: builds from idle, peaks in the useful low-mid range,
+    // holds briefly, then falls away as the engine approaches the limiter.
+    const points = [
+      [750, 0.48], [950, 0.66], [1250, 0.88], [1550, 1.0],
+      [2400, 0.98], [3200, 0.91], [4000, 0.78], [4600, 0.59], [5000, 0.38], [5300, 0.30],
+    ];
+    if (rpm <= points[0][0]) return points[0][1];
+    for (let i = 1; i < points.length; i++) {
+      const [r1, t1] = points[i - 1];
+      const [r2, t2] = points[i];
+      if (rpm <= r2) {
+        const x = clamp((rpm - r1) / (r2 - r1), 0, 1);
+        return t1 + (t2 - t1) * x;
+      }
+    }
+    return points[points.length - 1][1];
   }
   let gearIndex = 2;
   let shiftTimer = 0;
-  let shiftDuration = 0.30;
+  let shiftDuration = 0.34;
   let shiftCueTimer = 0;
   let shiftCue = '';
   let engineRpm = 850;
@@ -327,7 +337,13 @@ export function createVehicle(scene, physics, RAPIER) {
     const nextName = GEAR_NAMES[next];
     if (nextName === 'R' && Math.abs(self.speed) > 1.1) return false;
     const speed = Math.abs(self.speed);
-    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.38 : 0.30;
+    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.34;
+    if (direction < 0 && next >= 2) {
+      const nextSpeed = self.speed * (GEAR_NAMES[next] === 'R' ? -1 : 1);
+      const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[next] / GEAR_RATIOS[2]) * 750;
+      // Blip the engine toward the RPM the lower gear needs before the clutch re-engages.
+      engineRpm = clamp(engineRpm + Math.max(0, targetRpm - engineRpm) * 0.72, 750, 5300);
+    }
     shiftTimer = shiftDuration;
     shiftCue = direction > 0 ? 'UPSHIFT' : 'DOWNSHIFT';
     shiftCueTimer = 0.72;
@@ -361,7 +377,12 @@ export function createVehicle(scene, physics, RAPIER) {
     const speed = Math.abs(self.speed);
     if (direction < 0 && speed > GEAR_CAPS[target] * 0.92) overRevTimer = 0.3;
     gearIndex = target;
-    shiftDuration = 0.30;
+    shiftDuration = 0.34;
+    if (direction < 0 && target >= 2) {
+      const nextSpeed = self.speed * (GEAR_NAMES[target] === 'R' ? -1 : 1);
+      const targetRpm = 850 + Math.max(0, nextSpeed) * (GEAR_RATIOS[target] / GEAR_RATIOS[2]) * 750;
+      engineRpm = clamp(engineRpm + Math.max(0, targetRpm - engineRpm) * 0.72, 750, 5300);
+    }
     shiftTimer = shiftDuration;
     shiftCue = direction > 0 ? 'UPSHIFT' : 'DOWNSHIFT';
     shiftCueTimer = 0.72;
@@ -584,7 +605,12 @@ export function createVehicle(scene, physics, RAPIER) {
 
     const lugging = gearIndex >= 3 && speedInGear < gearMin * 0.78 && t > 0.04;
     let torque = gearName === 'N' ? 0 : GEAR_FORCE[gearIndex] * engineTorqueAtRpm(engineRpm);
-    if (shiftTimer > 0) torque *= 1 - 0.92 * clamp(shiftTimer / shiftDuration, 0, 1);
+    if (shiftTimer > 0) {
+      // Clutch take-up eases in progressively instead of restoring full drive force abruptly.
+      const shiftProgress = 1 - clamp(shiftTimer / shiftDuration, 0, 1);
+      const clutchEngagement = shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
+      torque *= 0.04 + 0.96 * clutchEngagement;
+    }
     if (lugging) {
       lugPhase += dt * Math.PI * 2 * 5.0;
       torque *= 0.18 + 0.82 * Math.max(0, Math.sin(lugPhase));
@@ -666,7 +692,7 @@ export function createVehicle(scene, physics, RAPIER) {
   function reset(y = cfg.spawnHeight, heading = 0) {
     gearIndex = 2;
     shiftTimer = 0;
-    shiftDuration = 0.30;
+    shiftDuration = 0.34;
     shiftCueTimer = 0;
     shiftCue = '';
     engineRpm = 850;
