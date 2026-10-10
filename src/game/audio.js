@@ -102,12 +102,12 @@ export function createAudio() {
     const rpmTarget = engineRPM;
     audioRpm += (rpmTarget - audioRpm) * (1 - Math.exp(-(lugging ? 7 : 5) * dt));
 
-    // Keep the vehicle's real RPM/physics model unchanged. Gear-specific multipliers shape
-    // only the synthesized engine pitch, making each gear audibly distinct without affecting handling.
-    const pitchByGear = { R: 1.08, N: 1.14, '1': 1.30, '2': 1.20, '3': 1.13, '4': 1.08, '5': 1.03 };
-    const limiterFlutter = engineRPM > 4900 ? 1 + 0.035 * Math.sin(t * 95) : 1;
-    // Raise the audible engine harmonics, especially in the taller gears, without changing vehicle physics.
-    const crankHz = clamp((audioRpm / 25) * (pitchByGear[gear] ?? 1) * limiterFlutter, 34, 340);
+    // Pitch follows RPM only. Gear ratios already change RPM in the vehicle model, so applying
+    // another multiplier per gear would make the same engine magically change character on each shift.
+    const limiterFlutter = engineRPM > 4900 ? 1 + 0.025 * Math.sin(t * 95) : 1;
+    // Map idle-to-redline across a deliberately broad audible range while keeping the ramp smooth.
+    const rpmNorm = clamp((audioRpm - 700) / (5300 - 700), 0, 1);
+    const crankHz = clamp((42 + rpmNorm * 300) * limiterFlutter, 42, 360);
     engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
 
     const cutoff = 750 + rev * 2800 + load * 1050;
