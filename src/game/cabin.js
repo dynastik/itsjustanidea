@@ -108,21 +108,22 @@ export function createCabInterior(vehicle) {
     // Broad central horn pad and four substantial arms, inspired by the reference silhouette.
     // Rounded rectangular horn pad, with genuinely softened corners rather than a sharp box.
     const hubShape = new THREE.Shape();
-    const hw = 0.082, hh = 0.06, hr = 0.03;
-    hubShape.moveTo(-hw + hr, -hh);
-    hubShape.lineTo(hw - hr, -hh);
-    hubShape.quadraticCurveTo(hw, -hh, hw, -hh + hr);
-    hubShape.lineTo(hw, hh - hr);
-    hubShape.quadraticCurveTo(hw, hh, hw - hr, hh);
-    hubShape.lineTo(-hw + hr, hh);
-    hubShape.quadraticCurveTo(-hw, hh, -hw, hh - hr);
-    hubShape.lineTo(-hw, -hh + hr);
-    hubShape.quadraticCurveTo(-hw, -hh, -hw + hr, -hh);
+    const topHalf = 0.115, bottomHalf = 0.055, topY = 0.08, bottomY = -0.08, corner = 0.025;
+    // Upside-down rounded trapezium: broad top edge, tapered sides, narrower bottom.
+    hubShape.moveTo(-topHalf + corner, topY);
+    hubShape.lineTo(topHalf - corner, topY);
+    hubShape.quadraticCurveTo(topHalf, topY, topHalf - 0.006, topY - corner);
+    hubShape.lineTo(bottomHalf + corner * 0.3, bottomY + corner);
+    hubShape.quadraticCurveTo(bottomHalf, bottomY, bottomHalf - corner, bottomY);
+    hubShape.lineTo(-bottomHalf + corner, bottomY);
+    hubShape.quadraticCurveTo(-bottomHalf, bottomY, -bottomHalf - corner * 0.3, bottomY + corner);
+    hubShape.lineTo(-topHalf + 0.006, topY - corner);
+    hubShape.quadraticCurveTo(-topHalf, topY, -topHalf + corner, topY);
     const hubGeometry = new THREE.ExtrudeGeometry(hubShape, {
-      depth: 0.045, bevelEnabled: true, bevelSegments: 3,
-      steps: 1, bevelSize: 0.009, bevelThickness: 0.007, curveSegments: 8,
+      depth: 0.07, bevelEnabled: true, bevelSegments: 4,
+      steps: 1, bevelSize: 0.012, bevelThickness: 0.01, curveSegments: 10,
     });
-    hubGeometry.translate(0, 0, -0.022);
+    hubGeometry.translate(0, 0, -0.035);
     spin.add(new THREE.Mesh(hubGeometry, M.panel));
     const armMat = M.trim;
     const arm = (x1, y1, x2, y2, width = 0.025) => {
@@ -160,7 +161,7 @@ export function createCabInterior(vehicle) {
     const consoleX = cabinCenterX;
     // Dash spans roughly zDash - 0.5 to zDash. Join at its rear edge so the console
     // emerges visibly from the dashboard instead of disappearing inside its mesh.
-    const consoleFrontZ = zDash - 0.48;
+    const consoleFrontZ = zDash - 0.60;
     const consoleBackZ = zBack + 0.015;
     const consoleLength = Math.max(0.65, consoleFrontZ - consoleBackZ);
     const consoleCenterZ = (consoleFrontZ + consoleBackZ) / 2;
