@@ -52,13 +52,6 @@ export function createInput(actions) {
       return;
     }
 
-    if (key in hotkeys) {
-      e.preventDefault();
-      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
-      if (!e.repeat) hotkeys[key]();
-      return;
-    }
-
     // Highway letters belong to the typing mechanic, including Q/E and uppercase characters.
     // Route them before gear shortcuts so story text can contain every letter.
     if (state.mode === 'highway') {
@@ -70,6 +63,13 @@ export function createInput(actions) {
         e.preventDefault();
         actions.typeKey?.(e.key);
       }
+      return;
+    }
+
+    if (key in hotkeys) {
+      e.preventDefault();
+      if (key === KEYS.cabView || key === KEYS.debug) clearHeld();
+      if (!e.repeat) hotkeys[key]();
       return;
     }
 
