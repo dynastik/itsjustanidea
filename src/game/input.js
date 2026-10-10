@@ -16,7 +16,7 @@ export const KEYS = {
 };
 
 // Match the vehicle's 30 m/s max; per-gear caps still apply.
-const CITY_SPEED_CAP = 999; // TEMP TEST: remove city speed cap
+const CITY_SPEED_CAP = 30;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 // The ONE object the vehicle reads. City fills it from WASD, highway from typing.
@@ -54,6 +54,16 @@ export function createInput(actions) {
     if (key === 'r' && state.mode === 'city') {
       e.preventDefault();
       if (!e.repeat) actions.reset();
+      return;
+    }
+
+    // Q/E give explicit manual downshift/upshift control in the city; Shift keeps the quick speed-based selector.
+    if ((key === 'q' || key === 'e') && state.mode === 'city') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) {
+        if (key === 'q') actions.shiftDown?.();
+        else actions.shiftUp?.();
+      }
       return;
     }
 
