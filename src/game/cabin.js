@@ -38,7 +38,7 @@ let pedalTilt = 0.55;
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
-  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null };
+  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
 
   function clear() {
     root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -263,14 +263,17 @@ export function createCabInterior(vehicle) {
     bridgePivot.add(new THREE.Mesh(bridgeGeometry, bridgeMaterial));
     add(box(consoleWidth - 0.035, 0.035, Math.max(0.3, consoleLength - 0.38), M.trim, consoleX, -0.565, consoleCenterZ - 0.035));
 
-    // Simple gear selector near the front, with no screens or decorative accessories.
+    // Gear stick pivots at its boot and leans into the selected H-pattern gate.
+    const shifter = add(new THREE.Group());
+    shifter.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
     const shifterStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.13, 8), M.trim);
-    shifterStem.position.set(consoleX, -0.49, consoleFrontZ - 0.36);
+    shifterStem.position.y = 0.065;
     shifterStem.rotation.x = -0.18;
-    add(shifterStem);
+    shifter.add(shifterStem);
     const shifterKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M.dark);
-    shifterKnob.position.set(consoleX, -0.425, consoleFrontZ - 0.36);
-    add(shifterKnob);
+    shifterKnob.position.y = 0.13;
+    shifter.add(shifterKnob);
+    parts.shifter = shifter;
 
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
     add(beam(V(xC, yRoof - 0.02, 0.48), V(xC, yRoof - 0.15, 0.44), 0.02, M.trim));
@@ -294,11 +297,38 @@ export function createCabInterior(vehicle) {
     setSteeringAngle(v.steerAngle);
     // Accelerator (right) and brake (middle) pivot toward a more upright position
     // while pressed, with a smoothed return when released.
-    const pedalTargets = [0, clamp(driveInput.brake ?? 0, 0, 1), clamp(driveInput.throttle ?? 0, 0, 1)];
+    // Transmission.clutch is the actual simulated disengagement amount: 1 = pedal down,
+    // 0 = clutch fully coupled. Drive the left pedal from that value, not player throttle.
+    const pedalTargets = [
+      clamp(v.transmission?.clutch ?? 0, 0, 1),
+      clamp(driveInput.brake ?? 0, 0, 1),
+      clamp(driveInput.throttle ?? 0, 0, 1),
+    ];
     for (let i = 0; i < pedalGroups.length; i++) {
       const target = pedalTilt - pedalTargets[i] * 0.35;
       pedalGroups[i].rotation.x += (target - pedalGroups[i].rotation.x) * (1 - Math.exp(-12 * dt));
     }
+
+    // Five-speed H-pattern: R/1 left, 2/3 centre, 4/5 right. The stick leans
+    // smoothly to the selected gate, including the automatic reverse/first changes.
+    if (parts.shifter) {
+      const gates = {
+        R: [-0.065, -0.055],
+        N: [0, 0],
+        1: [-0.065, 0.055],
+        2: [-0.065, -0.055],
+        3: [0, 0.055],
+        4: [0, -0.055],
+        5: [0.065, 0.055],
+      };
+      const [x, z] = gates[v.transmission?.gear] ?? gates.N;
+      const targetX = -Math.atan2(x, 0.13);
+      const targetZ = Math.atan2(z, 0.13);
+      const smoothing = 1 - Math.exp(-14 * dt);
+      parts.shifter.rotation.z += (targetX - parts.shifter.rotation.z) * smoothing;
+      parts.shifter.rotation.x += (targetZ - parts.shifter.rotation.x) * smoothing;
+    }
+
     if (parts.freshener) {
       const target = clamp(-v.steerAngle * v.speed * v.speed * 0.025, -0.9, 0.9);
       parts.freshener.rotation.z += (target - parts.freshener.rotation.z) * (1 - Math.exp(-5 * dt));
