@@ -13,7 +13,7 @@ const partOf=c=>c<.12?"morning":c<.46?"day":c<.64?"dusk":c<.86?"night":"dawn";
 const moodAct=()=>MOOD[Math.min(state.dayIndex||0,MOOD.length-1)][partOf(state.worldTime)];
 const LABELS={narration:"THE STORY",message:"THE ROAD",sign:"ROAD SIGN"};
 export const getSourceLabel=s=>LABELS[s]||LABELS.narration;
-export const isCaseInsensitive=s=>s==="message"||s==="sign";
+export const isCaseInsensitive=()=>true;
 let mode="short";try{const q=new URLSearchParams(window.location.search).get("mode"),saved=q||window.localStorage.getItem(KEY);if(saved==="short"||saved==="long")mode=saved;}catch{}
 let cursor=0,finished=false,currentAct="calm",lastFiller="";
 export const getStoryMode=()=>mode;
