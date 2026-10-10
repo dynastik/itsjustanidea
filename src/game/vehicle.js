@@ -502,11 +502,17 @@ export function createVehicle(scene, physics, RAPIER) {
     if (gearName !== 'N' && gearSpeed > cap) F -= h.brakeForce * 0.25 * clamp((gearSpeed - cap) / 3, 0, 1);
     if (off) F -= h.offRoad.dragForce * moving;
 
+    // Each gear has its own RPM band. Lower gears rev higher over a shorter speed range;
+    // upshifting drops RPM instead of every gear following the same generic pitch curve.
+    const rpmSpanByGear = { R: 1900, N: 0, '1': 5200, '2': 4300, '3': 3500, '4': 2850, '5': 2250 };
+    const throttleRevByGear = { R: 350, N: 4200, '1': 700, '2': 550, '3': 420, '4': 300, '5': 180 };
     const rpmTarget = gearName === 'N'
-      ? 850 + t * 4200
+      ? 850 + t * throttleRevByGear.N
       : gearName === '5' && Math.abs(v) < 4.5 && t > 0
         ? 900 + t * 750 + (0.5 + 0.5 * Math.sin(lugPhase)) * 350
-        : 850 + clamp(Math.abs(v) / Math.max(cap, 1), 0, 1) * 5200 + t * 700;
+        : 850
+          + clamp(Math.abs(v) / Math.max(cap, 1), 0, 1) * rpmSpanByGear[gearName]
+          + t * throttleRevByGear[gearName];
     engineRpm += (rpmTarget - engineRpm) * (1 - Math.exp(-5 * dt));
 
     const perWheel = (F / 4) * cal.engineSign;
