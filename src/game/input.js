@@ -1,6 +1,5 @@
 import { state } from './state.js';
 import { HIGHWAY_CONFIG, getWpm, getAccuracy, getInstability, getWheelJerk } from './typing.js';
-import { HANDOFF_SPEED_S } from './zones.js';
 
 // Non-printable keys on purpose: the highway types letters, capitals, spaces and punctuation.
 export const KEYS = {
