@@ -296,6 +296,32 @@ export function createCabInterior(vehicle) {
     for (const railZ of [-0.071, 0.071]) {
       add(box(0.154, 0.004, 0.0035, gateRailMat, consoleX, -0.558, gateZ + railZ));
     }
+    // Soft leather/rubber shift boot between the stick and transmission tunnel.
+    // It stays attached to the console while the stick pivots through its opening.
+    const bootLeather = mat(0x211e1b, { roughness: 1 });
+    const bootPleat = mat(0x34302c, { roughness: 0.96 });
+    const boot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.052, 0.085, 10, 3, false),
+      bootLeather,
+    );
+    boot.position.set(consoleX, -0.514, gateZ);
+    add(boot);
+    // Shallow raised folds give the flexible cover a stitched, accordion-like silhouette.
+    for (const [foldY, foldRadius] of [
+      [-0.544, 0.046],
+      [-0.525, 0.039],
+      [-0.506, 0.032],
+      [-0.487, 0.026],
+    ]) {
+      const fold = new THREE.Mesh(
+        new THREE.TorusGeometry(foldRadius, 0.0032, 5, 12),
+        bootPleat,
+      );
+      fold.rotation.x = Math.PI / 2;
+      fold.position.set(consoleX, foldY, gateZ);
+      add(fold);
+    }
+
     // Fixed pivot at the boot: the stem and knob rotate around this point, never slide.
     const shifter = add(new THREE.Group());
     shifter.position.set(consoleX, -0.49, gateZ);
