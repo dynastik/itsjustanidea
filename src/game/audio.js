@@ -95,7 +95,7 @@ export function createAudio() {
     const v = Math.abs(speed);
     const load = clamp(throttle, 0, 1);
     const rev = clamp((engineRPM - 700) / 5800, 0, 1);
-    const lugging = gear === '5' && v < 4 && load > 0.05;
+    const lugging = ['3', '4', '5'].includes(gear) && v < (gear === '3' ? 5 : 8) && load > 0.05;
     audioClutch += (clamp(clutch, 0, 1) - audioClutch) * (1 - Math.exp(-18 * dt));
 
     const rpmTarget = lugging
@@ -105,12 +105,13 @@ export function createAudio() {
 
     // Keep the vehicle's real RPM/physics model unchanged. Gear-specific multipliers shape
     // only the synthesized engine pitch, making each gear audibly distinct without affecting handling.
-    const pitchByGear = { R: 1.05, N: 1.12, '1': 1.22, '2': 1.10, '3': 1.0, '4': 0.91, '5': 0.84 };
-    const limiterFlutter = engineRPM > 4900 ? 1 + 0.025 * Math.sin(t * 95) : 1;
-    const crankHz = clamp((audioRpm / 30) * (pitchByGear[gear] ?? 1) * limiterFlutter, 28, 300);
+    const pitchByGear = { R: 1.08, N: 1.14, '1': 1.30, '2': 1.20, '3': 1.13, '4': 1.08, '5': 1.03 };
+    const limiterFlutter = engineRPM > 4900 ? 1 + 0.035 * Math.sin(t * 95) : 1;
+    // Raise the audible engine harmonics, especially in the taller gears, without changing vehicle physics.
+    const crankHz = clamp((audioRpm / 25) * (pitchByGear[gear] ?? 1) * limiterFlutter, 34, 340);
     engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
 
-    const cutoff = 550 + rev * 2300 + load * 850;
+    const cutoff = 750 + rev * 2800 + load * 1050;
     mufflerFilter.frequency.setTargetAtTime(cutoff, t, 0.055);
     exhaustResonance.frequency.setTargetAtTime(
       clamp(crankHz * 2.1, 120, 700), t, 0.07
@@ -118,10 +119,10 @@ export function createAudio() {
     exhaustResonance.gain.setTargetAtTime(1 + load * 1.8 + rev * 1.1, t, 0.09);
 
     intakeFilter.frequency.setTargetAtTime(650 + rev * 500 + load * 250, t, 0.1);
-    intakeGain.gain.setTargetAtTime(0.001 + load * 0.0025 + rev * 0.0015, t, 0.1);
+    intakeGain.gain.setTargetAtTime(0.0015 + load * 0.004 + rev * 0.0025, t, 0.1);
     const shiftDucking = 1 - audioClutch * 0.72;
     engineGain.gain.setTargetAtTime(
-      (0.17 + load * 0.09 + rev * 0.045 + (lugging ? 0.02 : 0)) * shiftDucking, t, 0.07
+      (0.28 + load * 0.17 + rev * 0.09 + (lugging ? 0.035 : 0)) * shiftDucking, t, 0.07
     );
 
     const vn = clamp(v / 30, 0, 1);
