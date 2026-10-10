@@ -507,13 +507,13 @@ export function createVehicle(scene, physics, RAPIER) {
     if (shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
 
+    // S at a standstill selects reverse; pressing W again returns to first gear.
+    if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
+    else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
     const gearCap = GEAR_CAPS[gearIndex] || 0.1;
     const cap = Math.max(0.1, Math.min(input.speedCap ?? h.maxSpeed, h.maxSpeed, gearCap)) * (off ? h.offRoad.speedFactor : 1);
-    // S at a standstill selects reverse; pressing W again returns to first gear.
-    if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
-    else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
     const t = clamp(Math.abs(input.throttle), 0, 1);
     const moving = clamp(Math.abs(v) / 0.5, 0, 1) * Math.sign(v);
     const speedInGear = v * direction;
