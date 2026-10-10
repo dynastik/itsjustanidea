@@ -98,9 +98,8 @@ export function createAudio() {
     const lugging = ['3', '4', '5'].includes(gear) && v < (gear === '3' ? 5 : 8) && load > 0.05;
     audioClutch += (clamp(clutch, 0, 1) - audioClutch) * (1 - Math.exp(-18 * dt));
 
-    const rpmTarget = lugging
-      ? Math.min(engineRPM, 1500 + load * 180)
-      : engineRPM;
+    // Follow the vehicle RPM in every gear; don't impose a separate low-RPM audio ceiling while lugging.
+    const rpmTarget = engineRPM;
     audioRpm += (rpmTarget - audioRpm) * (1 - Math.exp(-(lugging ? 7 : 5) * dt));
 
     // Keep the vehicle's real RPM/physics model unchanged. Gear-specific multipliers shape
