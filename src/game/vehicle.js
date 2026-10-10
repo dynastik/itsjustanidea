@@ -22,7 +22,7 @@ export const VEHICLE_CONFIG = {
   body: {
     mass: 1200,
     comOffsetY: -0.35,
-    linearDamping: 0.12,
+    linearDamping: 0.025,
     angularDamping: 0.8,
   },
   suspension: {
@@ -324,7 +324,7 @@ export function createVehicle(scene, physics, RAPIER) {
   }
   let gearIndex = 2;
   let shiftTimer = 0;
-  let shiftDuration = 0.38;
+  let shiftDuration = 0.40;
   let throttleOffTimer = 0;
   let downshiftHoldTimer = 0;
   let coastClutch = 1;
@@ -342,7 +342,7 @@ export function createVehicle(scene, physics, RAPIER) {
     const nextName = GEAR_NAMES[next];
     if (nextName === 'R' && Math.abs(self.speed) > 1.1) return false;
     const speed = Math.abs(self.speed);
-    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.38;
+    shiftDuration = direction > 0 && next >= 3 && speed < GEAR_MIN_SPEED[next] * 0.78 ? 0.42 : 0.40;
     if (direction < 0 && next >= 2) {
       downshiftHoldTimer = 1.6;
       const nextSpeed = self.speed * (GEAR_NAMES[next] === 'R' ? -1 : 1);
@@ -572,10 +572,6 @@ export function createVehicle(scene, physics, RAPIER) {
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
     if (downshiftHoldTimer > 0) downshiftHoldTimer = Math.max(0, downshiftHoldTimer - dt);
 
-    // S at a standstill selects reverse; pressing W again returns to first gear.
-    if (input.throttle < -0.05 && Math.abs(v) < 1.1) gearIndex = 0;
-    else if (input.throttle > 0.05 && gearIndex === 0) gearIndex = 2;
-
     // Both zones use the manual gearbox; highway steering is automated, not shifting.
 
     const gearName = GEAR_NAMES[gearIndex];
@@ -704,7 +700,7 @@ export function createVehicle(scene, physics, RAPIER) {
   function reset(y = cfg.spawnHeight, heading = 0) {
     gearIndex = 2;
     shiftTimer = 0;
-    shiftDuration = 0.34;
+    shiftDuration = 0.40;
     throttleOffTimer = 0;
     downshiftHoldTimer = 0;
     coastClutch = 1;
