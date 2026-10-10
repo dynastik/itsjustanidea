@@ -57,11 +57,10 @@ export function createInput(actions) {
       return;
     }
 
-    // Shift is a single clutch-like request: choose the gear appropriate to current speed.
-    // It works in both modes and never consumes story text. No background shifting occurs.
+    // Shift controls the manual city gearbox only. Highway shifting is automatic.
     if (key === 'shift') {
       e.preventDefault();
-      if (!e.repeat && !state.paused) actions.smartShift?.();
+      if (!e.repeat && !state.paused && state.mode === 'city') actions.smartShift?.();
       return;
     }
 
