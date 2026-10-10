@@ -298,6 +298,7 @@ export function createVehicle(scene, physics, RAPIER) {
   let gearIndex = 2;
   let shiftTimer = 0;
   let engineRpm = 850;
+  let lugPhase = 0;
   function shiftGear(direction) {
     const next = clamp(gearIndex + direction, 0, GEAR_NAMES.length - 1);
     if (next === gearIndex) return false;
@@ -481,7 +482,19 @@ export function createVehicle(scene, physics, RAPIER) {
     if (gearName !== 'N' && t > 0) {
       const direction = gearName === 'R' ? -1 : 1;
       const speedAlongGear = v * direction;
-      F += direction * h.engineForce * GEAR_FORCE[gearIndex] * t * clamp(1 - speedAlongGear / cap, 0, 1) * clutchCut;
+      let lugTorque = 1;
+      if (gearName === '5' && Math.abs(v) < 4.5) {
+        // Starting in top gear should lug and judder instead of pulling away cleanly.
+        // Pulsed wheel torque creates a small physical fore/aft jerk without extra bodies.
+        lugPhase += dt * (2 * Math.PI * 5.2);
+        const pulse = Math.max(0, Math.sin(lugPhase));
+        lugTorque = 0.10 + pulse * 0.90;
+      } else {
+        lugPhase = 0;
+      }
+      F += direction * h.engineForce * GEAR_FORCE[gearIndex] * t * lugTorque * clamp(1 - speedAlongGear / cap, 0, 1) * clutchCut;
+    } else if (gearName !== '5') {
+      lugPhase = 0;
     }
     if (input.brake > 0) F -= h.brakeForce * input.brake * moving;
     if (t === 0 && input.brake === 0) F -= h.coastForce * moving;
@@ -490,8 +503,10 @@ export function createVehicle(scene, physics, RAPIER) {
     if (off) F -= h.offRoad.dragForce * moving;
 
     const rpmTarget = gearName === 'N'
-      ? 850 + t * 1800
-      : 850 + clamp(Math.abs(v) / Math.max(cap, 1), 0, 1) * 3900 + t * 550;
+      ? 850 + t * 4200
+      : gearName === '5' && Math.abs(v) < 4.5 && t > 0
+        ? 900 + t * 750 + (0.5 + 0.5 * Math.sin(lugPhase)) * 350
+        : 850 + clamp(Math.abs(v) / Math.max(cap, 1), 0, 1) * 5200 + t * 700;
     engineRpm += (rpmTarget - engineRpm) * (1 - Math.exp(-5 * dt));
 
     const perWheel = (F / 4) * cal.engineSign;
@@ -552,6 +567,7 @@ export function createVehicle(scene, physics, RAPIER) {
     gearIndex = 2;
     shiftTimer = 0;
     engineRpm = 850;
+    lugPhase = 0;
     body.setTranslation({ x: 0, y, z: 0 }, true);
     body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
