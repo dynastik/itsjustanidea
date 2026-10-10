@@ -130,6 +130,7 @@ async function main() {
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    smartShift: () => vehicle.smartShift(),
     shiftUp: () => vehicle.shiftUp(),
     shiftDown: () => vehicle.shiftDown(),
     toggleAutoShift: () => vehicle.toggleAutoShift(),
