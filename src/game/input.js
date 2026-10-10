@@ -44,6 +44,12 @@ export function createInput(actions) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
 
+    if (state.mode === 'city' && !e.repeat && (key === '1' || key === '2')) {
+      e.preventDefault();
+      actions.setStoryMode?.(key === '1' ? 'short' : 'long');
+      return;
+    }
+
     if (key === 'r' && state.mode === 'city') {
       e.preventDefault();
       if (!e.repeat) actions.reset();
