@@ -625,7 +625,7 @@ export function createVehicle(scene, physics, RAPIER) {
     let shiftCoupling = 1;
     if (shiftTimer > 0) {
       const shiftProgress = 1 - clamp(shiftTimer / shiftDuration, 0, 1);
-      shiftCoupling = 0.04 + 0.96 * shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
+      shiftCoupling = 0.78 + 0.22 * shiftProgress * shiftProgress * (3 - 2 * shiftProgress);
     }
     torque *= coastClutch * shiftCoupling;
     if (lugging) {
