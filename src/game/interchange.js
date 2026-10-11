@@ -1,5 +1,5 @@
 // Highway interchange: the elevated cross-highway and the on-ramp that leaves the end of the city road and merges onto it.
-// Model-free (ribbons + instanced rails and pillars, a few draw calls). Replaces the old ramp in world.js.
+// Model-free (ribbons + instanced rails, piers, caps and girders: a handful of draw calls). Replaces the old ramp in world.js.
 //
 //   city road  ->  short straight  ->  smooth 90 degree bend (curvature and slope both continuous, rising to deck height)
 //              ->  acceleration lane running ALONGSIDE the highway (edge to edge, no coplanar overlap)
@@ -9,6 +9,8 @@
 //  - Guardrails only on the outer edge; the highway-facing edge is open from the start of the lane, and the highway's
 //    city-side rail is open along the merge, so there is a real gap to merge through.
 //  - Ramp height follows the highway deck exactly along the merge (no step, no gap to fall through).
+//  - Supports: ONE chunky square pier per ~PILLAR_SPACING m, centred under the road, with a wider cap slab on top,
+//    plus a dark girder strip along the underside so the deck has thickness from below.
 //  - `drivePath` is the centre line to drive: city end -> bend -> lane -> eased onto the highway centre -> along the
 //    highway. A lane-follower can use it instead of the z-indexed city road frame.
 import * as THREE from 'three';
@@ -30,10 +32,24 @@ export const INTERCHANGE = {
   leadLen: 12,       // straight lead-in continuing the city road
 };
 
+// Support tuning (metres). The road is 9 m wide.
+const SUPPORT = {
+  pierSize: 3.4,     // square pier footprint
+  spacing: 36,       // road length between piers
+  capW: 7.8,         // cap slab, across the road
+  capL: 4.8,         // cap slab, along the road
+  capH: 0.7,
+  girderW: 6.6,      // underside girder strip
+  girderH: 0.55,
+  minPierH: 0.6,     // no pier where the road is this close to the ground
+  minGirderGap: 1.0, // no girder where the road is this close to the ground
+};
+
 // opts: { halfWidth, cityEndZ, getRoadFrame(z) -> {x, y, heading}, terrainHeight(x, z), layout (highwayLayout.js) }
 export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, opts) {
   const { halfWidth: half, cityEndZ, getRoadFrame, terrainHeight, layout } = opts;
   const C = INTERCHANGE;
+  const S = SUPPORT;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const highwayZ = HW.z;
 
@@ -165,7 +181,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
   const drivePath = path.concat(highwaySamples.filter((p) => p.x > taperEndX + 3).map((p) => p.clone()));
 
-  // ---------- guardrails (visible + colliders), pillars ----------
+  // ---------- guardrails (visible + colliders) ----------
   const railPieces = [];
   function railLine(edge, other, body, skip) {
     for (let i = 0; i < edge.length - 1; i++) {
@@ -202,6 +218,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
   const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, Math.max(railPieces.length, 1));
   const dummy = new THREE.Object3D();
+  dummy.rotation.order = 'YXZ'; // yaw first, then pitch along the road's grade (girders)
   railPieces.forEach((r, i) => {
     dummy.position.set(r.x, r.y, r.z);
     dummy.rotation.set(0, r.yaw, 0);
@@ -218,38 +235,92 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   rails.frustumCulled = false;
   scene.add(rails);
 
-  // supports under anything that is well above the ground (none where the road is near ground level)
-  const pillarSpots = [];
-  const addPillar = (x, z, topY) => {
+  // ---------- supports: chunky piers + caps, underside girders ----------
+  // Box local axes after yaw = heading: +x across the road, +z along it.
+  const headingOf = (side) => Math.atan2(-side.z, side.x); // side = (tz, 0, -tx), so this is atan2(tx, tz)
+  const piers = [];   // { x, z, base, h, capY, heading }
+  function addPier(x, z, roadY, heading) {
     const base = terrainHeight(x, z);
-    const h = topY - base;
-    if (h >= 0.6) pillarSpots.push([x, base + h / 2, z, h]);
-  };
-  for (let i = 4; i < highwaySamples.length - 4; i += 8) {
-    for (const sign of [-1, 1]) {
-      const p = highwaySamples[i];
-      addPillar(p.x + hwSides[i].x * sign * (half + 1.1), p.z + hwSides[i].z * sign * (half + 1.1), p.y);
+    const topOfPier = roadY - 0.05 - S.capH;       // the cap sits just under the ribbon (no z-fighting)
+    const h = topOfPier - base;
+    if (h < S.minPierH) return;
+    piers.push({ x, z, base, h, capY: topOfPier + S.capH / 2, heading });
+  }
+  // walk a polyline, dropping a pier every S.spacing metres of road
+  function pierRun(points, headings, from, to) {
+    let run = S.spacing / 2;
+    for (let i = Math.max(from, 1); i < to; i++) {
+      run += points[i].distanceTo(points[i - 1]);
+      if (run < S.spacing) continue;
+      run = 0;
+      addPier(points[i].x, points[i].z, points[i].y, headings[i]);
     }
   }
-  for (let i = leadCount; i < path.length - taperN; i += 6) {
-    const c = centres[i];
-    const out = new THREE.Vector3().subVectors(R[i], L[i]).setY(0).normalize();
-    addPillar(R[i].x + out.x * 1.1, R[i].z + out.z * 1.1, c.y);
-    if (i < bendEndIdx - 2) addPillar(L[i].x - out.x * 1.1, L[i].z - out.z * 1.1, c.y); // none under the lane beside the highway
-  }
-  const pillarMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
-  const pillars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), pillarMat, Math.max(pillarSpots.length, 1));
-  pillarSpots.forEach(([x, y, z, h], i) => {
-    dummy.position.set(x, y, z);
-    dummy.rotation.set(0, 0, 0);
-    dummy.scale.set(0.72, h, 0.72);
+  pierRun(highwaySamples, hwSides.map(headingOf), 1, highwaySamples.length - 1);
+  pierRun(centres, sides.map(headingOf), leadCount, centres.length); // ramp bend + lane (the taper is skipped)
+
+  const pierMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
+  const capMat = new THREE.MeshToonMaterial({ color: 0x6f7276, gradientMap: toonGradientMap });
+  const unit = new THREE.BoxGeometry(1, 1, 1);
+  const pierMesh = new THREE.InstancedMesh(unit, pierMat, Math.max(piers.length, 1));
+  const capMesh = new THREE.InstancedMesh(unit, capMat, Math.max(piers.length, 1));
+  piers.forEach((p, i) => {
+    dummy.position.set(p.x, p.base + p.h / 2, p.z);
+    dummy.rotation.set(0, p.heading, 0);
+    dummy.scale.set(S.pierSize, p.h, S.pierSize);
     dummy.updateMatrix();
-    pillars.setMatrixAt(i, dummy.matrix);
+    pierMesh.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(p.x, p.capY, p.z);
+    dummy.scale.set(S.capW, S.capH, S.capL);
+    dummy.updateMatrix();
+    capMesh.setMatrixAt(i, dummy.matrix);
+    physics.createCollider(
+      RAPIER.ColliderDesc.cuboid(S.pierSize / 2, p.h / 2, S.pierSize / 2)
+        .setTranslation(p.x, p.base + p.h / 2, p.z).setRotation(yawQuat(p.heading)).setFriction(0.6),
+      highway.body
+    );
   });
-  pillars.count = pillarSpots.length;
-  pillars.instanceMatrix.needsUpdate = true;
-  pillars.frustumCulled = false;
-  scene.add(pillars);
+  for (const m of [pierMesh, capMesh]) {
+    m.count = piers.length;
+    m.instanceMatrix.needsUpdate = true;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.frustumCulled = false;
+    scene.add(m);
+  }
+
+  // Girder strip hugging the underside of the road, only where the road is well above the ground.
+  const girders = [];  // { x, y, z, len, yaw, pitch }
+  function girderRun(points, from, to) {
+    for (let i = Math.max(from, 1); i < to; i++) {
+      const a = points[i - 1], b = points[i];
+      const dx = b.x - a.x, dz = b.z - a.z, flat = Math.hypot(dx, dz);
+      if (flat < 0.3) continue;
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, my = (a.y + b.y) / 2;
+      if (my - terrainHeight(mx, mz) < S.minGirderGap) continue;
+      girders.push({
+        x: mx, z: mz, y: my - 0.05 - S.girderH / 2,
+        len: Math.hypot(flat, b.y - a.y) + 0.2,
+        yaw: Math.atan2(dx, dz), pitch: Math.atan2(b.y - a.y, flat),
+      });
+    }
+  }
+  girderRun(highwaySamples, 1, highwaySamples.length);
+  girderRun(centres, leadCount, centres.length);
+  const girderMat = new THREE.MeshToonMaterial({ color: 0x4d5054, gradientMap: toonGradientMap });
+  const girderMesh = new THREE.InstancedMesh(unit, girderMat, Math.max(girders.length, 1));
+  girders.forEach((g, i) => {
+    dummy.position.set(g.x, g.y, g.z);
+    dummy.rotation.set(-g.pitch, g.yaw, 0);
+    dummy.scale.set(S.girderW, S.girderH, g.len);
+    dummy.updateMatrix();
+    girderMesh.setMatrixAt(i, dummy.matrix);
+  });
+  girderMesh.count = girders.length;
+  girderMesh.instanceMatrix.needsUpdate = true;
+  girderMesh.castShadow = true;
+  girderMesh.frustumCulled = false;
+  scene.add(girderMesh);
 
   // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
   const roadXZ = [];
@@ -264,5 +335,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     return false;
   }
 
-  return { drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad, westEndX: HW.westX };
+  return {
+    drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
+    westEndX: HW.westX, pierCount: piers.length, girderCount: girders.length,
+  };
 }
