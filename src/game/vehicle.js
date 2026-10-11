@@ -572,7 +572,16 @@ export function createVehicle(scene, physics, RAPIER) {
     if (overRevTimer > 0) overRevTimer = Math.max(0, overRevTimer - dt);
     if (downshiftHoldTimer > 0) downshiftHoldTimer = Math.max(0, downshiftHoldTimer - dt);
 
-    // Both zones use the manual gearbox; highway steering is automated, not shifting.
+    // Highway gets automatic shifting; the city keeps its manual gearbox.
+    // Use separate up/down thresholds so speed fluctuations don't make the gearbox hunt.
+    if (state.mode === 'highway' && shiftTimer <= 0 && gearIndex >= 2) {
+      const shiftSpeed = Math.max(0, v);
+      if (gearIndex < 6 && shiftSpeed >= GEAR_CAPS[gearIndex] * 0.82) {
+        shiftGear(1, true);
+      } else if (gearIndex > 2 && shiftSpeed <= GEAR_MIN_SPEED[gearIndex] * 0.72) {
+        shiftGear(-1, true);
+      }
+    }
 
     const gearName = GEAR_NAMES[gearIndex];
     const direction = gearName === 'R' ? -1 : 1;
