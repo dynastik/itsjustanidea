@@ -405,7 +405,7 @@ export function createVehicle(scene, physics, RAPIER) {
     return { gear: gearName, rpm: Math.round(engineRpm),
       clutch: Math.max(shiftTimer > 0 ? 1 : 0, 1 - coastClutch),
       shift: shiftCueTimer > 0 ? shiftCue : '', lugging,
-      overRev: engineRpm >= 4800, auto: false };
+      overRev: engineRpm >= 4800, auto: state.mode === 'highway' };
   }
 
   const self = {
