@@ -15,6 +15,8 @@ import { createCabInterior } from './game/cabin.js';
 import { createAudio } from './game/audio.js';
 import { createInput, createDriveInput } from './game/input.js';
 import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
+import { cycleDifficulty } from './game/difficulty.js';
+import { createHeadlights } from './game/headlights.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
 import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
 import { createSigns } from './game/signs.js';
@@ -42,23 +44,8 @@ async function main() {
   const signs = createSigns(scene);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
-  // Manual forward-facing headlights. They are attached to the van, and the player toggles them with F5.
-  // Keep shadow casting off here: the two local spotlights should illuminate the road without doubling shadow cost.
-  const headlights = [-0.34, 0.34].map((x) => {
-    const light = new THREE.SpotLight(0xffe8c2, 42, 82, Math.PI / 7, 0.72, 1.2);
-    light.position.set(x, 0.12, 1.05);
-    light.castShadow = false;
-    const target = new THREE.Object3D();
-    target.position.set(x * 1.8, -0.7, 34);
-    vehicle.visual.add(light, target);
-    light.target = target;
-    light.visible = false;
-    return light;
-  });
-  function toggleHeadlights() {
-    state.headlightsOn = !state.headlightsOn;
-    headlights.forEach((light) => { light.visible = state.headlightsOn; });
-  }
+  // Manual headlights with smooth fades and authored story flickers.
+  const headlights = createHeadlights(vehicle);
 
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
   // (and again after the ride height is measured).
@@ -108,11 +95,10 @@ async function main() {
     input.clearHeld();
     state.worldTime = 0;
     state.dayIndex = 0;
-    state.headlightsOn = false;
+    headlights.reset();
     lastStoryTarget = null;
     storySignCount = 0;
     props.showStorySign(-1);
-    headlights.forEach((light) => { light.visible = false; });
     state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
     state.storyDone = false;
@@ -131,7 +117,8 @@ async function main() {
     shiftUp: () => vehicle.shiftUp(),
     shiftDown: () => vehicle.shiftDown(),
     toggleAutoShift: () => vehicle.toggleAutoShift(),
-    toggleHeadlights,
+    toggleHeadlights: () => headlights.toggle(),
+    cycleDifficulty,
     togglePause: () => { state.paused = !state.paused; },
     toggleDebug: () => {
       state.debug = !state.debug;
@@ -183,6 +170,7 @@ async function main() {
       } else if (storyTarget === 'He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back.') {
         props.showStorySign(-1);
       }
+      director.cueHeadlights(storyTarget, state.time, state.headlightsOn);
       lastStoryTarget = storyTarget;
     }
     const act=getAct(), wrongWorld=act==='wrong'||act==='horror'||act==='finale';
@@ -226,6 +214,7 @@ async function main() {
     city.update(state.worldTime);
     lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1, state.time);
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
+    headlights.update(dt, state.time);
     rig.update(dt);
     hud.update();
     gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
