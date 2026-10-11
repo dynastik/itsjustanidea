@@ -186,7 +186,7 @@ async function main() {
       lastStoryTarget = storyTarget;
     }
     const act=getAct(), wrongWorld=act==='wrong'||act==='horror'||act==='finale';
-    trees.update(vehicle.center.z,wrongWorld?1+Math.floor(state.time/12):0);
+    trees.update(vehicle.center.z,wrongWorld?1+Math.floor(state.time/12):0,vehicle.center.x);
     signs.update(vehicle.center.z,act,dayFactors(state.worldTime).night);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
