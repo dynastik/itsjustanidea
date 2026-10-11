@@ -277,6 +277,67 @@ function addRoadsideScatter(scene, layout) {
   mesh.receiveShadow = false;
   scene.add(mesh);
   if (import.meta.env?.DEV) console.info('[trees] roadside scatter:', spots.length, 'trees');
+  return { spots, mesh };
+}
+
+// Near-LOD for roadside scatter: promote nearby blob trees to the original detailed fluffy tree.
+const NEAR_RADIUS = 120;
+const NEAR_MAX = 40;
+const NEAR_MOVE = 6;
+
+function createScatterNear(scene, { spots, mesh: far }, geometry, material, leafMask) {
+  const mesh = new THREE.InstancedMesh(geometry, material, NEAR_MAX);
+  mesh.customDepthMaterial = makeLeafMaskDepthMaterial(leafMask);
+  mesh.customDistanceMaterial = makeLeafMaskDepthMaterial(leafMask);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  scene.add(mesh);
+
+  const d = new THREE.Object3D();
+  const farMatrix = spots.map((t) => {
+    d.position.set(t.x, t.y, t.z);
+    d.rotation.set(0, t.r, 0);
+    d.scale.set(t.s, t.s * t.h, t.s);
+    d.updateMatrix();
+    return d.matrix.clone();
+  });
+  const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  let current = new Set();
+  let lastX = Infinity, lastZ = Infinity;
+
+  function update(x, z) {
+    if (Math.hypot(x - lastX, z - lastZ) < NEAR_MOVE) return;
+    lastX = x; lastZ = z;
+    const r2 = NEAR_RADIUS * NEAR_RADIUS;
+    const candidates = [];
+    for (let i = 0; i < spots.length; i++) {
+      const dx = spots[i].x - x, dz = spots[i].z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < r2) candidates.push([d2, i]);
+    }
+    candidates.sort((a, b) => a[0] - b[0]);
+    const next = new Set(candidates.slice(0, NEAR_MAX).map((c) => c[1]));
+    let farDirty = false;
+    for (const i of current) if (!next.has(i)) {
+      far.setMatrixAt(i, farMatrix[i]);
+      farDirty = true;
+    }
+    let slot = 0;
+    for (const i of next) {
+      if (!current.has(i)) {
+        far.setMatrixAt(i, hidden);
+        farDirty = true;
+      }
+      mesh.setMatrixAt(slot++, farMatrix[i]);
+    }
+    mesh.count = slot;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (farDirty) far.instanceMatrix.needsUpdate = true;
+    current = next;
+  }
+  return { update };
 }
 
 export async function createTrees(scene, physics, RAPIER, layout) {
@@ -313,7 +374,10 @@ export async function createTrees(scene, physics, RAPIER, layout) {
     mesh.frustumCulled = false;
     scene.add(mesh);
   }
-  if (layout) addRoadsideScatter(scene, layout);
+  const scatter = layout ? addRoadsideScatter(scene, layout) : null;
+  const near = scatter && useDetailedAssets
+    ? createScatterNear(scene, scatter, detailedTreeGeometry, canopy.material, leafMask)
+    : null;
 
   const dummy = new THREE.Object3D();
   const dirtyMeshes = new Set();
@@ -392,7 +456,8 @@ export async function createTrees(scene, physics, RAPIER, layout) {
     canopy.uniforms.uFoliageLightDirection.value.copy(direction).normalize();
   }
 
-  function update(vehicleZ, shuffle = 0) {
+  function update(vehicleZ, shuffle = 0, vehicleX = 0) {
+    if (near) near.update(vehicleX, vehicleZ);
     const center = Math.floor(vehicleZ / TREE_SPACING);
     if (shuffle !== lastShuffle) {
       for (let n = -TREE_SLOTS / 2; n < TREE_SLOTS / 2; n++) for (const side of [-1, 1]) {
