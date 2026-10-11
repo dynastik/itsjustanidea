@@ -37,7 +37,7 @@ async function main() {
   const lighting = createLighting(scene);
   const world = createWorld(scene, physics, RAPIER);
   const props = createProps(scene, physics, RAPIER);
-  const trees = await createTrees(scene, physics, RAPIER);
+  const trees = await createTrees(scene, physics, RAPIER, world.layout);
   const city = createCity(scene, physics, RAPIER);
   const signs = createSigns(scene);
   const vehicle = createVehicle(scene, physics, RAPIER);
@@ -82,7 +82,7 @@ async function main() {
   function spawn() {
     const f = world.getRoadFrame(0);
     vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
-    world.update(0, 0);
+    world.update(0, 0, true);
     props.update(0);
     props.showStorySign(-1);
     trees.update(0);

@@ -15,6 +15,7 @@ const SEG = TERRAIN_SIZE / CELL;  // 320 cells per side
 const N = SEG + 1;                // vertices per side
 const REPEAT = 200;               // road curves/grades repeat every 200 m; terrain recentres (x and z) on multiples of this
 const RECENTER_DIST = 120;        // hysteresis: only rebuild once this far from the centre
+const ROWS_PER_FRAME = 48;        // terrain rebuild is sampled this many rows per frame (321 rows -> 7 frames)
 const ROAD_PERIOD = 10;           // metres per repeat of the road texture
 const FLAT_DIST = ROAD_HALF_WIDTH + 2.5;  // terrain is exactly road-height out to here (guardrails sit inside it)
 const SLOPE_DIST = 20;            // broad transition from the flat road corridor into the hills
@@ -96,15 +97,16 @@ export function terrainHeight(x, z) {
 }
 
 // Heights (row-major: zi * N + xi) and vertex colours for the grid centred on (0, centerZ).
-// The two arrays are shared and rewritten on every rebuild (nothing keeps a reference to the old values),
-// so recentring the terrain every ~200 m no longer allocates and throws away ~2 MB each time.
+// TERRAIN_* are the LIVE arrays (the mesh's colour attribute shares TERRAIN_COLORS). A rebuild is sampled into the BACK_*
+// arrays a few rows per frame and copied across in one go, so the visible terrain never shows a half-built state.
 const TERRAIN_HEIGHTS = new Float32Array(N * N);
 const TERRAIN_COLORS = new Float32Array(N * N * 3);
-function buildTerrainData(centerX, centerZ) {
-  const heights = TERRAIN_HEIGHTS;
-  const colors = TERRAIN_COLORS;
-  const c = new THREE.Color();
-  for (let zi = 0; zi < N; zi++) {
+const BACK_HEIGHTS = new Float32Array(N * N);
+const BACK_COLORS = new Float32Array(N * N * 3);
+const _c = new THREE.Color();
+
+function fillTerrainRows(centerX, centerZ, heights, colors, zi0, zi1) {
+  for (let zi = zi0; zi < zi1; zi++) {
     const z = centerZ + (-VIEW + zi * CELL);
     for (let xi = 0; xi < N; xi++) {
       const x = centerX + (-VIEW + xi * CELL);
@@ -115,13 +117,17 @@ function buildTerrainData(centerX, centerZ) {
 
       const shade = 0.8 + 0.25 * THREE.MathUtils.clamp((hgt + 5) / 10, 0, 1);
       const dirt = 1 - sm(_t.d, ROAD_HALF_WIDTH + 0.2, ROAD_HALF_WIDTH + 3.5);
-      c.copy(GRASS).lerp(DIRT, dirt).multiplyScalar(shade);
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
+      _c.copy(GRASS).lerp(DIRT, dirt).multiplyScalar(shade);
+      colors[i * 3] = _c.r;
+      colors[i * 3 + 1] = _c.g;
+      colors[i * 3 + 2] = _c.b;
     }
   }
-  return { heights, colors };
+}
+
+function buildTerrainData(centerX, centerZ) {
+  fillTerrainRows(centerX, centerZ, TERRAIN_HEIGHTS, TERRAIN_COLORS, 0, N);
+  return { heights: TERRAIN_HEIGHTS, colors: TERRAIN_COLORS };
 }
 
 // Created once. Later rebuilds pass the existing geometry and only rewrite heights, normals and colours in place:
@@ -307,11 +313,13 @@ export function createWorld(scene, physics, RAPIER) {
   }
   let terrainCollider = makeCollider(data0.heights);
 
-  function rebuildTerrain(newCenterX, newCenterZ) {
+  // Swap the finished back buffer in: mesh, road strip and collider all move to the new centre in the same frame.
+  function commitRebuild(newCenterX, newCenterZ) {
+    TERRAIN_HEIGHTS.set(BACK_HEIGHTS);
+    TERRAIN_COLORS.set(BACK_COLORS);
     centerX = newCenterX;
     centerZ = newCenterZ;
-    const data = buildTerrainData(centerX, centerZ);
-    buildTerrainGeometry(data, terrain.geometry);
+    buildTerrainGeometry({ heights: TERRAIN_HEIGHTS, colors: TERRAIN_COLORS }, terrain.geometry);
     terrain.position.x = centerX;
     terrain.position.z = centerZ;
     road.geometry.dispose();
@@ -320,13 +328,35 @@ export function createWorld(scene, physics, RAPIER) {
 
     physics.removeCollider(terrainCollider, true);
     terrainBody.setTranslation({ x: centerX, y: 0, z: centerZ }, true);
-    terrainCollider = makeCollider(data.heights);
+    terrainCollider = makeCollider(TERRAIN_HEIGHTS);
   }
 
+  let job = null; // { cx, cz, zi }: a rebuild in progress
+
   // The highway runs along x now, so the terrain follows the vehicle in x as well as z.
-  function update(x, z) {
-    if (Math.abs(z - centerZ) > RECENTER_DIST || Math.abs(x - centerX) > RECENTER_DIST) {
-      rebuildTerrain(Math.round(x / REPEAT) * REPEAT, Math.round(z / REPEAT) * REPEAT);
+  // force = true rebuilds synchronously (use after teleports/resets, when the old terrain is nowhere near the vehicle).
+  function update(x, z, force = false) {
+    const cx = Math.round(x / REPEAT) * REPEAT;
+    const cz = Math.round(z / REPEAT) * REPEAT;
+    if (force) {
+      job = null;
+      if (cx !== centerX || cz !== centerZ) {
+        fillTerrainRows(cx, cz, BACK_HEIGHTS, BACK_COLORS, 0, N);
+        commitRebuild(cx, cz);
+      }
+      return;
+    }
+    if (!job && (Math.abs(z - centerZ) > RECENTER_DIST || Math.abs(x - centerX) > RECENTER_DIST)) {
+      job = { cx, cz, zi: 0 };
+    }
+    if (!job) return;
+    const end = Math.min(N, job.zi + ROWS_PER_FRAME);
+    fillTerrainRows(job.cx, job.cz, BACK_HEIGHTS, BACK_COLORS, job.zi, end);
+    job.zi = end;
+    if (end >= N) {
+      const { cx: jx, cz: jz } = job;
+      job = null;
+      commitRebuild(jx, jz);
     }
   }
 

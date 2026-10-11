@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
 import { toonGradientMap } from './toon.js';
 import { CITY_Z_MIN } from './zones.js';
-import { GROUND_START_Z } from './highwayLayout.js';
+import { GROUND_START_Z, GROUND_X } from './highwayLayout.js';
 
 const TREE_SPACING = 20;
 const TREE_SLOTS = 40;
@@ -17,6 +17,17 @@ const HIDDEN_Y = -1000;
 function hash(n, salt) {
   const value = Math.sin(n * 127.1 + salt * 311.7) * 43758.5453;
   return value - Math.floor(value);
+}
+
+// Smooth 2D value noise in [0, 1): used to decide where the forests are.
+function valueNoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z);
+  const fx = x - xi, fz = z - zi;
+  const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  const h = (a, b) => hash(a * 57 + b * 131, 9);
+  const top = h(xi, zi) + (h(xi + 1, zi) - h(xi, zi)) * u;
+  const bottom = h(xi, zi + 1) + (h(xi + 1, zi + 1) - h(xi, zi + 1)) * u;
+  return top + (bottom - top) * v;
 }
 
 function addVertexColors(geometry, colorAt) {
@@ -71,18 +82,28 @@ async function loadDetailedTreeAssets() {
   return { geometry, leafMask };
 }
 
+// Cheap far-away tree: a trunk plus a cluster of low-poly leaf blobs, so the silhouette matches the round, fluffy
+// canopy of the detailed tree instead of reading as a cone / christmas tree.
 function makeDistantTreeGeometry() {
   const pieces = [];
   const bark = new THREE.Color(0x72513a);
-  const leaves = new THREE.Color(0x3d7540);
-  const trunk = new THREE.CylinderGeometry(0.17, 0.25, 2.4, 5, 1);
-  trunk.translate(0, 1.2, 0);
-  pieces.push(addVertexColors(trunk, (_x, y, _z, color) => color.copy(bark).multiplyScalar(0.86 + y * 0.08)));
-  for (const [radius, height, y] of [[1.55, 1.8, 2.9], [1.18, 1.9, 4.0], [0.78, 1.8, 5.05]]) {
-    const cone = new THREE.ConeGeometry(radius, height, 6, 1);
-    cone.translate(0, y, 0);
-    pieces.push(addVertexColors(cone, (_x, py, _z, color) => {
-      color.copy(leaves).multiplyScalar(0.82 + THREE.MathUtils.clamp((py - 2.2) * 0.08, 0, 0.24));
+  const leaves = new THREE.Color(0x4a8a3c);
+  const trunk = new THREE.CylinderGeometry(0.2, 0.3, 3.0, 6, 1);
+  trunk.translate(0, 1.5, 0);
+  pieces.push(addVertexColors(trunk, (_x, y, _z, color) => color.copy(bark).multiplyScalar(0.86 + y * 0.05)));
+  // [x, y, z, radiusX, radiusY, radiusZ]
+  const blobs = [
+    [0, 4.1, 0, 2.0, 1.7, 2.0],
+    [-1.15, 3.5, 0.45, 1.35, 1.15, 1.35],
+    [1.05, 3.6, -0.5, 1.4, 1.2, 1.4],
+    [0.1, 5.2, 0.2, 1.3, 1.0, 1.3],
+  ];
+  for (const [x, y, z, rx, ry, rz] of blobs) {
+    const blob = new THREE.IcosahedronGeometry(1, 1);
+    blob.scale(rx, ry, rz);
+    blob.translate(x, y, z);
+    pieces.push(addVertexColors(blob, (_x, py, _z, color) => {
+      color.copy(leaves).multiplyScalar(0.78 + THREE.MathUtils.clamp((py - 2.6) * 0.09, 0, 0.3));
     }));
   }
   return mergePieces(pieces);
@@ -201,7 +222,64 @@ function roadSidePose(z, side, offset) {
   };
 }
 
-export async function createTrees(scene, physics, RAPIER) {
+// Static instanced scatter for the part of the route that is NOT z-indexed (deck east of the ramp + the hill arc).
+// Placement is by distance to the road (layout.corridor), not by z, so it follows the arc. A low-frequency noise field
+// makes some stretches dense forest and others sparse, ordinary roadside. No colliders: the guardrails keep the van away.
+const SCATTER_STEP = 9;
+const SCATTER_X0 = 215;          // east of where the on-ramp taper ends (x ~ 190), so no tree can sit on the ramp
+const SCATTER_Z0 = 60;
+const SCATTER_NORMAL = { minOffset: 11, reach: 70, keep: 0.22 };
+const SCATTER_FOREST = { minOffset: 9, reach: 95, keep: 0.95 };
+
+function addRoadsideScatter(scene, layout) {
+  const hit = { d: 0, y: 0, w: 0 };
+  const lerp = THREE.MathUtils.lerp;
+  const spots = [];
+  for (let gx = SCATTER_X0; gx <= GROUND_X + 70; gx += SCATTER_STEP) {
+    for (let gz = SCATTER_Z0; gz <= GROUND_START_Z + 10; gz += SCATTER_STEP) {
+      const key = Math.round(gx / SCATTER_STEP) * 1000 + Math.round(gz / SCATTER_STEP);
+      const x = gx + (hash(key, 1) - 0.5) * SCATTER_STEP * 0.9;
+      const z = gz + (hash(key, 2) - 0.5) * SCATTER_STEP * 0.9;
+      if (z >= GROUND_START_Z + 10) continue;                 // the z-indexed trees take over from here
+      const forest = THREE.MathUtils.smoothstep(valueNoise(x / 110, z / 110), 0.52, 0.66);
+      const minOffset = lerp(SCATTER_NORMAL.minOffset, SCATTER_FOREST.minOffset, forest);
+      const reach = lerp(SCATTER_NORMAL.reach, SCATTER_FOREST.reach, forest);
+      if (!layout.corridor(x, z, reach, hit)) continue;
+      if (hit.d < minOffset) continue;
+      const fade = (hit.d - minOffset) / (reach - minOffset);
+      const keep = lerp(SCATTER_NORMAL.keep, SCATTER_FOREST.keep, forest) * (1 - 0.6 * fade);
+      if (hash(key, 3) > keep) continue;
+      spots.push({
+        x, z, y: terrainHeight(x, z),
+        s: (0.85 + hash(key, 4) * 0.55) * (1 + forest * 0.15),
+        h: 0.9 + hash(key, 5) * 0.35,
+        r: hash(key, 6) * Math.PI * 2,
+      });
+    }
+  }
+  const mesh = new THREE.InstancedMesh(
+    makeDistantTreeGeometry(),
+    new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradientMap }),
+    Math.max(spots.length, 1)
+  );
+  const d = new THREE.Object3D();
+  spots.forEach((t, i) => {
+    d.position.set(t.x, t.y, t.z);
+    d.rotation.set(0, t.r, 0);
+    d.scale.set(t.s, t.s * t.h, t.s);
+    d.updateMatrix();
+    mesh.setMatrixAt(i, d.matrix);
+  });
+  mesh.count = spots.length;
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.frustumCulled = false;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  scene.add(mesh);
+  if (import.meta.env?.DEV) console.info('[trees] roadside scatter:', spots.length, 'trees');
+}
+
+export async function createTrees(scene, physics, RAPIER, layout) {
   let detailedTreeGeometry;
   let leafMask;
   let useDetailedAssets = true;
@@ -235,6 +313,7 @@ export async function createTrees(scene, physics, RAPIER) {
     mesh.frustumCulled = false;
     scene.add(mesh);
   }
+  if (layout) addRoadsideScatter(scene, layout);
 
   const dummy = new THREE.Object3D();
   const dirtyMeshes = new Set();
