@@ -14,7 +14,7 @@ export const KEYS = {
   pause: 'escape',
 };
 
-const CITY_SPEED_CAP = 16;
+const CITY_SPEED_CAP = 25;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export function createDriveInput() {
