@@ -44,7 +44,7 @@ export const VEHICLE_CONFIG = {
     engineForce: 16000,
     brakeForce: 18000,
     reverseForce: 7000,
-    coastForce: 0,
+    coastForce: 0.5,
     maxSpeed: 30,
     reverseMaxSpeed: 3,
     maxSteerAngle: 0.55,
