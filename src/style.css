@@ -328,3 +328,17 @@ body {
     transition: none;
   }
 }
+
+#headlight-status.nudge {
+  color: #ffd98a;
+  animation: headlight-nudge 1.6s ease-in-out infinite;
+}
+
+@keyframes headlight-nudge {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #headlight-status.nudge { animation: none; }
+}
