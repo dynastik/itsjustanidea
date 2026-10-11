@@ -11,6 +11,7 @@ export const KEYS = {
   skipTime: 'f6',
   mute: 'f9',
   headlights: 'f5',
+  difficulty: 'f7',
   pause: 'escape',
 };
 
@@ -32,6 +33,7 @@ export function createInput(actions) {
     [KEYS.skipTime]: actions.skipTime,
     [KEYS.mute]: actions.toggleMute,
     [KEYS.headlights]: actions.toggleHeadlights,
+    [KEYS.difficulty]: actions.cycleDifficulty,
     [KEYS.pause]: actions.togglePause,
   };
   for (const k in hotkeys) if (!hotkeys[k]) delete hotkeys[k];
