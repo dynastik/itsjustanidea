@@ -3,6 +3,8 @@ import { getWpm, getAccuracy } from '../game/typing.js';
 import { getSourceLabel } from '../game/story.js';
 import * as director from '../game/director.js';
 import { HANDOFF_UI_FADE_S } from '../game/zones.js';
+import { getDifficulty } from '../game/difficulty.js';
+import { dayFactors } from '../game/daycycle.js';
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -33,7 +35,7 @@ export function createHud() {
     const highway = state.mode === 'highway';
     const dev = state.zoneAuto ? '' : ' [DEV]';
     const directorState = highway ? ` [${director.getDirectorState().toUpperCase()}]` : '';
-    set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState);
+    set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState + ' · ' + getDifficulty().toUpperCase());
     const typing = highway && !state.storyDone; // the panel goes away once the last line is typed
     set(typingPanel.style, 'panel', typing ? 'block' : 'none', 'display');
     // typing panel fades in over the handoff instead of popping on
@@ -41,6 +43,8 @@ export function createHud() {
     set(typingPanel.style, 'fade', Math.round(fade * 20) / 20, 'opacity');
     const reverse = state.speed < -0.3;
     set(headlightEl, 'headlights', state.headlightsOn ? 'HEADLIGHTS: ON (F5)' : 'HEADLIGHTS: OFF (F5)');
+    const needLights = dayFactors(state.worldTime).night > 0.5 && !state.headlightsOn;
+    if (cache.needLights !== needLights) { cache.needLights = needLights; headlightEl.classList.toggle('nudge', needLights); }
     const trans = state.transmission || { gear: '1', rpm: 850, auto: false };
     set(speedoEl, 'speed', `GEAR ${trans.gear} · ${Math.round(Math.abs(state.speed) * 3.6)} km/h${trans.auto ? ' · AUTO' : ''}`);
     set(rpmValueEl, 'rpmValue', String(Math.round(trans.rpm)));
