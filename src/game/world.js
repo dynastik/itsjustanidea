@@ -364,12 +364,12 @@ export function createWorld(scene, physics, RAPIER) {
   function surfaceAt(x, z) {
     // ground highway: z-indexed again
     if (z >= GROUND_START_Z) return { offRoad: Math.abs(x - layout.groundX(z)) > ROAD_HALF_WIDTH + 0.3 };
-    // ramp + deck + hill arc: not z-indexed, so test against the ribbons
-    if (z > CITY_Z_MAX + 12) return { offRoad: !interchange.onRoad(x, z) };
+    // Elevated ribbon and street-level road cross here; recognise the deck before checking the underpass.
+    if (interchange.onRoad(x, z)) return { offRoad: false };
     const f = getRoadFrame(z);
-    // inside the city the parking bays and sidewalks are paved, so only leaving them counts as off-road
     const paved = z > CITY_Z_MIN && z < CITY_Z_MAX ? ROAD_HALF_WIDTH + CITY_BAY_WIDTH + CITY_WALK_WIDTH : ROAD_HALF_WIDTH;
-    return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
+    if (z <= CITY_Z_MAX) return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
+    return { offRoad: true };
   }
 
   // A pose `dist` metres ahead of (x, z) along the drive path (ramp -> deck -> arc -> ground road). Used to place the story gantries.
