@@ -92,6 +92,38 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     return { body };
   }
 
+  // Visual-only ribbon for the temporary exit ramp. Unlike makeRibbon(), it deliberately has no physics collider:
+  // the exit is scenery for now and does not change vehicle routing.
+  function makeVisualRibbon(left, right) {
+    const n = left.length;
+    const positions = new Float32Array(n * 6);
+    const uvs = new Float32Array(n * 4);
+    const indices = new Uint32Array((n - 1) * 6);
+    let length = 0;
+    for (let i = 0; i < n; i++) {
+      if (i > 0) {
+        const dx = ((left[i].x + right[i].x) - (left[i - 1].x + right[i - 1].x)) * 0.5;
+        const dz = ((left[i].z + right[i].z) - (left[i - 1].z + right[i - 1].z)) * 0.5;
+        length += Math.hypot(dx, dz);
+      }
+      positions.set([left[i].x, left[i].y, left[i].z, right[i].x, right[i].y, right[i].z], i * 6);
+      uvs.set([0, length / 10, 1, length / 10], i * 4);
+      if (i < n - 1) indices.set([i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3], i * 6);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    geometry.computeVertexNormals();
+    const material = roadMaterial.clone();
+    material.side = THREE.DoubleSide;
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    return mesh;
+  }
+
   // ---------- the cross-highway ----------
   // West stub (ends in a barrier) -> elevated deck -> slow descent -> arc round the big hill -> hands over to the z-indexed
   // ground road at GROUND_START_Z. Shape and heights come from highwayLayout.js; the ribbon sits RIBBON_LIFT above the graded terrain.
@@ -176,6 +208,58 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   }
   const taperEndX = laneEndX + C.taperLen;
   const ramp = makeRibbon(L, R);
+
+  // ---------- visual-only exit ramp ----------
+  // Place the exit AFTER the entrance merge, on the usable downstream deck rather than
+  // beyond the west-end barrier. It peels away from the city-side edge and sweeps back
+  // towards the city. The gentle vertical hump lets it pass above the entrance ramp visually.
+  const exitLeft = [];
+  const exitRight = [];
+  const exitStartX = Math.max(taperEndX + 12, 220);
+  const exitGoreLen = 42;
+  const exitLaneZ = laneZ;
+  const exitGoreN = 12;
+  for (let i = 0; i <= exitGoreN; i++) {
+    const u = i / exitGoreN;
+    const x = exitStartX + exitGoreLen * u;
+    const y = highwayYAt(x) + LIFT;
+    const innerZ = hwEdgeZ + 0.04;
+    const outerZ = lerp(innerZ, exitLaneZ - half, smooth01(u));
+    exitLeft.push(V(x, y, innerZ));
+    exitRight.push(V(x, y, outerZ));
+  }
+
+  const exitStart = V(exitStartX + exitGoreLen, highwayYAt(exitStartX + exitGoreLen) + LIFT, exitLaneZ);
+  const exitEndZ = Math.min(cityEndZ - 4, 84);
+  const exitEndFrame = getRoadFrame(exitEndZ);
+  const exitEnd = V(exitEndFrame.x - half + 0.04, exitEndFrame.y + 0.065, exitEndZ);
+  const exitP0 = [exitStart.x, exitStart.z];
+  const exitP1 = [exitStart.x + 70, exitStart.z];
+  const exitP2 = [exitEnd.x - 12, exitEnd.z + 24];
+  const exitP3 = [exitEnd.x, exitEnd.z];
+  const exitBezier = (t) => {
+    const u = 1 - t;
+    return [0, 1].map((k) => u ** 3 * exitP0[k] + 3 * u ** 2 * t * exitP1[k] +
+      3 * u * t ** 2 * exitP2[k] + t ** 3 * exitP3[k]);
+  };
+  const exitCurveN = 64;
+  const exitCentres = [];
+  const deckY = highwayYAt(exitStart.x);
+  const cityY = exitEnd.y;
+  for (let i = 0; i <= exitCurveN; i++) {
+    const t = i / exitCurveN;
+    const [x, z] = exitBezier(t);
+    const baseY = lerp(deckY, cityY, smooth01(t));
+    const overpassHump = 4.0 * Math.sin(Math.PI * t) ** 2;
+    exitCentres.push(V(x, baseY + overpassHump, z));
+  }
+  const exitSides = exitCentres.map((_, i) => sideOf(exitCentres, i));
+  for (let i = 1; i < exitCentres.length; i++) {
+    exitLeft.push(exitCentres[i].clone().addScaledVector(exitSides[i], -half));
+    exitRight.push(exitCentres[i].clone().addScaledVector(exitSides[i], half));
+  }
+  makeVisualRibbon(exitLeft, exitRight);
+
 
   // drive path: ramp, then along the deck and round the hill arc. It ends at the arc end (z = GROUND_START_Z); from there
   // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
