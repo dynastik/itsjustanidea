@@ -422,16 +422,20 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     piers.push({ x, z, base, h, capY: topOfPier + S.capH / 2, heading });
   }
   // walk a polyline, dropping a pier every S.spacing metres of road
-  function pierRun(points, headings, from, to) {
+  function pierRun(points, headings, from, to, clearCityRoad = false) {
     let run = S.spacing / 2;
     for (let i = Math.max(from, 1); i < to; i++) {
       run += points[i].distanceTo(points[i - 1]);
       if (run < S.spacing) continue;
       run = 0;
+      if (clearCityRoad && Math.abs(points[i].x) < 15 && Math.abs(points[i].z - HW.z) < 5) continue;
       addPier(points[i].x, points[i].z, points[i].y, headings[i]);
     }
   }
-  pierRun(highwaySamples, hwSides.map(headingOf), 1, highwaySamples.length - 1);
+  pierRun(highwaySamples, hwSides.map(headingOf), 1, highwaySamples.length - 1, true);
+  // Span the city street on outside piers, keeping a column out of the driving lane.
+  addPier(-9, HW.z, layout.centerY(-9) + RIBBON_LIFT, Math.PI / 2);
+  addPier(9, HW.z, layout.centerY(9) + RIBBON_LIFT, Math.PI / 2);
   pierRun(centres, sides.map(headingOf), leadCount, centres.length); // ramp bend + lane (the taper is skipped)
 
   const pierMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
