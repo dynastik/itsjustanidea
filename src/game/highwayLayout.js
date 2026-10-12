@@ -27,7 +27,11 @@ const smooth = (x, a, b) => {
 
 export const HW = {
   z: 170,              // the straight deck runs along x at this z
-  westX: -120,         // west end of the deck (a barrier closes it). Only a stub: the merge is at x ~ 95-190
+  westX: -282,         // west end of the road (a barrier closes it), at ground level
+  westGroundX: -270,   // the road has reached ground level by here (then runs flat to the barrier)
+  westFlatX: -150,     // the deck is dead flat from here east; it descends towards westGroundX
+  westMeetX: -240,     // ground has risen to meet the road (embankment)
+  westClearX: -200,    // ground is still low (pillars) from here east
   deckRise: 4.5,       // deck height above the city road end
   descentFromX: 200,   // the deck is dead flat until here (the ramp merges onto it before this)
   hillX: 420,          // the arc starts here
@@ -52,9 +56,14 @@ export function createHighwayLayout({ startY, roadCenterX, roadHeight }) {
   const ZE = GROUND_START_Z;
   const CX = ARC_CENTER.x, CZ = ARC_CENTER.z, R = HW.radius;
 
-  const centerY = (x) => deckY - HW.descent * smooth(x, HW.descentFromX, HW.hillX);
-  // terrain target under the straight part: low (pillars) until clearFromX, then rises to meet the road
-  const underY = (x) => baseY + (centerY(x) - baseY) * smooth(x, HW.clearFromX, HW.hillX);
+  // West: descend from deck height to ground level; east: ease down towards the hill.
+  const centerY = (x) =>
+    baseY + (deckY - baseY) * smooth(x, HW.westGroundX, HW.westFlatX) - HW.descent * smooth(x, HW.descentFromX, HW.hillX);
+  // Ground rises to meet the road near both ends, leaving the central elevated section on pillars.
+  const underY = (x) => {
+    const meet = (1 - smooth(x, HW.westMeetX, HW.westClearX)) + smooth(x, HW.clearFromX, HW.hillX);
+    return baseY + (centerY(x) - baseY) * meet;
+  };
   const arcY = (a) => hillRoadY + (baseY - hillRoadY) * smooth(a / HALF_PI, 0, 1);
   const arcPoint = (a) => ({ x: CX + R * Math.sin(a), z: CZ - R * Math.cos(a) });
   const arcHeading = (a) => HALF_PI - a;       // heading = atan2(dx, dz): +x is PI/2, +z is 0
