@@ -271,6 +271,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   let exitPierCount = 0;
   for (let i = 8; i < exitCentres.length - 2; i += 8) {
     const p = exitCentres[i];
+    // Leave the crossing zone clear so a decorative pier does not block the entrance ramp below.
+    if (p.z < 130 && p.x < 110) continue;
     const groundY = terrainHeight(p.x, p.z);
     const h = p.y - groundY - 0.55;
     if (h < 1.5) continue;
@@ -286,6 +288,33 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   exitPierMesh.receiveShadow = true;
   exitPierMesh.frustumCulled = false;
   scene.add(exitPierMesh);
+
+  // Instanced guardrails along the exit's exposed edges; keep the gore open at the highway.
+  const exitRailMat = new THREE.MeshToonMaterial({ color: 0x85888b, gradientMap: toonGradientMap });
+  const exitRailGeo = new THREE.BoxGeometry(1, 1, 1);
+  const exitRailCapacity = (exitLeft.length - exitGoreN - 1) * 2;
+  const exitRailMesh = new THREE.InstancedMesh(exitRailGeo, exitRailMat, exitRailCapacity);
+  const exitRailDummy = new THREE.Object3D();
+  let exitRailCount = 0;
+  for (let i = exitGoreN; i < exitLeft.length - 1; i++) {
+    for (const edge of [exitLeft, exitRight]) {
+      const a = edge[i], b = edge[i + 1];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.3) continue;
+      exitRailDummy.position.set((a.x + b.x) / 2, (a.y + b.y) / 2 + 0.42, (a.z + b.z) / 2);
+      exitRailDummy.rotation.set(0, Math.atan2(dx, dz), 0);
+      exitRailDummy.scale.set(0.16, 0.65, len + 0.08);
+      exitRailDummy.updateMatrix();
+      exitRailMesh.setMatrixAt(exitRailCount++, exitRailDummy.matrix);
+    }
+  }
+  exitRailMesh.count = exitRailCount;
+  exitRailMesh.instanceMatrix.needsUpdate = true;
+  exitRailMesh.castShadow = true;
+  exitRailMesh.receiveShadow = true;
+  exitRailMesh.frustumCulled = false;
+  scene.add(exitRailMesh);
 
   // drive path: ramp, then along the deck and round the hill arc. It ends at the arc end (z = GROUND_START_Z); from there
   // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
