@@ -36,7 +36,8 @@ function roadHeight(z) {
 
 // The cross-highway (highwayLayout.js): deck over the city road end, arc round a big hill, then a ground road that is
 // z-indexed again from GROUND_START_Z on (so props, trees, signs and the road strip below keep working off getRoadFrame(z)).
-const layout = createHighwayLayout({ startY: roadHeight(CITY_Z_MAX), roadCenterX, roadHeight });
+const CITY_DRIVE_END_Z = HIGHWAY_ZONE_Z + ZONE_HYSTERESIS - 2;
+const layout = createHighwayLayout({ startY: roadHeight(CITY_DRIVE_END_Z), roadCenterX, roadHeight });
 
 // z-indexed road: the city road (and the lead-in), then from GROUND_START_Z the ground highway.
 // (Between CITY_Z_MAX + ~12 and GROUND_START_Z there is no z-indexed road: the ramp and deck are x/z ribbons, see interchange.js.)
@@ -279,7 +280,7 @@ export function createWorld(scene, physics, RAPIER) {
   scene.add(road);
 
   // One lightweight elevated joining ramp ahead of the player; no imported models or extra lights.
-  const interchange = createInterchange(scene, physics, RAPIER, road.material, { halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_Z_MAX, getRoadFrame, terrainHeight, layout });
+  const interchange = createInterchange(scene, physics, RAPIER, road.material, { halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_DRIVE_END_Z, getRoadFrame, terrainHeight, layout });
 
   // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
   // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
