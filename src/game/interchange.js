@@ -212,7 +212,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // ---------- visual-only exit ramp (original test geometry) ----------
   // A gore leaves the western flat deck, runs alongside it, then bends down and joins the city road's west edge.
   // Scenery only for now: no exit-ramp physics body and no change to the driving path.
-  const EXIT = { goreX: -150, goreLen: 40, laneLen: 10, handleA: 34, handleB: 30, joinZ: 128, taperZ: 114, endZ: 90 };
+  const EXIT = { goreX: -105, goreLen: 40, laneLen: 10, handleA: 34, handleB: 30, joinZ: 128, taperZ: 114, endZ: 90 };
   const roadX = (z) => getRoadFrame(z).x;
   const cityY = (z) => getRoadFrame(z).y + 0.05 + LIFT;
   const cityLaneX = (z) => roadX(z) - 2 * half + 0.04;
