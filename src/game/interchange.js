@@ -137,38 +137,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const highwayYAt = (x) => layout.centerY(Math.min(x, HW.hillX)) + RIBBON_LIFT;
 
 
-  // ---------- cloverleaf loop surfaces ----------
-  // These four elevated loops now use the same ribbon builder as the existing ramp, so each
-  // receives a fixed trimesh collider. They are a geometry/collision prototype; their endpoints
-  // still need continuous, tested tie-ins before the loops are considered drivable connections.
-  const CLOVER = { radius: 34, width: 7.5, samples: 72, lift: 0.18 };
-  function makeCloverLoop(cx, cz, sx, sz) {
-    const pts = [];
-    const left = [], right = [];
-    // Three-quarter loops leave an opening toward the approaches.
-    for (let i = 0; i <= CLOVER.samples; i++) {
-      const t = i / CLOVER.samples;
-      const a = -Math.PI / 2 + t * Math.PI * 1.5;
-      const x = cx + sx * CLOVER.radius * Math.cos(a);
-      const z = cz + sz * CLOVER.radius * Math.sin(a);
-      const y = layout.centerY(Math.max(HW.westGroundX, Math.min(x, HW.hillX))) + RIBBON_LIFT + CLOVER.lift;
-      pts.push(V(x, y, z));
-    }
-    for (let i = 0; i < pts.length; i++) {
-      const tangent = pts[Math.min(i + 1, pts.length - 1)].clone().sub(pts[Math.max(i - 1, 0)]);
-      const side = new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
-      left.push(pts[i].clone().addScaledVector(side, -CLOVER.width / 2));
-      right.push(pts[i].clone().addScaledVector(side, CLOVER.width / 2));
-    }
-    return makeRibbon(left, right);
-  }
-  // Loops surround the central crossing. Their road decks are elevated above the city street.
-  const cloverLoops = [
-    makeCloverLoop(-CLOVER.radius * 0.72, HW.z - CLOVER.radius * 0.72, -1, -1),
-    makeCloverLoop(CLOVER.radius * 0.72, HW.z - CLOVER.radius * 0.72, 1, -1),
-    makeCloverLoop(-CLOVER.radius * 0.72, HW.z + CLOVER.radius * 0.72, -1, 1),
-    makeCloverLoop(CLOVER.radius * 0.72, HW.z + CLOVER.radius * 0.72, 1, 1),
-  ];
+  // The earlier disconnected loop prototype was removed: unconnected elevated ribbons are not usable ramps.
 
   // ---------- the ramp ----------
   const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
@@ -325,7 +294,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     exitLeft.push(V(lx, y, z));
     exitRight.push(V(lerp(lx - 2 * half, lx - 0.12, smooth01(u)), y, z));
   }
-  makeVisualRibbon(exitLeft, exitRight);
+  // The exit is a real drivable surface, not scenery: it gets the same fixed trimesh collider as the on-ramp.
+  makeRibbon(exitLeft, exitRight);
 
   // Temporary visual supports along the elevated exit; no colliders.
   const exitPierMesh = new THREE.InstancedMesh(
@@ -346,6 +316,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     exitDummy.scale.set(2.6, h, 2.6);
     exitDummy.updateMatrix();
     exitPierMesh.setMatrixAt(exitPierCount++, exitDummy.matrix);
+    const pierBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, groundY + h / 2, p.z));
+    physics.createCollider(RAPIER.ColliderDesc.cuboid(1.3, h / 2, 1.3).setFriction(0.65), pierBody);
   }
   exitPierMesh.count = exitPierCount;
   exitPierMesh.instanceMatrix.needsUpdate = true;
@@ -528,6 +500,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
   const roadXZ = [];
   for (const p of path) roadXZ.push(p.x, p.z);
+  for (const p of exitCentres) roadXZ.push(p.x, p.z);
   for (const p of highwaySamples) roadXZ.push(p.x, p.z);
   const onRoadR2 = (half + 1.1) * (half + 1.1);
   function onRoad(x, z) {
