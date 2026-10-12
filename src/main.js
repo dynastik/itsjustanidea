@@ -17,6 +17,8 @@ import { createInput, createDriveInput } from './game/input.js';
 import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
 import { cycleDifficulty } from './game/difficulty.js';
 import { createHeadlights } from './game/headlights.js';
+import { createStops } from './game/stops.js';
+import { createSheet } from './ui/sheet.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
 import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
 import { createSigns } from './game/signs.js';
@@ -58,6 +60,8 @@ async function main() {
   const audio = createAudio();
   const hud = createHud();
   const ending = createEnding();
+  const stops = createStops(scene, world.getRoadFrame);
+  const sheet = createSheet();
   const driveInput = createDriveInput();
 
   let accumulator = 0;
@@ -96,6 +100,7 @@ async function main() {
     state.worldTime = 0;
     state.dayIndex = 0;
     headlights.reset();
+    stops.reset();
     lastStoryTarget = null;
     storySignCount = 0;
     props.showStorySign(-1);
@@ -196,6 +201,7 @@ async function main() {
     state.speed = vehicle.speed;
     state.transmission = vehicle.transmission;
     cabin.update(dt, vehicle, driveInput);
+    stops.update(dt, vehicle.center, vehicle.speed, state.mode === 'city');
 
     if (dt > 0) {
       const drop = prevSpeed - vehicle.speed;
@@ -217,6 +223,7 @@ async function main() {
     headlights.update(dt, state.time);
     rig.update(dt);
     hud.update();
+    sheet.update();
     gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
     gfx.adapt(dt);
     gfx.render();
