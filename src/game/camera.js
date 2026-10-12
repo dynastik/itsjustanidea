@@ -81,7 +81,9 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
     if (debug) { orbit.update(); return; }
 
     const prof = CAMERA_PROFILES[profileName];
-    if (!dragging) {
+    // Exterior camera drag is a temporary orbit, but cab look is player-controlled:
+    // keep its yaw/pitch after the mouse is released instead of easing back to center.
+    if (!dragging && profileName !== 'cab') {
       const k = Math.exp(-3 * dt);
       yaw *= k;
       pitch *= k;
