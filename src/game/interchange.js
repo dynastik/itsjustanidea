@@ -136,6 +136,45 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // deck height at x (only used where the ramp merges, which is on the flat part)
   const highwayYAt = (x) => layout.centerY(Math.min(x, HW.hillX)) + RIBBON_LIFT;
 
+
+  // ---------- city cloverleaf concept (visual-only first pass) ----------
+  // Four broad loop ramps frame the main highway / city-road crossing. They are deliberately scenery-only
+  // in this pass: the existing entrance ramp and vehicle drivePath remain untouched until each movement
+  // is given a tested, continuous drivable route.
+  const CLOVER = { radius: 34, width: 7.5, samples: 56, rise: 2.4 };
+  const cloverMaterial = roadMaterial;
+  function makeCloverLoop(cx, cz, sx, sz) {
+    const left = [], right = [];
+    const pts = [];
+    // A rounded 270-degree loop, opening toward the nearby highway/city-road approach.
+    // Parametric ellipse with a smooth vertical lift; each quadrant sits at a distinct visual level.
+    const start = -Math.PI / 2;
+    for (let i = 0; i <= CLOVER.samples; i++) {
+      const t = i / CLOVER.samples;
+      const a = start + t * Math.PI * 1.5;
+      const x = cx + sx * CLOVER.radius * Math.cos(a);
+      const z = cz + sz * CLOVER.radius * Math.sin(a);
+      const y = highwayYAt(Math.max(HW.westFlatX, Math.min(x, HW.hillX))) + 0.12 +
+        CLOVER.rise * Math.sin(Math.PI * t);
+      pts.push(V(x, y, z));
+    }
+    const side = (i) => {
+      const tangent = pts[Math.min(i + 1, pts.length - 1)].clone().sub(pts[Math.max(i - 1, 0)]);
+      return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
+    };
+    for (let i = 0; i < pts.length; i++) {
+      const s = side(i);
+      left.push(pts[i].clone().addScaledVector(s, -CLOVER.width / 2));
+      right.push(pts[i].clone().addScaledVector(s, CLOVER.width / 2));
+    }
+    makeVisualRibbon(left, right);
+  }
+  // Four quadrants around the junction. Kept clear of the straight highway's central crossing.
+  makeCloverLoop(-CLOVER.radius * 0.72, HW.z - CLOVER.radius * 0.72, -1, -1);
+  makeCloverLoop(CLOVER.radius * 0.72, HW.z - CLOVER.radius * 0.72, 1, -1);
+  makeCloverLoop(-CLOVER.radius * 0.72, HW.z + CLOVER.radius * 0.72, -1, 1);
+  makeCloverLoop(CLOVER.radius * 0.72, HW.z + CLOVER.radius * 0.72, 1, 1);
+
   // ---------- the ramp ----------
   const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
   const laneZ = hwEdgeZ - half + 0.04;       // acceleration lane centre; its inner edge overlaps the deck by 4 cm
