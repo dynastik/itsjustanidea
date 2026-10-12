@@ -342,3 +342,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   #headlight-status.nudge { animation: none; }
 }
+#delivery-sheet {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 10;
+  padding: 10px 12px;
+  border: 1px solid rgba(225, 229, 222, 0.18);
+  border-radius: 4px;
+  background: rgba(8, 12, 16, 0.7);
+  color: #e8dfc8;
+  font: 10px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.6px;
+  white-space: pre;
+  text-shadow: 0 1px 6px #000;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  #delivery-sheet {
+    display: none;
+  }
+}
