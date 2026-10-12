@@ -235,7 +235,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const exitEnd = V(exitEndFrame.x - half + 0.04, exitEndFrame.y + 0.065, exitEndZ);
   const exitP0 = [exitStart.x, exitStart.z];
   const exitP1 = [exitStart.x + 70, exitStart.z];
-  const exitP2 = [exitEnd.x - 12, exitEnd.z + 24];
+  const exitP2 = [exitEnd.x, exitEnd.z + 24];
   const exitP3 = [exitEnd.x, exitEnd.z];
   const exitBezier = (t) => {
     const u = 1 - t;
@@ -260,6 +260,32 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   }
   makeVisualRibbon(exitLeft, exitRight);
 
+  // Temporary supports keep the elevated exit from visibly floating. They are visual-only too.
+  const exitPierCapacity = Math.ceil(exitCentres.length / 8);
+  const exitPierMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshToonMaterial({ color: 0x77787b, gradientMap: toonGradientMap }),
+    exitPierCapacity
+  );
+  const exitDummy = new THREE.Object3D();
+  let exitPierCount = 0;
+  for (let i = 8; i < exitCentres.length - 2; i += 8) {
+    const p = exitCentres[i];
+    const groundY = terrainHeight(p.x, p.z);
+    const h = p.y - groundY - 0.55;
+    if (h < 1.5) continue;
+    exitDummy.position.set(p.x, groundY + h / 2, p.z);
+    exitDummy.rotation.set(0, 0, 0);
+    exitDummy.scale.set(2.6, h, 2.6);
+    exitDummy.updateMatrix();
+    exitPierMesh.setMatrixAt(exitPierCount++, exitDummy.matrix);
+  }
+  exitPierMesh.count = exitPierCount;
+  exitPierMesh.instanceMatrix.needsUpdate = true;
+  exitPierMesh.castShadow = true;
+  exitPierMesh.receiveShadow = true;
+  exitPierMesh.frustumCulled = false;
+  scene.add(exitPierMesh);
 
   // drive path: ramp, then along the deck and round the hill arc. It ends at the arc end (z = GROUND_START_Z); from there
   // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
