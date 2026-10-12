@@ -209,70 +209,101 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const taperEndX = laneEndX + C.taperLen;
   const ramp = makeRibbon(L, R);
 
-  // ---------- visual-only exit ramp ----------
-  // Place the exit AFTER the entrance merge, on the usable downstream deck rather than
-  // beyond the west-end barrier. It peels away from the city-side edge and sweeps back
-  // towards the city. The gentle vertical hump lets it pass above the entrance ramp visually.
+  // ---------- visual-only exit ramp (original test geometry) ----------
+  // A gore leaves the western flat deck, runs alongside it, then bends down and joins the city road's west edge.
+  // Scenery only for now: no exit-ramp physics body and no change to the driving path.
+  const EXIT = { goreX: -150, goreLen: 40, laneLen: 10, handleA: 34, handleB: 30, joinZ: 128, taperZ: 114, endZ: 90 };
+  const roadX = (z) => getRoadFrame(z).x;
+  const cityY = (z) => getRoadFrame(z).y + 0.05 + LIFT;
+  const cityLaneX = (z) => roadX(z) - 2 * half + 0.04;
   const exitLeft = [];
   const exitRight = [];
-  const exitStartX = Math.max(taperEndX + 12, 220);
-  const exitGoreLen = 42;
-  const exitLaneZ = laneZ;
-  const exitGoreN = 12;
-  for (let i = 0; i <= exitGoreN; i++) {
-    const u = i / exitGoreN;
-    const x = exitStartX + exitGoreLen * u;
+  const goreN = 8;
+  const goreEndX = EXIT.goreX + EXIT.goreLen;
+
+  // Gore: a point at the deck edge widens into the diverge lane.
+  for (let j = 0; j < goreN; j++) {
+    const u = j / goreN;
+    const x = EXIT.goreX + EXIT.goreLen * u;
     const y = highwayYAt(x) + LIFT;
-    const innerZ = hwEdgeZ + 0.04;
-    const outerZ = lerp(innerZ, exitLaneZ - half, smooth01(u));
-    exitLeft.push(V(x, y, innerZ));
-    exitRight.push(V(x, y, outerZ));
+    exitLeft.push(V(x, y, hwEdgeZ + 0.04));
+    exitRight.push(V(x, y, lerp(hwEdgeZ + 0.04 - 0.12, laneZ - half, smooth01(u))));
   }
 
-  const exitStart = V(exitStartX + exitGoreLen, highwayYAt(exitStartX + exitGoreLen) + LIFT, exitLaneZ);
-  const exitEndZ = Math.min(cityEndZ - 4, 84);
-  const exitEndFrame = getRoadFrame(exitEndZ);
-  const exitEnd = V(exitEndFrame.x - half + 0.04, exitEndFrame.y + 0.065, exitEndZ);
-  const exitP0 = [exitStart.x, exitStart.z];
-  const exitP1 = [exitStart.x + 70, exitStart.z];
-  const exitP2 = [exitEnd.x, exitEnd.z + 24];
-  const exitP3 = [exitEnd.x, exitEnd.z];
+  // Straight diverge lane, then a cubic bend down toward the city.
+  const exitCentres = [];
+  const exitBendX0 = goreEndX + EXIT.laneLen;
+  for (let x = goreEndX; x <= exitBendX0 + 1e-6; x += 5) {
+    exitCentres.push(V(x, highwayYAt(x) + LIFT, laneZ));
+  }
+  const eP0 = [exitBendX0, laneZ];
+  const eP3 = [cityLaneX(EXIT.joinZ), EXIT.joinZ];
+  const eP1 = [eP0[0] + EXIT.handleA, eP0[1]];
+  const eP2 = [eP3[0], eP3[1] + EXIT.handleB];
   const exitBezier = (t) => {
     const u = 1 - t;
-    return [0, 1].map((k) => u ** 3 * exitP0[k] + 3 * u ** 2 * t * exitP1[k] +
-      3 * u * t ** 2 * exitP2[k] + t ** 3 * exitP3[k]);
+    return [0, 1].map((k) => u ** 3 * eP0[k] + 3 * u ** 2 * t * eP1[k] +
+      3 * u * t ** 2 * eP2[k] + t ** 3 * eP3[k]);
   };
-  const exitCurveN = 64;
-  const exitCentres = [];
-  const deckY = highwayYAt(exitStart.x);
-  const cityY = exitEnd.y;
+  const exitCurveN = 40;
+  const exitCurve = [];
+  const exitArcLengths = [0];
+  let exitArcLength = 0;
   for (let i = 0; i <= exitCurveN; i++) {
-    const t = i / exitCurveN;
-    const [x, z] = exitBezier(t);
-    const baseY = lerp(deckY, cityY, smooth01(t));
-    const overpassHump = 4.0 * Math.sin(Math.PI * t) ** 2;
-    exitCentres.push(V(x, baseY + overpassHump, z));
+    const p = exitBezier(i / exitCurveN);
+    if (i > 0) {
+      exitArcLength += Math.hypot(p[0] - exitCurve[i - 1][0], p[1] - exitCurve[i - 1][1]);
+      exitArcLengths.push(exitArcLength);
+    }
+    exitCurve.push(p);
   }
+
+  // Smooth vertical profile from the flat deck to the city road's existing grade.
+  const exitY0 = highwayYAt(exitBendX0) + LIFT;
+  const exitY1 = cityY(EXIT.joinZ);
+  const exitM1 = -(cityY(EXIT.joinZ + 1) - cityY(EXIT.joinZ - 1)) / 2;
+  for (let i = 1; i <= exitCurveN; i++) {
+    const u = exitArcLengths[i] / exitArcLength;
+    const h00 = 2 * u ** 3 - 3 * u ** 2 + 1;
+    const h01 = -2 * u ** 3 + 3 * u ** 2;
+    const h11 = u ** 3 - u ** 2;
+    exitCentres.push(V(exitCurve[i][0],
+      h00 * exitY0 + h01 * exitY1 + h11 * exitArcLength * exitM1,
+      exitCurve[i][1]));
+  }
+  for (let z = EXIT.joinZ - 2; z >= EXIT.taperZ - 1e-6; z -= 2) {
+    exitCentres.push(V(cityLaneX(z), cityY(z), z));
+  }
+
   const exitSides = exitCentres.map((_, i) => sideOf(exitCentres, i));
-  for (let i = 1; i < exitCentres.length; i++) {
-    exitLeft.push(exitCentres[i].clone().addScaledVector(exitSides[i], -half));
-    exitRight.push(exitCentres[i].clone().addScaledVector(exitSides[i], half));
+  exitCentres.forEach((p, i) => {
+    exitLeft.push(p.clone().addScaledVector(exitSides[i], -half));
+    exitRight.push(p.clone().addScaledVector(exitSides[i], half));
+  });
+
+  // Taper into the city road just beyond the last city block.
+  const exitTaperN = 8;
+  for (let j = 1; j <= exitTaperN; j++) {
+    const u = j / exitTaperN;
+    const z = lerp(EXIT.taperZ, EXIT.endZ, u);
+    const lx = roadX(z) - half + 0.04;
+    const y = cityY(z);
+    exitLeft.push(V(lx, y, z));
+    exitRight.push(V(lerp(lx - 2 * half, lx - 0.12, smooth01(u)), y, z));
   }
   makeVisualRibbon(exitLeft, exitRight);
 
-  // Temporary supports keep the elevated exit from visibly floating. They are visual-only too.
-  const exitPierCapacity = Math.ceil(exitCentres.length / 8);
+  // Temporary visual supports along the elevated exit; no colliders.
   const exitPierMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshToonMaterial({ color: 0x77787b, gradientMap: toonGradientMap }),
-    exitPierCapacity
+    Math.max(1, Math.ceil(exitCentres.length / 8))
   );
   const exitDummy = new THREE.Object3D();
   let exitPierCount = 0;
   for (let i = 8; i < exitCentres.length - 2; i += 8) {
     const p = exitCentres[i];
-    // Leave the crossing zone clear so a decorative pier does not block the entrance ramp below.
-    if (p.z < 130 && p.x < 110) continue;
+    if (p.z < 130 && p.x < 110) continue; // leave the entrance-ramp crossing clear
     const groundY = terrainHeight(p.x, p.z);
     const h = p.y - groundY - 0.55;
     if (h < 1.5) continue;
@@ -289,14 +320,13 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   exitPierMesh.frustumCulled = false;
   scene.add(exitPierMesh);
 
-  // Instanced guardrails along the exit's exposed edges; keep the gore open at the highway.
-  const exitRailMat = new THREE.MeshToonMaterial({ color: 0x85888b, gradientMap: toonGradientMap });
+  // Guardrails along exposed edges, leaving the gore open at the highway.
   const exitRailGeo = new THREE.BoxGeometry(1, 1, 1);
-  const exitRailCapacity = (exitLeft.length - exitGoreN - 1) * 2;
-  const exitRailMesh = new THREE.InstancedMesh(exitRailGeo, exitRailMat, exitRailCapacity);
+  const exitRailMat = new THREE.MeshToonMaterial({ color: 0x85888b, gradientMap: toonGradientMap });
+  const exitRailMesh = new THREE.InstancedMesh(exitRailGeo, exitRailMat, Math.max(1, (exitLeft.length - goreN - 1) * 2));
   const exitRailDummy = new THREE.Object3D();
   let exitRailCount = 0;
-  for (let i = exitGoreN; i < exitLeft.length - 1; i++) {
+  for (let i = goreN; i < exitLeft.length - 1; i++) {
     for (const edge of [exitLeft, exitRight]) {
       const a = edge[i], b = edge[i + 1];
       const dx = b.x - a.x, dz = b.z - a.z;
@@ -349,10 +379,10 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   railPieces.push({ body: highway.body, x: highwaySamples[0].x + 0.25, y: highwaySamples[0].y + 0.65, z: highwayZ, yaw: 0, len: half * 2 + 0.4, th: 0.5, h: 1.3 });
   // highway: north rail all the way; the city-side rail is open along the merge
   railLine(hwLeft, hwRight, highway.body, () => false);
-  railLine(hwRight, hwLeft, highway.body, (i) => hwRight[i].x > P3[0] - 8 && hwRight[i].x < taperEndX + 6);
+  railLine(hwRight, hwLeft, highway.body, (i) => (hwRight[i].x > P3[0] - 8 && hwRight[i].x < taperEndX + 6) || (hwRight[i].x > EXIT.goreX - 6 && hwRight[i].x < exitBendX0 + 6));
   // ramp: no rails on the lead-in (it IS the road); outer rail all the way; highway-facing rail open from the lane on
   railLine(R, L, ramp.body, (i) => i < leadCount - 1);
-  railLine(L, R, ramp.body, (i) => i < leadCount - 1 || i >= bendEndIdx - 2);
+  railLine(L, R, ramp.body, (i) => i < leadCount - 1 || i >= bendEndIdx - 2 || (i < centres.length && centres[i].z < 118));
 
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
   const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, Math.max(railPieces.length, 1));
