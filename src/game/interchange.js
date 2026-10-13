@@ -136,73 +136,10 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // deck height at x (only used where the ramp merges, which is on the flat part)
   const highwayYAt = (x) => layout.centerY(Math.min(x, HW.hillX)) + RIBBON_LIFT;
 
-
   // ---------- the ramp ----------
   const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
   const laneZ = hwEdgeZ - half + 0.04;       // acceleration lane centre; its inner edge overlaps the deck by 4 cm
   const LIFT = 0.015;                        // ramp sits 1.5 cm above the deck where they touch (no z-fighting)
-
-  // ---------- four connected cloverleaf loop ramps ----------
-  // Each loop is a 270-degree one-way curve between the city approaches and the cross-highway.
-  // The loops occupy the four quadrants around the grade-separated crossing; they are real ribbon meshes
-  // with Rapier trimesh colliders and are included in the road-surface test below.
-  const cloverRoadCentres = [];
-  const cloverRamps = [];
-  const LOOP = { radius: 27, samples: 72, cityOffset: 52, deckOffset: 62, width: half * 2 };
-  function makeCloverLoop(sx, sz) {
-    // A broad 270-degree loop, with short tangent connectors at each end. The city connector is
-    // at street level; the highway connector reaches deck height, with a smooth grade between them.
-    const cx = sx * 48;
-    const cz = highwayZ + sz * 48;
-    const r = LOOP.radius;
-    const startAngle = sx > 0 ? Math.PI : 0;
-    const sweep = sx * sz > 0 ? -Math.PI * 1.5 : Math.PI * 1.5;
-    const arc = [];
-    for (let i = 0; i <= LOOP.samples; i++) {
-      const a = startAngle + sweep * i / LOOP.samples;
-      arc.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r });
-    }
-    const first = arc[0], last = arc[arc.length - 1];
-    // Choose connectors that terminate on the city approach and the highway edge, respectively.
-    const cityEnd = V(roadXForLoop(sz, sx), getRoadFrame(highwayZ + sz * LOOP.cityOffset).y + 0.05, highwayZ + sz * LOOP.cityOffset);
-    const deckEnd = V(sx * LOOP.deckOffset, highwayYAt(sx * LOOP.deckOffset) + LIFT, highwayZ + sz * (half * 2 - 0.04));
-    const pts = [];
-    const cityStart = V(cityEnd.x, cityEnd.y, cityEnd.z);
-    const cityCtrl = V(first.x, cityEnd.y + (deckEnd.y - cityEnd.y) * 0.12, first.z);
-    for (let i = 0; i < 12; i++) {
-      const t = i / 12, u = 1 - t;
-      pts.push(V(u*u*cityStart.x + 2*u*t*cityCtrl.x + t*t*first.x,
-        u*u*cityStart.y + 2*u*t*cityCtrl.y + t*t*(highwayYAt(first.x) + LIFT),
-        u*u*cityStart.z + 2*u*t*cityCtrl.z + t*t*first.z));
-    }
-    for (let i = 0; i < arc.length; i++) {
-      const t = i / (arc.length - 1);
-      pts.push(V(arc[i].x, lerp(cityEnd.y, deckEnd.y, smooth01(t)), arc[i].z));
-    }
-    for (let i = 1; i <= 12; i++) {
-      const t = i / 12, u = 1 - t;
-      const p0 = last, p1 = { x: last.x + sx * 14, z: last.z }, p2 = { x: deckEnd.x - sx * 18, z: deckEnd.z }, p3 = deckEnd;
-      const x = u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x;
-      const z = u*u*u*p0.z + 3*u*u*t*p1.z + 3*u*t*t*p2.z + t*t*t*p3.z;
-      pts.push(V(x, lerp(highwayYAt(first.x) + LIFT, deckEnd.y, t), z));
-    }
-    // Refit the whole loop to one continuous grade, avoiding a height step at either connector.
-    for (let i = 0; i < pts.length; i++) pts[i].y = lerp(cityEnd.y, deckEnd.y, smooth01(i / (pts.length - 1)));
-    const sidesLoop = pts.map((_, i) => sideOf(pts, i));
-    const left = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], -half));
-    const right = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], half));
-    const ribbon = makeRibbon(left, right);
-    cloverRamps.push({ pts, left, right, body: ribbon.body });
-    for (const p of pts) cloverRoadCentres.push(p.x, p.z);
-  }
-  // Small helper deliberately uses the existing city road frame, not a new parallel road system.
-  function roadXForLoop(sz, sx) {
-    return getRoadFrame(highwayZ + sz * LOOP.cityOffset).x + sx * 3.5;
-  }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) makeCloverLoop(sx, sz);
-
-  // The earlier disconnected loop prototype was removed: unconnected elevated ribbons are not usable ramps.
-
   const centres = [];
 
   // 1. lead-in: straight on from the city road, hugging its height
@@ -354,8 +291,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     exitLeft.push(V(lx, y, z));
     exitRight.push(V(lerp(lx - 2 * half, lx - 0.12, smooth01(u)), y, z));
   }
-  // The exit is a real drivable surface, not scenery: it gets the same fixed trimesh collider as the on-ramp.
-  makeRibbon(exitLeft, exitRight);
+  makeVisualRibbon(exitLeft, exitRight);
 
   // Temporary visual supports along the elevated exit; no colliders.
   const exitPierMesh = new THREE.InstancedMesh(
@@ -376,8 +312,6 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     exitDummy.scale.set(2.6, h, 2.6);
     exitDummy.updateMatrix();
     exitPierMesh.setMatrixAt(exitPierCount++, exitDummy.matrix);
-    const pierBody = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, groundY + h / 2, p.z));
-    physics.createCollider(RAPIER.ColliderDesc.cuboid(1.3, h / 2, 1.3).setFriction(0.65), pierBody);
   }
   exitPierMesh.count = exitPierCount;
   exitPierMesh.instanceMatrix.needsUpdate = true;
@@ -482,20 +416,16 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     piers.push({ x, z, base, h, capY: topOfPier + S.capH / 2, heading });
   }
   // walk a polyline, dropping a pier every S.spacing metres of road
-  function pierRun(points, headings, from, to, clearCityRoad = false) {
+  function pierRun(points, headings, from, to) {
     let run = S.spacing / 2;
     for (let i = Math.max(from, 1); i < to; i++) {
       run += points[i].distanceTo(points[i - 1]);
       if (run < S.spacing) continue;
       run = 0;
-      if (clearCityRoad && Math.abs(points[i].x) < 15 && Math.abs(points[i].z - HW.z) < 5) continue;
       addPier(points[i].x, points[i].z, points[i].y, headings[i]);
     }
   }
-  pierRun(highwaySamples, hwSides.map(headingOf), 1, highwaySamples.length - 1, true);
-  // Span the city street on outside piers, keeping a column out of the driving lane.
-  addPier(-9, HW.z, layout.centerY(-9) + RIBBON_LIFT, Math.PI / 2);
-  addPier(9, HW.z, layout.centerY(9) + RIBBON_LIFT, Math.PI / 2);
+  pierRun(highwaySamples, hwSides.map(headingOf), 1, highwaySamples.length - 1);
   pierRun(centres, sides.map(headingOf), leadCount, centres.length); // ramp bend + lane (the taper is skipped)
 
   const pierMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
@@ -564,8 +494,6 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
   const roadXZ = [];
   for (const p of path) roadXZ.push(p.x, p.z);
-  roadXZ.push(...cloverRoadCentres);
-  for (const p of exitCentres) roadXZ.push(p.x, p.z);
   for (const p of highwaySamples) roadXZ.push(p.x, p.z);
   const onRoadR2 = (half + 1.1) * (half + 1.1);
   function onRoad(x, z) {
