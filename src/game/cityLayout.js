@@ -24,6 +24,8 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
   const BAY_OUT = BAY_IN + CITY_BAY_WIDTH;
   const WALK_OUT = BAY_OUT + CITY_WALK_WIDTH;
   const BUILD_IN = WALK_OUT + 0.8;
+  // Keep a clear underpass envelope around the elevated highway crossing in the city centre.
+  const inInterchangeClearance = (z) => z > 88 && z < 235;
 
   // a point `offset` metres to one side of the road centre (side +1 = +x / left when facing +z)
   const sidePose = (z, side, offset) => {
@@ -55,10 +57,12 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
         const roofRoll = rand();
         const roof = h < 13 && roofRoll < 0.22 ? 3 : roofRoll < 0.38 ? 2 : roofRoll < 0.7 ? 1 : 0;
         const p = sidePose(z + w / 2, side, BUILD_IN + d / 2);
-        out.buildings.push({
-          x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading,
-          tone: Math.floor(rand() * 8), roof, side,
-        });
+        if (!inInterchangeClearance(p.z)) {
+          out.buildings.push({
+            x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading,
+            tone: Math.floor(rand() * 8), roof, side,
+          });
+        }
         z += w + 2.4; // alley: wide enough that the road's curve can't push neighbours into each other
       }
 
@@ -66,22 +70,25 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
       for (let cz = z0 + 4; cz < z1 - 4; cz += 6.5 + rand() * 5) {
         if (rand() < 0.4) continue;
         const p = sidePose(cz, side, BAY_IN + CITY_BAY_WIDTH / 2);
-        out.cars.push({
-          x: p.x, y: p.y, z: p.z, heading: p.heading,
-          tone: Math.floor(rand() * 7), style: Math.floor(rand() * 3),
-        });
+        if (!inInterchangeClearance(p.z)) {
+          out.cars.push({
+            x: p.x, y: p.y, z: p.z, heading: p.heading,
+            tone: Math.floor(rand() * 7), style: Math.floor(rand() * 3),
+          });
+        }
       }
 
       // streetlights on the sidewalk, every 24 m
       for (let lz = z0 + 6; lz < z1 - 3; lz += 24) {
         const p = sidePose(lz, side, BAY_OUT + 0.6);
-        out.lamps.push({ x: p.x, y: p.y + CURB, z: p.z, heading: p.heading, side });
+        if (!inInterchangeClearance(p.z)) out.lamps.push({ x: p.x, y: p.y + CURB, z: p.z, heading: p.heading, side });
       }
 
       // paved strips: bay (road-level asphalt) and sidewalk (raised), as short pitched segments
       for (let zs = z0; zs < z1 - 0.01; zs += SEG_LEN) {
         const za = zs, zb = Math.min(zs + SEG_LEN, z1), len = zb - za, zc = (za + zb) / 2;
         const ya = frameAt(za).y, yb = frameAt(zb).y;
+        if (inInterchangeClearance(zc)) continue;
         const pitch = Math.atan2(yb - ya, len);
         const bay = sidePose(zc, side, BAY_IN + CITY_BAY_WIDTH / 2);
         out.flats.push({ kind: 'bay', x: bay.x, y: bay.y, z: bay.z, sx: CITY_BAY_WIDTH, sy: 0.07, sz: len + 0.06, heading: bay.heading, pitch });
