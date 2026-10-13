@@ -36,7 +36,7 @@ export function createHud() {
     const dev = state.zoneAuto ? '' : ' [DEV]';
     const directorState = highway ? ` [${director.getDirectorState().toUpperCase()}]` : '';
     set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState + ' · ' + getDifficulty().toUpperCase());
-    const typing = highway && !state.storyDone; // the panel goes away once the last line is typed
+    const typing = highway && !state.storyDone && !state.outro && !state.legDone; // the panel goes away once the last line is typed
     set(typingPanel.style, 'panel', typing ? 'block' : 'none', 'display');
     // typing panel fades in over the handoff instead of popping on
     const fade = Math.min(1, (state.time - state.highwayEnteredAt) / HANDOFF_UI_FADE_S);

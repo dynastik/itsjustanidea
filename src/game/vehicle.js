@@ -706,7 +706,7 @@ export function createVehicle(scene, physics, RAPIER) {
     }
   }
 
-  function reset(y = cfg.spawnHeight, heading = 0) {
+  function reset(y = cfg.spawnHeight, heading = 0, x = 0, z = 0, speed = 0) {
     gearIndex = 2;
     shiftTimer = 0;
     shiftDuration = 0.40;
@@ -720,9 +720,9 @@ export function createVehicle(scene, physics, RAPIER) {
     lugPhase = 0;
     overRevTimer = 0;
     limiterPhase = 0;
-    body.setTranslation({ x: 0, y, z: 0 }, true);
+    body.setTranslation({ x, y, z }, true);
     body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
-    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setLinvel({ x: Math.sin(heading) * speed, y: 0, z: Math.cos(heading) * speed }, true);
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     self.steerAngle = 0;
     flipTimer = 0;

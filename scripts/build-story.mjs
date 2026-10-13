@@ -1,64 +1,113 @@
-// Turns the story scripts in /story into src/game/storyText.js. Run: npm run story
-// Write the story in the .md files (see the header comment in story/long.md for the format), then run this.
+// Turns the story scripts in /story into src/game/storyText.js (short) and src/game/storyLong.js (long). Run: npm run story
+// Write the story in the .md files (see the header comments in story/short.md and story/long.md for the formats), then run this.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ACT_MAP = ['calm', 'calm', 'uneasy', 'wrong', 'horror', 'finale']; // Act I..VI -> how wrong the world is
+const ACT_MAP = ['calm', 'calm', 'uneasy', 'wrong', 'horror', 'finale']; // short: Act I..VI -> how wrong the world is
+const ACTS = new Set(['calm', 'uneasy', 'wrong', 'horror', 'finale']);
 const MAX_PARAGRAPH = 260; // narration lines are grouped into typing paragraphs up to about this many characters
 
-function parse(file) {
-  const text = fs.readFileSync(path.join(root, 'story', file), 'utf8').replace(/<!--[\s\S]*?-->/g, '').replace(/\r/g, '');
-  const sections = text.split(/^## /m).slice(1);
-  if (sections.length !== ACT_MAP.length) throw new Error(`${file}: expected ${ACT_MAP.length} acts, found ${sections.length}`);
+const read = (file) => fs.readFileSync(path.join(root, 'story', file), 'utf8').replace(/<!--[\s\S]*?-->/g, '').replace(/\r/g, '');
+const clean = (lines, file) => lines.map((l) => l.trim()).filter((l) => l && !l.startsWith('*')).map((l) => {
+  if (/[^\x20-\x7e]/.test(l)) throw new Error(`${file}: non-ASCII character in: ${l}`);
+  if (l.includes('`')) throw new Error(`${file}: backtick in: ${l}`);
+  return l;
+});
+
+// Groups lines into prompts. act can change via "@act x"; "[break]" forces a new paragraph; the ending line is not typed.
+function toItems(lines, startAct, file, ending = null) {
   const items = [];
-  let ending = 'NEXT DRIVER, PLEASE.';
-  sections.forEach((section, i) => {
-    const act = ACT_MAP[i];
-    const lines = section.split('\n').slice(1).map((l) => l.trim()).filter((l) => l && !l.startsWith('*'));
-    let buf = '';
-    const flush = () => { if (buf) items.push({ act, kind: 'narration', text: buf }); buf = ''; };
-    for (const line of lines) {
-      if (/[^\x20-\x7e]/.test(line)) throw new Error(`${file}: non-ASCII character in: ${line}`);
-      if (line.includes('`')) throw new Error(`${file}: backtick in: ${line}`);
-      const sign = line.match(/^\[sign\]\s*(.+)$/);
-      const caps = line === line.toUpperCase() && /[A-Z]/.test(line);
-      if (sign || caps) {
-        flush();
-        if (i === ACT_MAP.length - 1 && line === ending) continue; // shown after the fade, not typed
-        items.push({ act, kind: sign ? 'sign' : 'message', text: sign ? sign[1] : line });
-      } else if (buf && buf.length + 1 + line.length > MAX_PARAGRAPH) {
-        flush();
-        buf = line;
-      } else {
-        buf = buf ? `${buf} ${line}` : line;
-      }
+  let act = startAct, buf = '';
+  const flush = () => { if (buf) items.push({ act, kind: 'narration', text: buf }); buf = ''; };
+  for (const line of lines) {
+    const at = line.match(/^@act\s+(\w+)$/);
+    if (at) {
+      if (!ACTS.has(at[1])) throw new Error(`${file}: unknown act "${at[1]}"`);
+      flush(); act = at[1]; continue;
     }
-    flush();
+    if (line === '[break]') { flush(); continue; }
+    const sign = line.match(/^\[sign\]\s*(.+)$/);
+    const caps = line === line.toUpperCase() && /[A-Z]/.test(line);
+    if (sign || caps) {
+      flush();
+      if (ending && line === ending) continue; // shown after the fade, not typed
+      items.push({ act, kind: sign ? 'sign' : 'message', text: sign ? sign[1] : line });
+    } else if (buf && buf.length + 1 + line.length > MAX_PARAGRAPH) {
+      flush(); buf = line;
+    } else {
+      buf = buf ? `${buf} ${line}` : line;
+    }
+  }
+  flush();
+  return items;
+}
+
+function parseShort(file) {
+  const sections = read(file).split(/^## /m).slice(1);
+  if (sections.length !== ACT_MAP.length) throw new Error(`${file}: expected ${ACT_MAP.length} acts, found ${sections.length}`);
+  const ending = 'NEXT DRIVER, PLEASE.';
+  const items = [];
+  sections.forEach((section, i) => {
+    const lines = clean(section.split('\n').slice(1), file);
+    items.push(...toItems(lines, ACT_MAP[i], file, i === ACT_MAP.length - 1 ? ending : null));
   });
   return { items, ending };
 }
 
-const long = parse('long.md');
-const short = parse('short.md');
-const fmt = (items) => items.map((p) => `  P(${JSON.stringify(p.act)}, ${JSON.stringify(p.kind)}, ${JSON.stringify(p.text)}),`).join('\n');
-const chars = (items) => items.reduce((n, p) => n + p.text.length, 0);
+function parseLong(file) {
+  const sections = read(file).split(/^## /m).slice(1);
+  const legs = [];
+  let ending = [];
+  for (const section of sections) {
+    const [head, ...rest] = section.split('\n');
+    const lines = clean(rest, file);
+    if (/^ending/i.test(head.trim())) { ending = lines; continue; }
+    const m = head.match(/^(.+?)\s*\|\s*([\d.]+)\s*-\s*([\d.]+)\s*\|\s*(\w+)\s*$/);
+    if (!m) throw new Error(`${file}: bad leg heading "${head}" (want: Title | from-to | act)`);
+    if (!ACTS.has(m[4])) throw new Error(`${file}: unknown act "${m[4]}" in "${head}"`);
+    legs.push({ title: m[1], from: Number(m[2]), to: Number(m[3]), items: toItems(lines, m[4], file) });
+  }
+  if (!legs.length) throw new Error(`${file}: no legs found`);
+  return { legs, ending };
+}
 
-const out = `// GENERATED by scripts/build-story.mjs from story/short.md and story/long.md. Do not edit by hand: edit the scripts and run \`npm run story\`.
+const fmt = (items, indent = '  ') => items.map((p) => `${indent}P(${JSON.stringify(p.act)}, ${JSON.stringify(p.kind)}, ${JSON.stringify(p.text)}),`).join('\n');
+const chars = (items) => items.reduce((n, p) => n + p.text.length, 0);
+const mins = (n) => (n / 5 / 40).toFixed(1);
+
+const longFile = path.join(root, 'story', 'long.md');
+if (fs.existsSync(longFile)) {
+  const long = parseLong('long.md');
+  const out = `// GENERATED by scripts/build-story.mjs from story/long.md. Do not edit by hand: edit the script and run \`npm run story\`.
 const P = (act, kind, text) => ({ act, kind, text });
 
-export const ENDING_LINE = ${JSON.stringify(long.ending)};
+export const LONG_ENDING = ${JSON.stringify(long.ending)};
+
+export const LEGS = [
+${long.legs.map((l) => `  {\n    title: ${JSON.stringify(l.title)}, from: ${l.from}, to: ${l.to},\n    items: [\n${fmt(l.items, '      ')}\n    ],\n  },`).join('\n')}
+];
+`;
+  fs.writeFileSync(path.join(root, 'src/game/storyLong.js'), out);
+  let total = 0;
+  for (const l of long.legs) { total += chars(l.items); console.log(`  leg "${l.title}": ${l.items.length} paragraphs, ${chars(l.items)} chars, about ${mins(chars(l.items))} min at 40 WPM`); }
+  console.log(`long: ${long.legs.length} legs, ${total} chars, about ${mins(total)} min of typing at 40 WPM`);
+}
+
+const shortFile = path.join(root, 'story', 'short.md');
+if (fs.existsSync(shortFile)) {
+  const short = parseShort('short.md');
+  const out = `// GENERATED by scripts/build-story.mjs from story/short.md. Do not edit by hand: edit the script and run \`npm run story\`.
+// (The long story lives in storyLong.js.)
+const P = (act, kind, text) => ({ act, kind, text });
+
+export const ENDING_LINE = ${JSON.stringify(short.ending)};
 
 export const SHORT = [
 ${fmt(short.items)}
 ];
-
-export const LONG = [
-${fmt(long.items)}
-];
 `;
-fs.writeFileSync(path.join(root, 'src/game/storyText.js'), out);
-for (const [name, s] of [['short', short], ['long', long]]) {
-  console.log(`${name}: ${s.items.length} paragraphs, ${chars(s.items)} chars, about ${(chars(s.items) / 5 / 40).toFixed(1)} min at 40 WPM`);
+  fs.writeFileSync(path.join(root, 'src/game/storyText.js'), out);
+  console.log(`short: ${short.items.length} paragraphs, ${chars(short.items)} chars, about ${mins(chars(short.items))} min at 40 WPM`);
 }

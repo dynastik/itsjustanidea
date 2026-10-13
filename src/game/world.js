@@ -3,6 +3,7 @@ import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS, CITY_Z_MIN, CITY_Z_MAX, CITY_BAY_WIDTH
 import { toonGradientMap } from './toon.js';
 import { createHighwayInterchange as createInterchange } from './interchange.js';
 import { createHighwayLayout, GROUND_START_Z } from './highwayLayout.js';
+import { lotInfluence } from './lotLayout.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
 
@@ -86,6 +87,8 @@ function sampleTerrain(x, z, out) {
     const k = (1 - sm(hwHit.d, FLAT_DIST, REACH)) * hwHit.w;
     if (k > influence) { influence = k; roadY = hwHit.y; }
   }
+  const lot = lotInfluence(x, z, roadCenterX, roadHeight); // the depot lot is graded level with the road
+  if (lot.k > influence) { influence = lot.k; roadY = lot.y; }
   out.h = influence > 0 ? nat + (roadY - nat) * influence : nat;
   out.d = dist;
 }
@@ -400,5 +403,5 @@ export function createWorld(scene, physics, RAPIER) {
     return { x: f.x, y: f.y + 0.035, z: GROUND_START_Z + remaining, heading: f.heading };
   }
 
-  return { update, surfaceAt, getRoadFrame, getAheadPose, drivePath: interchange.drivePath, groundStartZ: GROUND_START_Z, layout };
+  return { update, surfaceAt, getRoadFrame, getAheadPose, drivePath: interchange.drivePath, exitPath: interchange.exitPath, groundStartZ: GROUND_START_Z, layout };
 }

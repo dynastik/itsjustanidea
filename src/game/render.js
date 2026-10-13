@@ -57,6 +57,7 @@ export function createRenderer(scene, camera) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
+  renderer.info.autoReset = false; // the composer renders several passes per frame; render() resets once
   document.body.appendChild(renderer.domElement);
 
   const composer = new EffectComposer(renderer);
@@ -136,7 +137,8 @@ export function createRenderer(scene, camera) {
 
   return {
     domElement: renderer.domElement,
-    render: () => composer.render(),
+    info: renderer.info,
+    render: () => { renderer.info.reset(); composer.render(); },
     setLook,
     adapt,
   };

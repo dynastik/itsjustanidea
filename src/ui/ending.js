@@ -1,9 +1,9 @@
-// The ending: after the last message the screen fades to black, there is a brief silence, then
-// "Next driver, please." and the whole thing starts again from the morning (onDone does the full reset).
+// The ending: fade to black, a brief silence, the closing line(s), then the run restarts from the morning (onDone resets behind the black).
+// Short story: "NEXT DRIVER, PLEASE." Long story: the roadmap cliffhanger, which pairs with the delivery sheet
+// (sheet.js shows the first stop already delivered on the next loop).
 import { ENDING_LINE } from '../game/storyText.js';
 import { getStoryMode } from '../game/story.js';
-
-const LONG_LINES = ['GOOD MORNING, ELIAS.', 'YOUR FIRST DELIVERY IS ALREADY COMPLETE.'];
+import { LONG_ENDING } from '../game/storyLong.js';
 
 export function createEnding() {
   const el = document.createElement('div');
@@ -21,7 +21,7 @@ export function createEnding() {
     async play(onDone) {
       if (running) return;
       running = true;
-      const lines = getStoryMode() === 'long' ? LONG_LINES : [ENDING_LINE];
+      const lines = getStoryMode() === 'long' ? LONG_ENDING : [ENDING_LINE];
       el.classList.add('on');                       // fade to black (CSS transition, 2.5 s)
       await wait(5000);                             // the fade, then a brief silence
       for (let i = 0; i < lines.length; i++) {

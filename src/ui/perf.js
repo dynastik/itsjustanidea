@@ -1,22 +1,27 @@
-// Debug-only frame-time readout (toggle with the ` key). Roadmap: measure before and after expensive changes on the baseline laptop.
-// Pass renderer.info for draw calls / triangles (see the one-line render.js change).
-import { state } from '../game/state.js';
-
+// Always-on frame-time meter (top centre). Pass renderer.info for draw calls / triangles (see apply-patches.mjs, render.js).
 export function createPerf(info) {
   const el = document.createElement('div');
-  el.style.cssText = 'position:fixed;top:56px;right:20px;z-index:12;display:none;padding:6px 9px;border:1px solid rgba(225,229,222,.18);border-radius:4px;background:rgba(8,12,16,.7);color:#b8c9a9;font:10px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;pointer-events:none';
+  el.id = 'perf';
+  el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:12;padding:6px 12px;border:1px solid rgba(225,229,222,.2);border-radius:5px;background:rgba(8,12,16,.72);font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;text-align:center;white-space:pre;pointer-events:none;text-shadow:0 1px 5px #000';
+  const big = document.createElement('div');
+  big.style.cssText = 'font-size:22px;font-weight:700;letter-spacing:1px';
+  const small = document.createElement('div');
+  small.style.cssText = 'color:#b6bbb5';
+  el.append(big, small);
   document.body.appendChild(el);
+  big.textContent = '-- FPS';
   let acc = 0, frames = 0, worst = 0;
   return {
     update(dt) {
-      if (!state.debug) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
       if (dt <= 0) return;
       acc += dt; frames++; worst = Math.max(worst, dt);
       if (acc < 0.5) return;
+      const fps = frames / acc;
+      big.textContent = `${Math.round(fps)} FPS`;
+      big.style.color = fps >= 55 ? '#a9d99b' : fps >= 40 ? '#e7c46c' : '#f0877d';
       const r = info?.render;
-      el.style.display = 'block';
-      el.textContent = `${(frames / acc).toFixed(0)} fps  avg ${(acc / frames * 1000).toFixed(1)} ms  worst ${(worst * 1000).toFixed(0)} ms` +
-        (r ? `\ncalls ${r.calls}  tris ${(r.triangles / 1000).toFixed(0)}k` : '');
+      small.textContent = `${(acc / frames * 1000).toFixed(1)} ms avg  |  ${(worst * 1000).toFixed(0)} ms worst` +
+        (r ? `\n${r.calls} calls  |  ${(r.triangles / 1000).toFixed(0)}k tris` : '');
       acc = 0; frames = 0; worst = 0;
     },
   };

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { pickPrompt, resetStory, skipToNextAct, isCaseInsensitive } from './story.js';
+import { pickPrompt, resetStory, skipToNextAct, isCaseInsensitive, isStoryFinished } from './story.js';
 
 // Highway tuning lives here so typing feel is tweaked in one place.
 export const HIGHWAY_CONFIG = {
@@ -55,7 +55,8 @@ export function pickNewWord() {
   if (!p) { // story over: the ending takes it from here (main.js)
     t.target = '';
     t.source = 'end';
-    state.storyDone = true;
+    if (isStoryFinished()) state.storyDone = true;
+    else state.legDone = true; // long mode: this highway leg is over (route.js takes the exit)
     return;
   }
   t.target = p.text;

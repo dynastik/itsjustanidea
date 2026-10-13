@@ -1,7 +1,10 @@
 // Pure layout maths for the city zone (no three.js, so it can be unit-tested in plain node).
 // Everything is generated once from a fixed seed: the city is the same every run, and the horror
 // can later re-use or corrupt it on purpose.
+// The depot lot (lotLayout.js) is carved out of the first block: no buildings, cars, lamps or sidewalk there. The random
+// numbers are still drawn in the same order, so the rest of the city is unchanged.
 import { CITY_Z_MIN, CITY_Z_MAX, CITY_BAY_WIDTH, CITY_WALK_WIDTH } from './zones.js';
+import { LOT } from './lotLayout.js';
 
 export const STREETS = [-96, -32, 32];  // cross-street centres (z)
 export const STREET_W = 10;
@@ -16,6 +19,8 @@ function mulberry32(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+const inLot = (side, za, zb, margin = 0) => side === LOT.side && zb > LOT.z0 - margin && za < LOT.z1 + margin;
 
 // frameAt(z) -> { x, y, heading } of the road centre line. roadHalf = half width of the road.
 export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
@@ -54,26 +59,27 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
         const h = 8 + Math.pow(rand(), 1.8) * 17; // mostly low-rise, a few taller landmarks
         const roofRoll = rand();
         const roof = h < 13 && roofRoll < 0.22 ? 3 : roofRoll < 0.38 ? 2 : roofRoll < 0.7 ? 1 : 0;
-        const p = sidePose(z + w / 2, side, BUILD_IN + d / 2);
-        out.buildings.push({
-          x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading,
-          tone: Math.floor(rand() * 8), roof, side,
-        });
+        const tone = Math.floor(rand() * 8);
+        if (!inLot(side, z, z + w, 2)) {
+          const p = sidePose(z + w / 2, side, BUILD_IN + d / 2);
+          out.buildings.push({ x: p.x, y: p.y, z: p.z, w, d, h, heading: p.heading, tone, roof, side });
+        }
         z += w + 2.4; // alley: wide enough that the road's curve can't push neighbours into each other
       }
 
       // parked cars in the bay
       for (let cz = z0 + 4; cz < z1 - 4; cz += 6.5 + rand() * 5) {
         if (rand() < 0.4) continue;
+        const tone = Math.floor(rand() * 7);
+        const style = Math.floor(rand() * 3);
+        if (inLot(side, cz - 3, cz + 3)) continue;
         const p = sidePose(cz, side, BAY_IN + CITY_BAY_WIDTH / 2);
-        out.cars.push({
-          x: p.x, y: p.y, z: p.z, heading: p.heading,
-          tone: Math.floor(rand() * 7), style: Math.floor(rand() * 3),
-        });
+        out.cars.push({ x: p.x, y: p.y, z: p.z, heading: p.heading, tone, style });
       }
 
       // streetlights on the sidewalk, every 24 m
       for (let lz = z0 + 6; lz < z1 - 3; lz += 24) {
+        if (inLot(side, lz - 1, lz + 1)) continue;
         const p = sidePose(lz, side, BAY_OUT + 0.6);
         out.lamps.push({ x: p.x, y: p.y + CURB, z: p.z, heading: p.heading, side });
       }
@@ -81,6 +87,7 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
       // paved strips: bay (road-level asphalt) and sidewalk (raised), as short pitched segments
       for (let zs = z0; zs < z1 - 0.01; zs += SEG_LEN) {
         const za = zs, zb = Math.min(zs + SEG_LEN, z1), len = zb - za, zc = (za + zb) / 2;
+        if (inLot(side, za, zb)) continue; // the lot is open to the road
         const ya = frameAt(za).y, yb = frameAt(zb).y;
         const pitch = Math.atan2(yb - ya, len);
         const bay = sidePose(zc, side, BAY_IN + CITY_BAY_WIDTH / 2);

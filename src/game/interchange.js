@@ -291,7 +291,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     exitLeft.push(V(lx, y, z));
     exitRight.push(V(lerp(lx - 2 * half, lx - 0.12, smooth01(u)), y, z));
   }
-  makeVisualRibbon(exitLeft, exitRight);
+  makeRibbon(exitLeft, exitRight);
 
   // Temporary visual supports along the elevated exit; no colliders.
   const exitPierMesh = new THREE.InstancedMesh(
@@ -491,10 +491,18 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   girderMesh.frustumCulled = false;
   scene.add(girderMesh);
 
+  // Drive path for the exit sequence (route.js): west end of the deck -> gore -> exit ramp -> onto the city road, heading -z.
+  const exitPath = [];
+  for (let x = -262; x < -122; x += 6) exitPath.push({ x, z: highwayZ });
+  for (let j = 0; j <= 8; j++) { const u = j / 8; exitPath.push({ x: lerp(-122, goreEndX, u), z: lerp(highwayZ, laneZ, smooth01(u)) }); }
+  for (const p of exitCentres) exitPath.push({ x: p.x, z: p.z });
+  for (let j = 1; j <= 10; j++) { const u = j / 10; const z = lerp(EXIT.taperZ, 82, u); exitPath.push({ x: lerp(cityLaneX(EXIT.taperZ), roadX(z) - 2.25, smooth01(u)), z }); }
+
   // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
   const roadXZ = [];
   for (const p of path) roadXZ.push(p.x, p.z);
   for (const p of highwaySamples) roadXZ.push(p.x, p.z);
+  for (const p of exitCentres) roadXZ.push(p.x, p.z);
   const onRoadR2 = (half + 1.1) * (half + 1.1);
   function onRoad(x, z) {
     for (let i = 0; i < roadXZ.length; i += 2) {
@@ -505,7 +513,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   }
 
   return {
-    drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
+    exitPath, drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
     westEndX: HW.westX, pierCount: piers.length, girderCount: girders.length,
   };
 }

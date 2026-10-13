@@ -19,8 +19,10 @@ import { cycleDifficulty } from './game/difficulty.js';
 import { createHeadlights } from './game/headlights.js';
 import { createStops } from './game/stops.js';
 import { createSheet } from './ui/sheet.js';
-import { getStoryTime, getStoryMode, setStoryMode, getAct } from './game/story.js';
-import { LONG_DAY_SECONDS, dayFactors } from './game/daycycle.js';
+import { getStoryTime, getStoryMode, setStoryMode, getAct, getLongClock } from './game/story.js';
+import { dayFactors } from './game/daycycle.js';
+import { createLot } from './game/lot.js';
+import { createRoute } from './game/route.js';
 import { createSigns } from './game/signs.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
@@ -49,6 +51,7 @@ async function main() {
   const props = createProps(scene, physics, RAPIER);
   const trees = await createTrees(scene, physics, RAPIER, world.layout);
   const city = createCity(scene, physics, RAPIER);
+  const lot = createLot(scene, physics, RAPIER);
   const signs = createSigns(scene);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
@@ -71,20 +74,29 @@ async function main() {
   const perf = createPerf(gfx.info);
   const driveInput = createDriveInput();
 
+  const route = createRoute({ world, vehicle, stops, placeVan });
   let accumulator = 0;
+  let clockTotal = getStoryMode() === 'long' ? getLongClock(0) : 0; // long mode: continuous day clock, 1.0 = one day
+  const CLOCK_SLEW = 0.1; // max clock speed (days per second) when the story jumps ahead between legs
   let prevSpeed = 0;
   let lastStoryTarget = null;
   let storySignCount = 0;
   let promptsSinceSign = 0;
   const treeLightDirection = new THREE.Vector3();
 
-  function spawn() {
-    const f = world.getRoadFrame(0);
-    vehicle.reset(f.y + vehicle.cfg.spawnHeight, f.heading);
-    world.update(0, 0, true);
-    props.update(0);
+  // Teleport the van and re-centre everything that is streamed around it (terrain, props, trees).
+  function placeVan(x, y, z, heading, speed = 0) {
+    vehicle.reset(y, heading, x, z, speed);
+    world.update(x, z, true);
+    props.update(z);
     props.showStorySign(-1);
-    trees.update(0);
+    trees.update(z, 0, x);
+  }
+
+  // Every run starts in a bay of the depot lot.
+  function spawn() {
+    const s = lot.spawn;
+    placeVan(s.x, s.y + vehicle.cfg.spawnHeight, s.z, s.heading);
   }
   spawn();
 
@@ -99,21 +111,19 @@ async function main() {
     window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
   }
 
-  function advanceClock(frac) { let t=state.worldTime+frac; if(t>=1){state.dayIndex=(state.dayIndex||0)+Math.floor(t);t%=1;} state.worldTime=t; }
-
   function fullReset() {
     spawn();
     beginTypingSession({ restartStory: true });
     input.clearHeld();
-    state.worldTime = 0;
-    state.dayIndex = 0;
+    clockTotal = getStoryMode() === 'long' ? getLongClock(0) : 0;
+    state.dayIndex = Math.floor(clockTotal);
+    state.worldTime = clockTotal - state.dayIndex;
     headlights.reset();
-    stops.reset();
+    route.reset();
     lastStoryTarget = null;
     storySignCount = 0;
     promptsSinceSign = 0;
     props.showStorySign(-1);
-    state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
     state.storyDone = false;
     prevSpeed = 0;
@@ -153,7 +163,7 @@ async function main() {
       setMode(state.mode === 'city' ? 'highway' : 'city');
     } : undefined,
     setStoryMode: (mode) => { if (state.highwayEnteredAt !== -Infinity || getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
-    skipTime: import.meta.env.DEV ? () => { if (getStoryMode() === 'short') skipActDev(); else advanceClock(0.125); } : undefined,
+    skipTime: import.meta.env.DEV ? () => skipActDev() : undefined,
     reset: fullReset,
   });
 
@@ -174,8 +184,16 @@ async function main() {
 
     state.time += dt;
     if (getStoryMode() === 'short') { const target=getStoryTime(state.typing.buffer.length); state.worldTime+=(target-state.worldTime)*(1-Math.exp(-dt/3)); }
-    else if(state.mode==='highway'&&!state.storyDone) advanceClock(dt/LONG_DAY_SECONDS);
+    else {
+      // long mode: the day clock follows typing progress inside the current leg; between legs it sweeps on to the next leg's start
+      const target = getLongClock(state.typing.buffer.length);
+      const step = THREE.MathUtils.clamp((target - clockTotal) * (1 - Math.exp(-dt / 3)), -CLOCK_SLEW * dt, CLOCK_SLEW * dt);
+      clockTotal += step;
+      state.dayIndex = Math.floor(clockTotal);
+      state.worldTime = clockTotal - state.dayIndex;
+    }
     updateZoneMode();
+    route.update(dt);
     director.update(vehicle.center.z);
     if (state.storyDone && !ending.active) {
       state.loops++;
@@ -205,7 +223,8 @@ async function main() {
     signs.update(vehicle.center.z,act,dayFactors(state.worldTime).night);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
-    if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
+    if (route.controlling) route.drive(driveInput, () => input.writeHighway(driveInput, vehicle, world));
+    else if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
     else input.writeHighway(driveInput, vehicle, world);
 
     // Highway story progression is typing-driven again: prompts only advance when completed.
@@ -241,6 +260,7 @@ async function main() {
     });
 
     city.update(state.worldTime);
+    lot.update(state.worldTime);
     lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1, state.time);
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     headlights.update(dt, state.time);

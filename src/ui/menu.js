@@ -35,8 +35,8 @@ export function createMenu(cb) {
       <div class="menu-row">
         <span class="menu-label">Story</span>
         <div class="seg" data-group="story">
-          <button type="button" data-v="short">Short<small>about 12 minutes</small></button>
-          <button type="button" data-v="long">Long<small>a full day into night</small></button>
+          <button type="button" data-v="short">Short<small>one drive, about 12 minutes</small></button>
+          <button type="button" data-v="long">Long<small>three days and nights, about 40 minutes</small></button>
         </div>
         <p class="menu-note" id="menu-restart" hidden>Changing the story restarts the run.</p>
       </div>
