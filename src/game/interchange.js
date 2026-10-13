@@ -598,8 +598,15 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   for (const p of highwaySamples) roadXZ.push(p.x, p.z);
   const onRoadR2 = (half + 1.1) * (half + 1.1);
   function onRoad(x, z) {
-    for (let i = 0; i < roadXZ.length; i += 2) {
-      const dx = x - roadXZ[i], dz = z - roadXZ[i + 1];
+    // Test distance to each sampled centreline segment, not only to sample points. This keeps
+    // the off-road state continuous between samples and across the cloverleaf merge seams.
+    for (let i = 0; i < roadXZ.length - 2; i += 2) {
+      const ax = roadXZ[i], az = roadXZ[i + 1];
+      const bx = roadXZ[i + 2], bz = roadXZ[i + 3];
+      const vx = bx - ax, vz = bz - az;
+      const len2 = vx * vx + vz * vz;
+      const t = len2 > 1e-8 ? THREE.MathUtils.clamp(((x - ax) * vx + (z - az) * vz) / len2, 0, 1) : 0;
+      const dx = x - (ax + vx * t), dz = z - (az + vz * t);
       if (dx * dx + dz * dz < onRoadR2) return true;
     }
     return false;
