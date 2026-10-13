@@ -8,18 +8,18 @@ export const ROAD_HALF_WIDTH = 4.5;
 
 // Terrain: one regular grid, used for BOTH the visible mesh and the Rapier heightfield, so what
 // you see is exactly what the wheels touch. 2.5 m cells keep the flat road strip accurate.
-const VIEW = 400;                 // half-extent of the live terrain around the vehicle
+const VIEW = 500;                 // half-extent of the live terrain around the vehicle
 const TERRAIN_SIZE = VIEW * 2;
 const CELL = 2.5;
 const SEG = TERRAIN_SIZE / CELL;  // 320 cells per side
 const N = SEG + 1;                // vertices per side
 const REPEAT = 200;               // road curves/grades repeat every 200 m; terrain recentres (x and z) on multiples of this
-const RECENTER_DIST = 120;        // hysteresis: only rebuild once this far from the centre
-const ROWS_PER_FRAME = 48;        // terrain rebuild is sampled this many rows per frame (321 rows -> 7 frames)
+const RECENTER_DIST = 150;        // hysteresis: only rebuild once this far from the centre
+const ROWS_PER_FRAME = 64;        // terrain rebuild is sampled this many rows per frame (321 rows -> 7 frames)
 const ROAD_PERIOD = 10;           // metres per repeat of the road texture
 const FLAT_DIST = ROAD_HALF_WIDTH + 2.5;  // terrain is exactly road-height out to here (guardrails sit inside it)
 const SLOPE_DIST = 20;            // broad transition from the flat road corridor into the hills
-const HILL = 4.5;                  // broad, tall scenery while the road keeps a separate gentle grade
+const HILL = 5.5;                  // broad, tall scenery while the road keeps a separate gentle grade
 
 const GRASS = new THREE.Color(0x4a7c3a);
 const DIRT = new THREE.Color(0x8a7d5c);
@@ -75,7 +75,7 @@ function sampleTerrain(x, z, out) {
   const nat = naturalHeight(x, z);
   let influence = 0, roadY = 0, dist = 1e9;
 
-  const wCity = 1 - sm(z, CITY_Z_MAX + 12, CITY_Z_MAX + 62);
+  const wCity = (z > 52 && z < 238) ? 0 : 1 - sm(z, CITY_Z_MAX + 12, CITY_Z_MAX + 62);
   if (wCity > 0) {
     const d = Math.abs(x - roadCenterX(z));
     if (wCity > 0.999 && d < dist) dist = d;
@@ -369,7 +369,7 @@ export function createWorld(scene, physics, RAPIER) {
     if (interchange.onRoad(x, z)) return { offRoad: false };
     const f = getRoadFrame(z);
     const paved = z > CITY_Z_MIN && z < CITY_Z_MAX ? ROAD_HALF_WIDTH + CITY_BAY_WIDTH + CITY_WALK_WIDTH : ROAD_HALF_WIDTH;
-    if (z <= CITY_Z_MAX) return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
+    if (z <= CITY_Z_MAX && !(z > 52 && z < 238)) return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
     return { offRoad: true };
   }
 
