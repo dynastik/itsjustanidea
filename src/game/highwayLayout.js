@@ -26,21 +26,21 @@ const smooth = (x, a, b) => {
 };
 
 export const HW = {
-  z: 170,              // the straight deck runs along x at this z
-  westX: -282,         // west end of the road (a barrier closes it), at ground level
-  westGroundX: -270,   // the road has reached ground level by here (then runs flat to the barrier)
-  westFlatX: -150,     // the deck is dead flat from here east; it descends towards westGroundX
-  westMeetX: -240,     // ground has risen to meet the road (embankment)
-  westClearX: -200,    // ground is still low (pillars) from here east
+  z: 170,              // the straight east-west deck crosses the north-south city arterial
+  westX: -360,         // longer west approach, closed at its terminal barrier
+  westGroundX: -345,   // west approach returns to ground before the barrier
+  westFlatX: -240,     // long level deck for safe merges
+  westMeetX: -315,     // ground rises to meet the western approach
+  westClearX: -270,    // keep the central section clear beneath the deck
   deckRise: 4.5,       // deck height above the city road end
   descentFromX: 200,   // the deck is dead flat until here (the ramp merges onto it before this)
-  hillX: 420,          // the arc starts here
+  hillX: 500,          // the descent and arc sit beyond the interchange
   descent: 2.0,        // metres the deck loses between descentFromX and hillX
-  clearFromX: 330,     // ground under the deck starts rising here to meet the road at hillX
-  radius: 150,         // hill arc radius
+  clearFromX: 410,     // ground rises only after the elevated section
+  radius: 170,         // broad highway curve
   hillHeight: 30,      // peak of the big hill the arc wraps round
   hillSigma: 115,
-  groundRamp: 120,     // metres over which the ground road eases into its z-based wiggle
+  groundRamp: 140,     // metres over which the ground road eases into its z-based wiggle
 };
 export const RIBBON_LIFT = 0.035;                       // ribbon sits this far above the graded terrain
 export const GROUND_START_Z = HW.z + HW.radius;         // 320: first z where the road is z-indexed again (multiple of 2.5 on purpose)
