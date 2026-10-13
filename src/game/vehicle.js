@@ -26,14 +26,16 @@ export const VEHICLE_CONFIG = {
     angularDamping: 0.8,
   },
   suspension: {
-    restLength: 0.35,
-    wheelRadius: 0.3,
-    connectionY: -0.44,
-    stiffness: 28,
-    compression: 4.5,
-    relaxation: 3.5,
-    maxTravel: 0.3,
-    maxForce: 60000,
+    // Keep the wheel hubs lower and give the controller enough ray length/travel to maintain
+    // contact over the interchange's seams and graded deck. The chassis collider stays unchanged.
+    restLength: 0.42,
+    wheelRadius: 0.32,
+    connectionY: -0.34,
+    stiffness: 34,
+    compression: 5.0,
+    relaxation: 4.0,
+    maxTravel: 0.42,
+    maxForce: 72000,
   },
   tires: {
     frictionSlipFront: 9,
@@ -275,6 +277,9 @@ export function createVehicle(scene, physics, RAPIER) {
     ctrl.setWheelMaxSuspensionForce(i, s.maxForce);
     ctrl.setWheelFrictionSlip(i, i < 2 ? tr.frictionSlipFront : tr.frictionSlipRear);
     ctrl.setWheelSideFrictionStiffness(i, tr.sideFrictionStiffness);
+    // The controller's default wheel collision groups can otherwise exclude custom road
+    // colliders when the scene uses non-default filtering. Explicitly use the default all-bit mask.
+    ctrl.setWheelCollisionGroups(i, 0xffffffff);
   });
   let lastGrip = 1;
 
