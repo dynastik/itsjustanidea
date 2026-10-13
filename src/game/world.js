@@ -36,8 +36,7 @@ function roadHeight(z) {
 
 // The cross-highway (highwayLayout.js): deck over the city road end, arc round a big hill, then a ground road that is
 // z-indexed again from GROUND_START_Z on (so props, trees, signs and the road strip below keep working off getRoadFrame(z)).
-const CITY_DRIVE_END_Z = HIGHWAY_ZONE_Z + ZONE_HYSTERESIS - 2;
-const layout = createHighwayLayout({ startY: roadHeight(CITY_DRIVE_END_Z), roadCenterX, roadHeight });
+const layout = createHighwayLayout({ startY: roadHeight(CITY_Z_MAX), roadCenterX, roadHeight });
 
 // z-indexed road: the city road (and the lead-in), then from GROUND_START_Z the ground highway.
 // (Between CITY_Z_MAX + ~12 and GROUND_START_Z there is no z-indexed road: the ramp and deck are x/z ribbons, see interchange.js.)
@@ -280,7 +279,7 @@ export function createWorld(scene, physics, RAPIER) {
   scene.add(road);
 
   // One lightweight elevated joining ramp ahead of the player; no imported models or extra lights.
-  const interchange = createInterchange(scene, physics, RAPIER, road.material, { halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_DRIVE_END_Z, getRoadFrame, terrainHeight, layout });
+  const interchange = createInterchange(scene, physics, RAPIER, road.material, { halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_Z_MAX, getRoadFrame, terrainHeight, layout });
 
   // On-ramp trigger line: painted across the road where the game hands you over from WASD to typing
   // (see zones.js). Fixed in world space, so terrain recentring doesn't affect it.
@@ -365,12 +364,12 @@ export function createWorld(scene, physics, RAPIER) {
   function surfaceAt(x, z) {
     // ground highway: z-indexed again
     if (z >= GROUND_START_Z) return { offRoad: Math.abs(x - layout.groundX(z)) > ROAD_HALF_WIDTH + 0.3 };
-    // Elevated ribbon and street-level road cross here; recognise the deck before checking the underpass.
-    if (interchange.onRoad(x, z)) return { offRoad: false };
+    // ramp + deck + hill arc: not z-indexed, so test against the ribbons
+    if (z > CITY_Z_MAX + 12) return { offRoad: !interchange.onRoad(x, z) };
     const f = getRoadFrame(z);
+    // inside the city the parking bays and sidewalks are paved, so only leaving them counts as off-road
     const paved = z > CITY_Z_MIN && z < CITY_Z_MAX ? ROAD_HALF_WIDTH + CITY_BAY_WIDTH + CITY_WALK_WIDTH : ROAD_HALF_WIDTH;
-    if (z <= CITY_Z_MAX) return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
-    return { offRoad: true };
+    return { offRoad: Math.abs(x - f.x) > paved + 0.3 };
   }
 
   // A pose `dist` metres ahead of (x, z) along the drive path (ramp -> deck -> arc -> ground road). Used to place the story gantries.
