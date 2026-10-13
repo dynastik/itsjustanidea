@@ -449,6 +449,12 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // ramp: no rails on the lead-in (it IS the road); outer rail all the way; highway-facing rail open from the lane on
   railLine(R, L, ramp.body, (i) => i < leadCount - 1);
   railLine(L, R, ramp.body, (i) => i < leadCount - 1 || i >= bendEndIdx - 2 || (i < centres.length && centres[i].z < 118));
+  // Each cloverleaf loop gets exposed-edge guardrails with Rapier colliders, like the main ramp.
+  // Keep these on the ramp's own fixed body so barrier collisions follow the graded ribbon.
+  for (const loop of cloverRamps) {
+    railLine(loop.left, loop.right, loop.body, () => false);
+    railLine(loop.right, loop.left, loop.body, () => false);
+  }
 
   const railMaterial = new THREE.MeshToonMaterial({ color: 0xb9bec5, gradientMap: toonGradientMap });
   const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), railMaterial, Math.max(railPieces.length, 1));
