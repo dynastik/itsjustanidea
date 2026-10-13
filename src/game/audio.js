@@ -4,7 +4,10 @@ export function createAudio() {
   let ctx = null;
   let master, engineOsc, mufflerFilter, exhaustResonance, engineGain;
   let intakeFilter, intakeGain, windGain, windFilter, roadGain, roadFilter, noiseBuf;
-  let muted = true; // Audio is muted by default; F9 toggles mute.
+  let droneGain;
+  let muted = true; // the menu sets this from saved settings; F9 toggles mute.
+  let volume = 0.8;
+  let mood = 0;
   let audioRpm = 850;
   let audioClutch = 0;
   let lastGear = null;
@@ -81,6 +84,22 @@ export function createAudio() {
     loopedNoise().connect(roadFilter);
     roadFilter.connect(roadGain);
     roadGain.connect(master);
+
+    // Horror drone: three slightly detuned low sines (beating against each other), silent until the story turns.
+    const droneFilter = ctx.createBiquadFilter();
+    droneFilter.type = 'lowpass';
+    droneFilter.frequency.value = 220;
+    droneGain = ctx.createGain();
+    droneGain.gain.value = 0;
+    for (const f of [49, 49.7, 73.4]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      o.connect(droneFilter);
+      o.start();
+    }
+    droneFilter.connect(droneGain);
+    droneGain.connect(master);
   }
 
   function unlock() {
@@ -172,7 +191,8 @@ export function createAudio() {
     roadGain.gain.setTargetAtTime(clamp(v / 20, 0, 1) * (offRoad ? 0.09 : 0.022), t, 0.12);
     roadFilter.frequency.setTargetAtTime(offRoad ? 1250 : 420, t, 0.12);
 
-    master.gain.setTargetAtTime(paused || muted ? 0 : 0.8, t, 0.06);
+    droneGain.gain.setTargetAtTime(mood * 0.07, t, 2);
+    master.gain.setTargetAtTime(paused || muted ? 0 : volume, t, 0.06);
   }
 
   function bump(intensity) {
@@ -207,5 +227,46 @@ export function createAudio() {
     n.stop(t + 0.2);
   }
 
-  return { update, bump, toggleMute: () => { muted = !muted; } };
+  // A road message arrives as a soft, low, slightly wrong tone with a thin breath of noise.
+  function sting() {
+    if (!ctx || muted || !noiseBuf) return;
+    const t = ctx.currentTime;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    g.connect(master);
+    for (const f of [92, 97.5]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.94, t + 1.5);
+      o.connect(g);
+      o.start(t);
+      o.stop(t + 1.65);
+    }
+    const n = ctx.createBufferSource();
+    const nf = ctx.createBiquadFilter();
+    const ng = ctx.createGain();
+    n.buffer = noiseBuf;
+    nf.type = 'highpass';
+    nf.frequency.value = 3200;
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.linearRampToValueAtTime(0.012, t + 0.04);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    n.connect(nf);
+    nf.connect(ng);
+    ng.connect(master);
+    n.start(t);
+    n.stop(t + 0.55);
+  }
+
+  return {
+    update, bump, sting,
+    toggleMute: () => { muted = !muted; },
+    setMuted: (m) => { muted = !!m; },
+    getMuted: () => muted,
+    setVolume: (v) => { volume = clamp(v, 0, 1); },
+    setMood: (m) => { mood = clamp(m, 0, 1); },
+  };
 }

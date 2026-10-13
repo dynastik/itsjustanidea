@@ -25,9 +25,15 @@ import { createSigns } from './game/signs.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
 import { createEnding } from './ui/ending.js';
+import { createMenu } from './ui/menu.js';
+import { createPerf } from './ui/perf.js';
 import * as director from './game/director.js';
 
 const MAX_STEPS_PER_FRAME = 5;
+const SIGN_TEXT = 'WELCOME TO BELLWEATHER.';
+const SIGN_LINGER_PROMPTS = 3; // the second gantry stays up for this many prompts after its text, then goes
+// How loud the horror drone is per act (audio.setMood).
+const ACT_MOOD = { calm: 0, uneasy: 0.1, wrong: 0.45, horror: 1, finale: 0.25 };
 
 async function main() {
   await RAPIER.init();
@@ -62,12 +68,14 @@ async function main() {
   const ending = createEnding();
   const stops = createStops(scene, world.getRoadFrame);
   const sheet = createSheet();
+  const perf = createPerf(gfx.info);
   const driveInput = createDriveInput();
 
   let accumulator = 0;
   let prevSpeed = 0;
   let lastStoryTarget = null;
   let storySignCount = 0;
+  let promptsSinceSign = 0;
   const treeLightDirection = new THREE.Vector3();
 
   function spawn() {
@@ -103,6 +111,7 @@ async function main() {
     stops.reset();
     lastStoryTarget = null;
     storySignCount = 0;
+    promptsSinceSign = 0;
     props.showStorySign(-1);
     state.zoneAuto = true;
     state.highwayEnteredAt = -Infinity;
@@ -111,6 +120,15 @@ async function main() {
     director.reset();
     setMode('city');
   }
+
+  // Menu first: it registers its key handler before the game's, so it owns the keyboard while open.
+  // It opens immediately and pauses the game until "Start driving" (that click also unlocks audio).
+  createMenu({
+    onStoryMode: (mode) => { if (getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
+    onVolume: (v) => audio.setVolume(v),
+    onMute: (m) => audio.setMuted(m),
+    getMuted: () => audio.getMuted(),
+  });
 
   const input = createInput({
     typeKey: handleTypingKey,
@@ -166,15 +184,19 @@ async function main() {
 
     world.update(vehicle.center.x, vehicle.center.z);
     props.update(vehicle.center.z);
-    // Reveal each overhead sign when its actual sign text becomes the active typing prompt.
+    // Reveal each overhead sign when its actual sign text becomes the active typing prompt. The second one is taken
+    // down a few prompts later (the old exact-paragraph match never fired, so it stayed up for the whole run).
     const storyTarget = state.typing.target;
     if (storyTarget !== lastStoryTarget) {
-      if (storyTarget === 'WELCOME TO BELLWEATHER.') {
+      if (storyTarget === SIGN_TEXT) {
         props.showStorySign(Math.min(storySignCount, 1), world.getAheadPose(vehicle.center.x, vehicle.center.z, 70));
         storySignCount = Math.min(storySignCount + 1, 2);
-      } else if (storyTarget === 'He checked the road behind him in the mirror. There had been no turn. No junction. No reason he could think of to have circled back.') {
+        promptsSinceSign = 0;
+      } else if (storySignCount >= 2 && ++promptsSinceSign >= SIGN_LINGER_PROMPTS) {
         props.showStorySign(-1);
+        storySignCount = 3; // stop checking until the next reset
       }
+      if (storyTarget && state.typing.source === 'message') audio.sting();
       director.cueHeadlights(storyTarget, state.time, state.headlightsOn);
       lastStoryTarget = storyTarget;
     }
@@ -209,6 +231,7 @@ async function main() {
     }
     prevSpeed = vehicle.speed;
 
+    audio.setMood(ACT_MOOD[act] ?? 0);
     audio.update(dt, {
       speed: vehicle.speed,
       throttle: driveInput.throttle,
@@ -224,6 +247,7 @@ async function main() {
     rig.update(dt);
     hud.update();
     sheet.update();
+    perf.update(dt);
     gfx.setLook({ tilt: rig.tilt, worldTime: state.worldTime, dt });
     gfx.adapt(dt);
     gfx.render();

@@ -40,8 +40,12 @@ const HEADLIGHT_CUES = new Set([
 const FLICKER_S = 1.3;
 // [segment end (s), glitch 0..1] where 1 = beams fully out
 const FLICKER_STEPS = [[0.12, 1], [0.22, 0], [0.30, 1], [0.55, 0.15], [0.70, 1], [FLICKER_S, 0.35]];
-const reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const systemReducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+let reducedOverride = null; // menu setting: true = always reduce, null = follow the system preference
 let flickerStart = -Infinity;
+
+export function setReducedFlicker(value) { reducedOverride = value ? true : null; }
+export const getReducedFlicker = () => reducedOverride ?? systemReducedMotion;
 
 // Called when a new typing prompt starts. Does nothing unless the prompt is a cue and the player has the lights on.
 export function cueHeadlights(promptText, now, lightsOn) {
@@ -52,7 +56,7 @@ export function cueHeadlights(promptText, now, lightsOn) {
 export function getHeadlightGlitch(now) {
   const t = now - flickerStart;
   if (t < 0 || t > FLICKER_S) return 0;
-  if (reducedMotion) return 0.5 * Math.sin(Math.PI * t / FLICKER_S);
+  if (getReducedFlicker()) return 0.5 * Math.sin(Math.PI * t / FLICKER_S);
   for (const [end, value] of FLICKER_STEPS) if (t < end) return value;
   return 0;
 }
