@@ -25,7 +25,7 @@ export function generateCityLayout({ frameAt, roadHalf, seed = 20240501 }) {
   const WALK_OUT = BAY_OUT + CITY_WALK_WIDTH;
   const BUILD_IN = WALK_OUT + 0.8;
   // Keep a clear underpass envelope around the elevated highway crossing in the city centre.
-  const inInterchangeClearance = (z) => z > 88 && z < 198;
+  const inInterchangeClearance = (z) => z > 88 && z < 235;
 
   // a point `offset` metres to one side of the road centre (side +1 = +x / left when facing +z)
   const sidePose = (z, side, offset) => {
