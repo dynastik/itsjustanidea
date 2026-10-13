@@ -7,7 +7,7 @@ export const HANDOFF_SPEED_S = 4;     // seconds over which the speed you carrie
 export const HANDOFF_UI_FADE_S = 1.5; // seconds for the typing panel to fade in
 
 // City district continues around the elevated crossing; the gameplay handoff remains at z=90.
-export const CITY_Z_MIN = -160;
-export const CITY_Z_MAX = 230;
-export const CITY_BAY_WIDTH = 2.4;   // parking bay beside the road
-export const CITY_WALK_WIDTH = 3.2;  // sidewalk beyond the bay
+export const CITY_Z_MIN = -220;
+export const CITY_Z_MAX = 270;
+export const CITY_BAY_WIDTH = 2.8;   // parking bay beside the road
+export const CITY_WALK_WIDTH = 3.6;  // sidewalk beyond the bay
