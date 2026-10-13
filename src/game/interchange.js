@@ -497,6 +497,12 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   addPier(-9, HW.z, layout.centerY(-9) + RIBBON_LIFT, Math.PI / 2);
   addPier(9, HW.z, layout.centerY(9) + RIBBON_LIFT, Math.PI / 2);
   pierRun(centres, sides.map(headingOf), leadCount, centres.length); // ramp bend + lane (the taper is skipped)
+  // The four cloverleaf loops are elevated road structures too, not floating ribbons.
+  // Drop piers only where there is enough clearance; addPier() rejects near-ground supports.
+  for (const loop of cloverRamps) {
+    const loopHeadings = loop.pts.map((_, i) => headingOf(sideOf(loop.pts, i)));
+    pierRun(loop.pts, loopHeadings, 1, loop.pts.length - 1);
+  }
 
   const pierMat = new THREE.MeshToonMaterial({ color: 0x85878a, gradientMap: toonGradientMap });
   const capMat = new THREE.MeshToonMaterial({ color: 0x6f7276, gradientMap: toonGradientMap });
@@ -546,6 +552,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   }
   girderRun(highwaySamples, 1, highwaySamples.length);
   girderRun(centres, leadCount, centres.length);
+  for (const loop of cloverRamps) girderRun(loop.pts, 1, loop.pts.length);
   const girderMat = new THREE.MeshToonMaterial({ color: 0x4d5054, gradientMap: toonGradientMap });
   const girderMesh = new THREE.InstancedMesh(unit, girderMat, Math.max(girders.length, 1));
   girders.forEach((g, i) => {
@@ -579,5 +586,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   return {
     drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
     westEndX: HW.westX, pierCount: piers.length, girderCount: girders.length,
+    cloverleafRampCount: cloverRamps.length,
+    cloverleafRamps: cloverRamps.map((loop) => ({ pointCount: loop.pts.length, body: loop.body })),
   };
 }
