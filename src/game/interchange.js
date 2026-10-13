@@ -137,6 +137,11 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   const highwayYAt = (x) => layout.centerY(Math.min(x, HW.hillX)) + RIBBON_LIFT;
 
 
+  // ---------- the ramp ----------
+  const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
+  const laneZ = hwEdgeZ - half + 0.04;       // acceleration lane centre; its inner edge overlaps the deck by 4 cm
+  const LIFT = 0.015;                        // ramp sits 1.5 cm above the deck where they touch (no z-fighting)
+
   // ---------- four connected cloverleaf loop ramps ----------
   // Each loop is a 270-degree one-way curve between the city approaches and the cross-highway.
   // The loops occupy the four quadrants around the grade-separated crossing; they are real ribbon meshes
@@ -196,10 +201,6 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
 
   // The earlier disconnected loop prototype was removed: unconnected elevated ribbons are not usable ramps.
 
-  // ---------- the ramp ----------
-  const hwEdgeZ = highwayZ - half;           // the highway's city-side edge
-  const laneZ = hwEdgeZ - half + 0.04;       // acceleration lane centre; its inner edge overlaps the deck by 4 cm
-  const LIFT = 0.015;                        // ramp sits 1.5 cm above the deck where they touch (no z-fighting)
   const centres = [];
 
   // 1. lead-in: straight on from the city road, hugging its height
