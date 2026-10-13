@@ -148,12 +148,13 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // with Rapier trimesh colliders and are included in the road-surface test below.
   const cloverRoadCentres = [];
   const cloverRamps = [];
-  const LOOP = { radius: 27, samples: 72, cityOffset: 52, deckOffset: 62, width: half * 2 };
+  const LOOP = { radius: 25, samples: 96, cityOffset: 54, deckOffset: 66, connectorSamples: 18, width: half * 2 };
   function makeCloverLoop(sx, sz) {
-    // A broad 270-degree loop, with short tangent connectors at each end. The city connector is
-    // at street level; the highway connector reaches deck height, with a smooth grade between them.
-    const cx = sx * 48;
-    const cz = highwayZ + sz * 48;
+    // One directional 270-degree loop per quadrant. The loop endpoints are deliberately
+    // placed ON the city approach and ON the highway deck (not beside the deck), so the
+    // road mesh and Rapier collider have a continuous, usable connection at both ends.
+    const cx = sx * 47;
+    const cz = highwayZ + sz * 47;
     const r = LOOP.radius;
     const startAngle = sx > 0 ? Math.PI : 0;
     const sweep = sx * sz > 0 ? -Math.PI * 1.5 : Math.PI * 1.5;
@@ -163,31 +164,46 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
       arc.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r });
     }
     const first = arc[0], last = arc[arc.length - 1];
-    // Choose connectors that terminate on the city approach and the highway edge, respectively.
-    const cityEnd = V(roadXForLoop(sz, sx), getRoadFrame(highwayZ + sz * LOOP.cityOffset).y + 0.05, highwayZ + sz * LOOP.cityOffset);
-    const deckEnd = V(sx * LOOP.deckOffset, highwayYAt(sx * LOOP.deckOffset) + LIFT, highwayZ + sz * (half * 2 - 0.04));
+    const cityZ = highwayZ + sz * LOOP.cityOffset;
+    const cityEnd = V(roadXForLoop(sz, sx), getRoadFrame(cityZ).y + RIBBON_LIFT, cityZ);
+    // The highway deck is 9 m wide; finish 0.25 m inside its edge to avoid a collision seam.
+    const deckEnd = V(sx * LOOP.deckOffset, highwayYAt(sx * LOOP.deckOffset) + 0.01,
+      highwayZ + sz * (half - 0.25));
     const pts = [];
-    const cityStart = V(cityEnd.x, cityEnd.y, cityEnd.z);
-    const cityCtrl = V(first.x, cityEnd.y + (deckEnd.y - cityEnd.y) * 0.12, first.z);
-    for (let i = 0; i < 12; i++) {
-      const t = i / 12, u = 1 - t;
-      pts.push(V(u*u*cityStart.x + 2*u*t*cityCtrl.x + t*t*first.x,
-        u*u*cityStart.y + 2*u*t*cityCtrl.y + t*t*(highwayYAt(first.x) + LIFT),
-        u*u*cityStart.z + 2*u*t*cityCtrl.z + t*t*first.z));
+    const addBezier = (p0, p1, p2, p3, count, skipFirst = false) => {
+      for (let i = skipFirst ? 1 : 0; i <= count; i++) {
+        const t = i / count, u = 1 - t;
+        pts.push(V(
+          u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+          0,
+          u*u*u*p0.z + 3*u*u*t*p1.z + 3*u*t*t*p2.z + t*t*t*p3.z
+        ));
+      }
+    };
+    const cityStart = { x: cityEnd.x, z: cityEnd.z };
+    const firstPoint = { x: first.x, z: first.z };
+    // Tangent-aligned cubic approach: avoids a sharp kink where the city road feeds the loop.
+    addBezier(cityStart,
+      { x: cityStart.x, z: cityStart.z + sz * 15 },
+      { x: first.x - sx * 12, z: first.z + sz * 8 },
+      firstPoint, LOOP.connectorSamples);
+    for (let i = 1; i <= LOOP.samples; i++) {
+      const a = startAngle + sweep * i / LOOP.samples;
+      pts.push(V(cx + Math.cos(a) * r, 0, cz + Math.sin(a) * r));
     }
-    for (let i = 0; i < arc.length; i++) {
-      const t = i / (arc.length - 1);
-      pts.push(V(arc[i].x, lerp(cityEnd.y, deckEnd.y, smooth01(t)), arc[i].z));
+    // Tangent-aligned exit connector into the deck's outer lane.
+    addBezier({ x: last.x, z: last.z },
+      { x: last.x + sx * 12, z: last.z },
+      { x: deckEnd.x - sx * 14, z: deckEnd.z },
+      { x: deckEnd.x, z: deckEnd.z }, LOOP.connectorSamples, true);
+    const y0 = cityEnd.y, y1 = deckEnd.y;
+    for (let i = 0; i < pts.length; i++) {
+      const t = i / (pts.length - 1);
+      pts[i].y = lerp(y0, y1, smooth01(t));
     }
-    for (let i = 1; i <= 12; i++) {
-      const t = i / 12, u = 1 - t;
-      const p0 = last, p1 = { x: last.x + sx * 14, z: last.z }, p2 = { x: deckEnd.x - sx * 18, z: deckEnd.z }, p3 = deckEnd;
-      const x = u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x;
-      const z = u*u*u*p0.z + 3*u*u*t*p1.z + 3*u*t*t*p2.z + t*t*t*p3.z;
-      pts.push(V(x, lerp(highwayYAt(first.x) + LIFT, deckEnd.y, t), z));
-    }
-    // Refit the whole loop to one continuous grade, avoiding a height step at either connector.
-    for (let i = 0; i < pts.length; i++) pts[i].y = lerp(cityEnd.y, deckEnd.y, smooth01(i / (pts.length - 1)));
+    // Pin the end vertices exactly to the joining surfaces after interpolation.
+    pts[0].set(cityEnd.x, cityEnd.y, cityEnd.z);
+    pts[pts.length - 1].set(deckEnd.x, deckEnd.y, deckEnd.z);
     const sidesLoop = pts.map((_, i) => sideOf(pts, i));
     const left = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], -half));
     const right = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], half));
