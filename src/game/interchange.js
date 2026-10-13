@@ -88,7 +88,35 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     mesh.frustumCulled = false;
     scene.add(mesh);
     const body = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    // Rapier trimeshes are effectively one-sided for contact generation. The road mesh winding
+    // varies around tight loop curves, which can leave the van falling through apparently solid
+    // asphalt. Give every ribbon a thin chain of top-facing box colliders as a robust drivable
+    // surface, while retaining the trimesh for continuous shape detail and underside contact.
     physics.createCollider(RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8), body);
+    const deckThickness = 0.28;
+    for (let i = 0; i < n - 1; i++) {
+      const ax = (left[i].x + right[i].x) * 0.5;
+      const az = (left[i].z + right[i].z) * 0.5;
+      const bx = (left[i + 1].x + right[i + 1].x) * 0.5;
+      const bz = (left[i + 1].z + right[i + 1].z) * 0.5;
+      const dx = bx - ax, dz = bz - az;
+      const length = Math.hypot(dx, dz);
+      if (length < 0.01) continue;
+      const yaw = Math.atan2(-dx, dz);
+      const y = (left[i].y + right[i].y + left[i + 1].y + right[i + 1].y) * 0.25;
+      const pitch = Math.atan2(
+        ((left[i + 1].y + right[i + 1].y) - (left[i].y + right[i].y)) * 0.5,
+        length
+      );
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+      physics.createCollider(
+        RAPIER.ColliderDesc.cuboid(half + 0.35, deckThickness * 0.5, length * 0.56)
+          .setTranslation((ax + bx) * 0.5, y - deckThickness * 0.5, (az + bz) * 0.5)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+          .setFriction(1.15),
+        body
+      );
+    }
     return { body };
   }
 
