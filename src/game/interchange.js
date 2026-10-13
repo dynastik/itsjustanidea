@@ -88,15 +88,14 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     mesh.frustumCulled = false;
     scene.add(mesh);
     const body = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    // Rapier trimeshes are effectively one-sided for contact generation. The road mesh winding
-    // varies around tight loop curves, which can leave the van falling through apparently solid
-    // asphalt. Give every ribbon a thin chain of top-facing box colliders as a robust drivable
-    // surface, while retaining the trimesh for continuous shape detail and underside contact.
-    physics.createCollider(RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8), body);
-    // Use broad, overlapping boxes aligned only in yaw. Pitch-rotated thin boxes can leave
-    // wheel-ray gaps on grades and banked curves; the 0.5 m deck gives suspension rays a
-    // dependable top face even where the ribbon mesh winding changes.
-    const deckThickness = 0.5;
+    // The ribbon triangles are kept for exact contact geometry, but the van's raycast suspension
+    // needs a simple, continuous top surface. Use thick overlapping box segments whose TOP is
+    // exactly at the sampled road height; their depth extends down, never up through the tyres.
+    physics.createCollider(
+      RAPIER.ColliderDesc.trimesh(positions, indices).setFriction(0.8),
+      body
+    );
+    const deckThickness = 2.0;
     for (let i = 0; i < n - 1; i++) {
       const ax = (left[i].x + right[i].x) * 0.5;
       const az = (left[i].z + right[i].z) * 0.5;
@@ -108,8 +107,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
       const yaw = Math.atan2(-dx, dz);
       const y = (left[i].y + right[i].y + left[i + 1].y + right[i + 1].y) * 0.25;
       physics.createCollider(
-        RAPIER.ColliderDesc.cuboid(half + 0.6, deckThickness * 0.5, length * 0.62)
-          .setTranslation((ax + bx) * 0.5, y - deckThickness * 0.42, (az + bz) * 0.5)
+        RAPIER.ColliderDesc.cuboid(half + 0.75, deckThickness * 0.5, length * 0.7)
+          .setTranslation((ax + bx) * 0.5, y - deckThickness * 0.5, (az + bz) * 0.5)
           .setRotation(yawQuat(yaw))
           .setFriction(1.2),
         body
