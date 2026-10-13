@@ -98,6 +98,11 @@ const path = ic.drivePath;
 let maxStep = 0;
 for (let i = 1; i < path.length; i++) maxStep = Math.max(maxStep, Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z));
 check('drive path points are close together', maxStep < 6, `max step ${maxStep.toFixed(2)} m, ${path.length} points`);
+check('four cloverleaf ramps are generated', ic.cloverleafRampCount === 4, `count=${ic.cloverleafRampCount}`);
+check('each cloverleaf ramp has a drivable collision body', ic.cloverleafRamps?.length === 4 && ic.cloverleafRamps.every((r) => r.body && r.pointCount >= 70),
+  (ic.cloverleafRamps ?? []).map((r) => `${r.pointCount} samples`).join(', '));
+check('cloverleaf loops receive support infrastructure', ic.pierCount > 20 && ic.girderCount > 20,
+  `${ic.pierCount} piers, ${ic.girderCount} girder segments`);
 const last = path[path.length - 1];
 check('drive path ends at the ground road start', Math.abs(last.z - GROUND_START_Z) < 1e-6 && Math.abs(last.x - GROUND_X) < 1e-6);
 check('on-ramp merge ends before the deck starts to descend', ic.taperEndX < HW.descentFromX, `taper ends x=${ic.taperEndX.toFixed(1)}`);
