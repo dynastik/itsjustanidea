@@ -148,7 +148,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   // with Rapier trimesh colliders and are included in the road-surface test below.
   const cloverRoadCentres = [];
   const cloverRamps = [];
-  const LOOP = { radius: 27, samples: 72, cityOffset: 62, deckOffset: 62, width: half * 2 };
+  const LOOP = { radius: 27, samples: 72, cityOffset: 52, deckOffset: 62, width: half * 2 };
   function makeCloverLoop(sx, sz) {
     // A broad 270-degree loop, with short tangent connectors at each end. The city connector is
     // at street level; the highway connector reaches deck height, with a smooth grade between them.
@@ -165,7 +165,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     const first = arc[0], last = arc[arc.length - 1];
     // Choose connectors that terminate on the city approach and the highway edge, respectively.
     const cityEnd = V(roadXForLoop(sz, sx), getRoadFrame(highwayZ + sz * LOOP.cityOffset).y + 0.05, highwayZ + sz * LOOP.cityOffset);
-    const deckEnd = V(sx * LOOP.deckOffset, highwayYAt(sx * LOOP.deckOffset) + LIFT, laneZ);
+    const deckEnd = V(sx * LOOP.deckOffset, highwayYAt(sx * LOOP.deckOffset) + LIFT, highwayZ + sz * (half * 2 - 0.04));
     const pts = [];
     const cityStart = V(cityEnd.x, cityEnd.y, cityEnd.z);
     const cityCtrl = V(first.x, cityEnd.y + (deckEnd.y - cityEnd.y) * 0.12, first.z);
@@ -186,6 +186,8 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
       const z = u*u*u*p0.z + 3*u*u*t*p1.z + 3*u*t*t*p2.z + t*t*t*p3.z;
       pts.push(V(x, lerp(highwayYAt(first.x) + LIFT, deckEnd.y, t), z));
     }
+    // Refit the whole loop to one continuous grade, avoiding a height step at either connector.
+    for (let i = 0; i < pts.length; i++) pts[i].y = lerp(cityEnd.y, deckEnd.y, smooth01(i / (pts.length - 1)));
     const sidesLoop = pts.map((_, i) => sideOf(pts, i));
     const left = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], -half));
     const right = pts.map((p, i) => p.clone().addScaledVector(sidesLoop[i], half));
