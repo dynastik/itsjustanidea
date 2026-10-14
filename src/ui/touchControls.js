@@ -138,8 +138,9 @@ export function createTouchControls(input, actions) {
     const city = state.mode === 'city';
     const cab = city && actions.isCabView();
     viewButton.textContent = `${actions.getViewName()} VIEW`;
-    drive.hidden = !city || cab;
+    drive.hidden = !city;
     cabHint.hidden = !cab;
+    document.body.classList.toggle('touch-cab-view', cab);
     type.hidden = city;
     root.hidden = state.paused;
     if (state.paused) {

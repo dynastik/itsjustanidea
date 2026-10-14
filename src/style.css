@@ -475,13 +475,13 @@ body {
 
 .touch-pedals #touch-reverse {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
   font-size: 15px !important;
 }
 
 .touch-pedals [data-control="brake"] {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   font-size: 0 !important;
 }
 
@@ -491,6 +491,14 @@ body {
   align-self: center;
   height: clamp(68px, 18vw, 86px);
   font-size: 26px !important;
+}
+
+body.touch-cab-view #touch-drive > .touch-cluster:first-child {
+  display: none;
+}
+
+body.touch-cab-view .touch-pedals {
+  margin-left: auto;
 }
 
 #touch-cab-hint {
