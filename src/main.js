@@ -179,6 +179,10 @@ async function main() {
     setTouchReverse: (enabled) => vehicle.setTouchReverse(enabled),
     canChangeTouchDirection: () => vehicle.canChangeTouchDirection(),
     isTouchReverse: () => vehicle.transmission.gear === 'R',
+    isCabView: () => rig.profile === 'cab',
+    camera,
+    canvas: gfx.domElement,
+    getSteeringWheelHit: () => cabin.steeringWheelHit,
   });
 
   function updateZoneMode() {

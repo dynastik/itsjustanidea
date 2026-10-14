@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { state } from '../game/state.js';
 
 export function hasTouchInput() {
@@ -20,10 +21,11 @@ export function createTouchControls(input, actions) {
       </div>
       <div class="touch-cluster touch-pedals">
         <button id="touch-reverse" type="button" aria-label="Toggle reverse" aria-pressed="false" title="Stop to change direction">R<span>REV</span></button>
-        <button type="button" data-control="brake" aria-label="Brake">↓<span>BRAKE</span></button>
+        <button type="button" data-control="brake" aria-label="Brake"><span>BRAKE</span></button>
         <button type="button" data-control="throttle" aria-label="Accelerate">↑<span>GO</span></button>
       </div>
     </div>
+    <div id="touch-cab-hint" hidden>Drag the steering wheel to steer</div>
     <div id="touch-type">
       <label for="touch-type-input">Tap to type the highway text</label>
       <input id="touch-type-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Type the highway text" />
@@ -31,12 +33,14 @@ export function createTouchControls(input, actions) {
   document.body.appendChild(root);
 
   const drive = root.querySelector('#touch-drive');
+  const cabHint = root.querySelector('#touch-cab-hint');
   const type = root.querySelector('#touch-type');
   const typeInput = root.querySelector('#touch-type-input');
   const reverseButton = root.querySelector('#touch-reverse');
   const held = { left: false, right: false, brake: false, throttle: false };
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const getDrive = () => ({
-    steer: Number(held.left) - Number(held.right),
+    steer: cabDrag ? clamp((cabDrag.startX - cabDrag.currentX) / 95, -1, 1) : Number(held.left) - Number(held.right),
     throttle: Number(held.throttle),
     brake: Number(held.brake),
   });
@@ -71,6 +75,39 @@ export function createTouchControls(input, actions) {
   });
 
   let acceptedValue = '';
+  let cabDrag = null;
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const canvas = actions.canvas;
+  canvas.addEventListener('pointerdown', (event) => {
+    if (state.mode !== 'city' || !actions.isCabView()) return;
+    pointer.set(
+      ((event.clientX - canvas.getBoundingClientRect().left) / canvas.clientWidth) * 2 - 1,
+      -((event.clientY - canvas.getBoundingClientRect().top) / canvas.clientHeight) * 2 + 1
+    );
+    raycaster.setFromCamera(pointer, actions.camera);
+    const steeringWheelHit = actions.getSteeringWheelHit();
+    if (!steeringWheelHit || !raycaster.intersectObject(steeringWheelHit, false).length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    canvas.setPointerCapture(event.pointerId);
+    cabDrag = { id: event.pointerId, startX: event.clientX, currentX: event.clientX };
+  }, { capture: true });
+  canvas.addEventListener('pointermove', (event) => {
+    if (!cabDrag || event.pointerId !== cabDrag.id) return;
+    event.preventDefault();
+    cabDrag.currentX = event.clientX;
+    input.setTouchControls(getDrive());
+  }, { capture: true });
+  const endCabDrag = (event) => {
+    if (!cabDrag || (event && event.pointerId !== cabDrag.id)) return;
+    cabDrag = null;
+    input.setTouchControls(getDrive());
+  };
+  canvas.addEventListener('pointerup', endCabDrag);
+  canvas.addEventListener('pointercancel', endCabDrag);
+  canvas.addEventListener('lostpointercapture', endCabDrag);
+
   const viewport = window.visualViewport;
   function updateViewport() {
     const top = viewport?.offsetTop ?? 0;
@@ -96,21 +133,26 @@ export function createTouchControls(input, actions) {
 
   function update() {
     const city = state.mode === 'city';
-    drive.hidden = !city;
+    const cab = city && actions.isCabView();
+    drive.hidden = !city || cab;
+    cabHint.hidden = !cab;
     type.hidden = city;
     root.hidden = state.paused;
     if (state.paused) {
       if (document.activeElement === typeInput) typeInput.blur();
+      endCabDrag();
       for (const key in held) held[key] = false;
       root.querySelectorAll('[data-control]').forEach((button) => button.classList.remove('pressed'));
       input.setTouchControls(getDrive());
     }
+    if (!city || !cab) endCabDrag();
     if (city) {
       if (document.activeElement === typeInput) typeInput.blur();
       acceptedValue = '';
       if (typeInput.value) typeInput.value = '';
       input.setTouchControls(getDrive());
     } else {
+      endCabDrag();
       for (const key in held) held[key] = false;
       root.querySelectorAll('[data-control]').forEach((button) => button.classList.remove('pressed'));
       input.setTouchControls(getDrive());

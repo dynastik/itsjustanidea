@@ -386,6 +386,7 @@ body {
 
 #touch-controls[hidden],
 #touch-drive[hidden],
+#touch-cab-hint[hidden],
 #touch-type[hidden] {
   display: none;
 }
@@ -440,6 +441,11 @@ body {
   justify-content: space-between;
 }
 
+#touch-drive > .touch-cluster:first-child button {
+  width: clamp(52px, 14vw, 70px);
+  height: clamp(52px, 14vw, 70px);
+}
+
 .touch-cluster {
   display: flex;
   gap: 8px;
@@ -447,13 +453,15 @@ body {
 
 .touch-pedals {
   display: grid;
-  grid-template-columns: repeat(3, minmax(54px, 68px));
-  grid-template-rows: repeat(2, 58px);
+  grid-template-columns: repeat(3, clamp(48px, 13vw, 64px));
+  grid-template-rows: repeat(2, clamp(48px, 13vw, 62px));
 }
 
 .touch-pedals button {
-  min-width: 54px !important;
-  min-height: 54px !important;
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100%;
   font-size: 20px !important;
 }
 
@@ -466,14 +474,26 @@ body {
 .touch-pedals [data-control="brake"] {
   grid-column: 2;
   grid-row: 1;
+  font-size: 0 !important;
 }
 
 .touch-pedals [data-control="throttle"] {
   grid-column: 3;
   grid-row: 1 / span 2;
   align-self: center;
-  min-height: 76px !important;
+  height: clamp(68px, 18vw, 86px);
   font-size: 26px !important;
+}
+
+#touch-cab-hint {
+  position: absolute;
+  right: 12px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: 12px;
+  color: var(--ui-muted);
+  font: 11px ui-monospace, Menlo, Consolas, monospace;
+  text-align: center;
+  pointer-events: none;
 }
 
 #touch-type {
@@ -528,7 +548,7 @@ body.touch-controls-enabled #ui-overlay {
 }
 
 body.touch-controls-enabled #typing-panel {
-  max-height: calc(var(--touch-vv-height, 100dvh) - 30px);
+  max-height: calc(var(--touch-vv-height, 100dvh) - var(--touch-vv-top, 0px) - 24px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -537,16 +557,9 @@ body.touch-controls-enabled #touch-drive {
   bottom: calc(10px + env(safe-area-inset-bottom));
 }
 
-@media (max-width: 400px) {
-  #touch-drive > .touch-cluster:first-child button {
-    min-width: 54px;
-  }
-
+@media (max-width: 380px) {
   .touch-pedals {
-    grid-template-columns: repeat(3, minmax(44px, 54px));
-  }
-
-  .touch-pedals button {
-    min-width: 44px !important;
+    grid-template-columns: repeat(3, clamp(42px, 12vw, 52px));
+    grid-template-rows: repeat(2, clamp(46px, 13vw, 56px));
   }
 }

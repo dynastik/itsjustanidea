@@ -41,7 +41,7 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
   const dir = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
 
-  domElement.addEventListener('pointerdown', () => { if (!debug) dragging = true; });
+  domElement.addEventListener('pointerdown', (e) => { if (!debug && !e.defaultPrevented) dragging = true; });
   window.addEventListener('pointerup', () => { dragging = false; });
   window.addEventListener('pointermove', (e) => {
     if (!dragging || debug) return;

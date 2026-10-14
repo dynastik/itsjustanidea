@@ -429,7 +429,7 @@ export function createVehicle(scene, physics, RAPIER) {
     setTouchAutoShift: (enabled) => { touchAutoShift = !!enabled; },
     setTouchReverse: (enabled) => {
       if (!touchAutoShift || state.mode !== 'city' || Math.abs(self.speed) > 1.1) return false;
-      const target = enabled ? 1 : 2;
+      const target = enabled ? 0 : 2;
       if (gearIndex !== target) shiftGear(target - gearIndex, true);
       return gearIndex === target;
     },

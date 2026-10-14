@@ -50,7 +50,7 @@ const GEAR_GATE = {
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
-  const parts = { spin: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
+  const parts = { spin: null, steeringWheelHit: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
   // Track the stick tip's projected offset and route it through the H-gate's
   // neutral crossbar whenever the selected gear changes.
   let shifterTravel = { x: 0, z: 0, gear: 'N', route: [] };
@@ -112,6 +112,13 @@ export function createCabInterior(vehicle) {
     const wheelPivot = add(new THREE.Group());
     wheelPivot.position.set(0, -0.3, 0.44);
     wheelPivot.rotation.x = 0.5;
+    const steeringWheelHit = new THREE.Mesh(
+      new THREE.CircleGeometry(0.24, 32),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false, side: THREE.DoubleSide })
+    );
+    steeringWheelHit.position.z = -0.05;
+    wheelPivot.add(steeringWheelHit);
+    parts.steeringWheelHit = steeringWheelHit;
     const spin = new THREE.Group();
     wheelPivot.add(spin);
     const wheelPoints = [
@@ -442,6 +449,7 @@ export function createCabInterior(vehicle) {
     update,
     setSteeringAngle,
     get wheelSpin() { return parts.spin; },
+    get steeringWheelHit() { return parts.steeringWheelHit; },
     get mirror() { return parts.mirror; },
     get freshener() { return parts.freshener; },
     get radioScreen() { return parts.radioScreen; },
