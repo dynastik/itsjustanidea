@@ -298,6 +298,7 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [ ] Test with 3-5 people if possible; focus feedback on clarity, typing fairness, horror pacing, and whether the ending is understandable without being explained.
 - [ ] Profile the baseline laptop and fix meaningful stutters, bugs, or readability issues.
 - [ ] Confirm the game works at common desktop resolutions and remains playable at lower performance.
+- [ ] If the Pages workflow is temporarily switched to `npm run dev` during development, switch it back to `npm run build` before release; the dev server does not generate the deployable `dist` artifact.
 - [ ] Tag v1.0 only after both modes are complete and the ending is stable.
 
 ---

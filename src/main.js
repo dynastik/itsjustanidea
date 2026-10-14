@@ -112,9 +112,7 @@ async function main() {
     beginTypingSession();
   });
 
-  if (import.meta.env.DEV) {
-    window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
-  }
+  window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
 
   function fullReset() {
     spawn();
@@ -163,12 +161,12 @@ async function main() {
       rig.setDebug(state.debug);
       vehicle.setDebugVisible(state.debug);
     },
-    devSwitchMode: import.meta.env.DEV ? () => {
+    devSwitchMode: () => {
       state.zoneAuto = false;
       setMode(state.mode === 'city' ? 'highway' : 'city');
-    } : undefined,
+    },
     setStoryMode: (mode) => { if (state.highwayEnteredAt !== -Infinity || getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
-    skipTime: import.meta.env.DEV ? () => skipActDev() : undefined,
+    skipTime: () => skipActDev(),
     reset: fullReset,
   });
   const touchControls = createTouchControls(input, {

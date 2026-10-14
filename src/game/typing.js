@@ -157,7 +157,7 @@ export function getWheelJerk() {
 }
 
 // Typing telemetry for pacing (Phase 6 tension estimator reads this; same shape a NN would get).
-// In dev builds the console has window.typingTelemetry.summary() / .log() / .logJson().
+// The console exposes window.typingTelemetry.summary() / .log() / .logJson().
 export function getTelemetry() {
   const now = state.time;
   const recent = keyLog.filter((k) => now - k.t <= TELEMETRY_WINDOW_S);
