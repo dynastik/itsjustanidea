@@ -13,6 +13,7 @@ export function createTouchControls(input, actions) {
   const root = document.createElement('div');
   root.id = 'touch-controls';
   root.innerHTML = `
+    <button id="touch-view" type="button" aria-label="Change camera view">NORMAL VIEW</button>
     <button id="touch-menu" type="button">MENU</button>
     <div id="touch-drive" aria-label="Driving controls">
       <div class="touch-cluster">
@@ -37,6 +38,7 @@ export function createTouchControls(input, actions) {
   const type = root.querySelector('#touch-type');
   const typeInput = root.querySelector('#touch-type-input');
   const reverseButton = root.querySelector('#touch-reverse');
+  const viewButton = root.querySelector('#touch-view');
   const held = { left: false, right: false, brake: false, throttle: false };
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const getDrive = () => ({
@@ -66,6 +68,7 @@ export function createTouchControls(input, actions) {
   }
 
   root.querySelector('#touch-menu').addEventListener('click', actions.openMenu);
+  viewButton.addEventListener('click', actions.cycleView);
   reverseButton.addEventListener('click', () => {
     const enabled = !actions.isTouchReverse();
     if (actions.setTouchReverse(enabled)) {
@@ -134,6 +137,7 @@ export function createTouchControls(input, actions) {
   function update() {
     const city = state.mode === 'city';
     const cab = city && actions.isCabView();
+    viewButton.textContent = `${actions.getViewName()} VIEW`;
     drive.hidden = !city || cab;
     cabHint.hidden = !cab;
     type.hidden = city;

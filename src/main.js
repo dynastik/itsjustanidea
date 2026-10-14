@@ -180,6 +180,8 @@ async function main() {
     canChangeTouchDirection: () => vehicle.canChangeTouchDirection(),
     isTouchReverse: () => vehicle.transmission.gear === 'R',
     isCabView: () => rig.profile === 'cab',
+    cycleView: () => rig.cycleView(),
+    getViewName: () => ({ chase: 'NORMAL', toy: 'TOY CAM', cab: 'CAB' }[rig.profile]),
     camera,
     canvas: gfx.domElement,
     getSteeringWheelHit: () => cabin.steeringWheelHit,

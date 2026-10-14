@@ -131,6 +131,21 @@ export function createCameraRig(camera, domElement, vehicle, cabInterior) {
   return {
     update,
     get profile() { return profileName; },
+    cycleView() {
+      if (profileName === 'chase') {
+        profileName = 'toy';
+        exteriorProfile = 'toy';
+      } else if (profileName === 'toy') {
+        exteriorProfile = 'toy';
+        profileName = 'cab';
+      } else {
+        profileName = 'chase';
+        exteriorProfile = 'chase';
+      }
+      const inCabView = profileName === 'cab';
+      vehicle.setExteriorVisible(inCabView ? false : CAMERA_PROFILES[profileName].exteriorVisible);
+      if (cabInterior) cabInterior.root.visible = inCabView;
+    },
     toggleCab() {
       if (profileName === 'cab') profileName = exteriorProfile;
       else { exteriorProfile = profileName; profileName = 'cab'; }
