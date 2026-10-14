@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS, CITY_Z_MIN, CITY_Z_MAX, CITY_BAY_WIDTH, CITY_WALK_WIDTH } from './zones.js';
 import { toonGradientMap } from './toon.js';
 import { createHighwayInterchange as createInterchange } from './interchange.js';
-import { createHighwayLayout, GROUND_START_Z } from './highwayLayout.js';
+import { createHighwayLayout, GROUND_START_Z, GROUND_END_Z } from './highwayLayout.js';
+import { createReturnRoad } from './returnRoad.js';
 import { lotInfluence } from './lotLayout.js';
 
 export const ROAD_HALF_WIDTH = 4.5;
@@ -38,6 +39,7 @@ function roadHeight(z) {
 // The cross-highway (highwayLayout.js): deck over the city road end, arc round a big hill, then a ground road that is
 // z-indexed again from GROUND_START_Z on (so props, trees, signs and the road strip below keep working off getRoadFrame(z)).
 const layout = createHighwayLayout({ startY: roadHeight(CITY_Z_MAX), roadCenterX, roadHeight });
+layout.returnRoad = createReturnRoad(layout); // brings the highway back round to the west end of the deck
 
 // z-indexed road: the city road (and the lead-in), then from GROUND_START_Z the ground highway.
 // (Between CITY_Z_MAX + ~12 and GROUND_START_Z there is no z-indexed road: the ramp and deck are x/z ribbons, see interchange.js.)
@@ -89,6 +91,11 @@ function sampleTerrain(x, z, out) {
   }
   const lot = lotInfluence(x, z, roadCenterX, roadHeight); // the depot lot is graded level with the road
   if (lot.k > influence) { influence = lot.k; roadY = lot.y; }
+  if (layout.returnRoad.corridor(x, z, REACH, hwHit)) { // the return road is graded like the rest of the highway
+    if (hwHit.d < dist) dist = hwHit.d;
+    const k = 1 - sm(hwHit.d, FLAT_DIST, REACH);
+    if (k > influence) { influence = k; roadY = hwHit.y; }
+  }
   out.h = influence > 0 ? nat + (roadY - nat) * influence : nat;
   out.d = dist;
 }
@@ -199,7 +206,7 @@ function buildRoadGeometry(centerZ) {
     const lz = -VIEW + zi * CELL;
     const z = centerZ + lz;
     const ground = z >= GROUND_START_Z;
-    const vis = z <= CITY_Z_MAX || ground;
+    const vis = z <= CITY_Z_MAX || (ground && z <= GROUND_END_Z);
     visible[zi] = vis ? 1 : 0;
     const rx = ground ? layout.groundX(z) : roadCenterX(z);
     const ry = (ground ? layout.groundY(z) : roadHeight(z)) + 0.035;
@@ -366,7 +373,7 @@ export function createWorld(scene, physics, RAPIER) {
   // What is under the vehicle? Feeds grip/speed penalties (and later, audio + tire tracks).
   function surfaceAt(x, z) {
     // ground highway: z-indexed again
-    if (z >= GROUND_START_Z) return { offRoad: Math.abs(x - layout.groundX(z)) > ROAD_HALF_WIDTH + 0.3 };
+    if (z >= GROUND_START_Z) return { offRoad: Math.abs(x - layout.groundX(z)) > ROAD_HALF_WIDTH + 0.3 && !layout.returnRoad.onRoad(x, z) };
     // ramp + deck + hill arc: not z-indexed, so test against the ribbons
     if (z > CITY_Z_MAX + 12) return { offRoad: !interchange.onRoad(x, z) };
     const f = getRoadFrame(z);
@@ -377,11 +384,7 @@ export function createWorld(scene, physics, RAPIER) {
 
   // A pose `dist` metres ahead of (x, z) along the drive path (ramp -> deck -> arc -> ground road). Used to place the story gantries.
   function getAheadPose(x, z, dist) {
-    const path = interchange.drivePath;
-    if (z >= GROUND_START_Z) {
-      const f = getRoadFrame(z + dist);
-      return { x: f.x, y: f.y + 0.035, z: z + dist, heading: f.heading };
-    }
+    const path = interchange.ringPath; // the whole loop: ramp, deck, arc, ground road, return road, west stub
     let nearest = 0, best = Infinity;
     for (let i = 0; i < path.length; i++) {
       const dx = x - path[i].x, dz = z - path[i].z;
@@ -403,5 +406,5 @@ export function createWorld(scene, physics, RAPIER) {
     return { x: f.x, y: f.y + 0.035, z: GROUND_START_Z + remaining, heading: f.heading };
   }
 
-  return { update, surfaceAt, getRoadFrame, getAheadPose, drivePath: interchange.drivePath, exitPath: interchange.exitPath, groundStartZ: GROUND_START_Z, layout };
+  return { update, surfaceAt, getRoadFrame, getAheadPose, drivePath: interchange.drivePath, exitPath: interchange.exitPath, ringPath: interchange.ringPath, groundStartZ: GROUND_START_Z, layout };
 }

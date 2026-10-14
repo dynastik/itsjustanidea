@@ -6,7 +6,7 @@
 // a new sign), so this costs a few draw calls and no per-frame work beyond moving nothing.
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
-import { GROUND_START_Z } from './highwayLayout.js';
+import { GROUND_START_Z, GROUND_END_Z } from './highwayLayout.js';
 
 const STEP = 160;            // metres between signs
 const SLOTS = 6;
@@ -121,7 +121,7 @@ export function createSigns(scene) {
   function assign(k, slot, act) {
     const z = (k + 0.5) * STEP;
     const s = slots[slot];
-    if (z < START_Z) { s.group.visible = false; return; }
+    if (z < START_Z || z > GROUND_END_Z) { s.group.visible = false; return; }
     const f = getRoadFrame(z);
     const x = f.x - OFFSET * Math.cos(f.heading);       // right-hand side of the road
     const zz = z + OFFSET * Math.sin(f.heading);

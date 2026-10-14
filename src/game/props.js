@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, getRoadFrame, terrainHeight } from './world.js';
 import { toonGradientMap } from './toon.js';
-import { GROUND_START_Z } from './highwayLayout.js';
+import { GROUND_START_Z, GROUND_END_Z } from './highwayLayout.js';
 
 // Highway-zone roadside props. Instanced visuals recycled around the vehicle; guardrails also get
 // real colliders, but only for the stretch near the vehicle.
@@ -122,7 +122,7 @@ export function createProps(scene, physics, RAPIER) {
     const zc = (k + 0.5) * SEG;
     for (const side of [-1, 1]) {
       const i = slot * 2 + (side < 0 ? 0 : 1);
-      if (zc < START_Z) { hide(rails, i); hide(posts, i); continue; }
+      if (zc < START_Z || zc > GROUND_END_Z) { hide(rails, i); hide(posts, i); continue; }
       const p = sidePose(zc, side, RAIL_OFFSET);
       put(rails, i, p.x, terrainHeight(p.x, p.z) + 0.6, p.z, p.heading);
       const ps = sidePose(zc - SEG / 2, side, RAIL_OFFSET);
@@ -132,7 +132,7 @@ export function createProps(scene, physics, RAPIER) {
 
   function writeMarker(m, slot) {
     const z = m * MARK_STEP;
-    if (z < START_Z) { hide(plates, slot); hide(markPosts, slot); return; }
+    if (z < START_Z || z > GROUND_END_Z) { hide(plates, slot); hide(markPosts, slot); return; }
     const p = sidePose(z, -1, RAIL_OFFSET + 1.4); // right-hand side of the road
     const y = terrainHeight(p.x, p.z);
     put(markPosts, slot, p.x, y + 1.1, p.z, p.heading);
@@ -144,7 +144,7 @@ export function createProps(scene, physics, RAPIER) {
   function addColliders(k) {
     const zc = (k + 0.5) * SEG;
     const list = [];
-    if (zc >= START_Z) {
+    if (zc >= START_Z && zc <= GROUND_END_Z) {
       for (const side of [-1, 1]) {
         const p = sidePose(zc, side, RAIL_OFFSET);
         const b = physics.createRigidBody(

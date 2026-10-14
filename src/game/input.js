@@ -141,7 +141,10 @@ export function writeHighwayInput(d, vehicle, road = null, held = {}) {
     lateral = (vehicle.center.x - p.x) * Math.cos(frame.heading) - (vehicle.center.z - p.z) * Math.sin(frame.heading);
     if (nearest > 0 && nearest < path.length - 1) {
       const ds = (Math.hypot(p.x - a.x, p.z - a.z) + Math.hypot(b.x - p.x, b.z - p.z)) / 2;
-      if (ds > 0.5) curvature = (Math.atan2(b.x - p.x, b.z - p.z) - Math.atan2(p.x - a.x, p.z - a.z)) / ds;
+      if (ds > 0.5) {
+        const dh = Math.atan2(b.x - p.x, b.z - p.z) - Math.atan2(p.x - a.x, p.z - a.z);
+        curvature = Math.atan2(Math.sin(dh), Math.cos(dh)) / ds;
+      }
     }
   } else {
     lateral = vehicle.center.x - frame.x;
@@ -166,7 +169,8 @@ export function writeHighwayInput(d, vehicle, road = null, held = {}) {
     frame.heading - c.maxAutoHeading,
     frame.heading + c.maxAutoHeading
   );
-  const wDes = c.headingResponse * (desiredHeading - vehicle.heading) + curvature * Math.max(vehicle.speed, 0);
+  const headingErr = Math.atan2(Math.sin(desiredHeading - vehicle.heading), Math.cos(desiredHeading - vehicle.heading));
+  const wDes = c.headingResponse * headingErr + curvature * Math.max(vehicle.speed, 0);
   const steerSpeed = Math.abs(vehicle.speed);
   const angle = Math.atan((wDes * vehicle.cfg.wheelbase) / Math.max(steerSpeed, 2));
   d.steer = clamp(angle / vehicle.maxSteerAtSpeed(steerSpeed), -1, 1);

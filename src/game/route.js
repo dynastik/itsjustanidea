@@ -1,31 +1,30 @@
-// The long-mode journey between legs: start (depot lot) -> city -> highway leg -> EXIT -> city -> highway leg -> ... -> end.
+// The long-mode journey: start (depot lot) -> city -> highway leg -> EXIT -> city -> highway leg -> ... -> end.
 //
-// When the last prompt of a leg is typed (state.legDone) the van keeps cruising for a few seconds, the screen fades to black, the
-// van is placed at the west end of the elevated highway and drives itself along the exit ramp (interchange.exitPath) onto the city
-// road. There the player takes over with WASD, delivers (or finds the delivery already done), turns round at a cross street and
-// drives back up the on-ramp for the next leg. The next leg of the story starts when you re-enter the highway.
+// The highway is a loop now (returnRoad.js brings it back round to the west end of the elevated deck), so nothing is teleported:
+// when the last prompt of a leg is typed (state.legDone) the van keeps lapping on autopilot until it comes round to the west stub,
+// then follows the exit ramp (interchange.exitPath) down onto the city road and hands control to the player. There the player
+// delivers (or finds the delivery already done), turns round at a cross street and drives back up the on-ramp for the next leg.
+// The next leg of the story starts when the player re-enters the highway.
 import { state, setMode } from './state.js';
 import { getStoryMode, advanceLeg } from './story.js';
 
-const OUTRO_S = 4.5;        // cruise on after the last line of a leg
-const FADE_S = 1.2;
-const EXIT_TIMEOUT_S = 50;  // safety net: if the van gets stuck on the exit it is placed at the end
-const CRUISE_SPEED = 16;
+const APPROACH_SPEED = 25;      // m/s while lapping towards the exit
+const APPROACH_SLOW = 14;       // m/s for the last SLOW_DIST metres before the exit
+const SLOW_DIST = 170;
+const ENTER_DIST = 14;          // within this of the exit path's first point (west stub) the exit takes over
 const EXIT_SPEED = 13;
 const EXIT_FINAL_SPEED = 7;
-const START_SPEED = 12;
+const APPROACH_TIMEOUT_S = 240; // safety nets: if something goes wrong the van is simply placed in the city
+const EXIT_TIMEOUT_S = 60;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
-// placeVan(x, y, z, heading, speed): teleport helper from main.js (also recentres terrain, props and trees)
+// placeVan(x, y, z, heading, speed): teleport helper from main.js; only used by the safety nets
 export function createRoute({ world, vehicle, stops, placeVan }) {
-  const fader = document.createElement('div');
-  fader.style.cssText = 'position:fixed;inset:0;z-index:31;background:#000;opacity:0;pointer-events:none;transition:opacity 1.1s ease';
-  document.body.appendChild(fader);
-
-  let phase = 'play'; // play | outro | fade | exit
+  let phase = 'play'; // play | approach | exit
   let t = 0;
   let idx = 0;
+  let toExit = Infinity;
 
   function begin(p) { phase = p; t = 0; }
 
@@ -35,19 +34,23 @@ export function createRoute({ world, vehicle, stops, placeVan }) {
     d.brake = s > target + 1.5 ? clamp((s - target) * 0.12, 0, 0.35) : 0;
   }
 
-  function teleportToExit() {
+  // the next city visit starts here: the story moves on to the next leg, the sheet gets its next row
+  function nextVisit() {
     advanceLeg();
     state.legDone = false;
     state.visit = (state.visit || 0) + 1;
-    const p = world.exitPath[0];
-    const y = world.layout.centerY(p.x) + 0.035 + vehicle.cfg.spawnHeight;
-    placeVan(p.x, y, p.z, Math.PI / 2, START_SPEED);
-    idx = 0;
     stops.setVisit(state.visit, { pre: state.visit >= 2 }); // from the third city on, the record is already complete
+  }
+
+  function startExit() {
+    nextVisit();
+    idx = 0;
+    begin('exit');
   }
 
   function finishExit(forced) {
     if (forced) {
+      if (phase === 'approach') nextVisit();
       const f = world.getRoadFrame(84);
       placeVan(f.x - 2.25, f.y + 0.05 + vehicle.cfg.spawnHeight, 84, f.heading + Math.PI, 6);
     }
@@ -88,11 +91,7 @@ export function createRoute({ world, vehicle, stops, placeVan }) {
     get phase() { return phase; },
     get controlling() { return phase !== 'play'; },
     reset() {
-      phase = 'play'; t = 0; idx = 0;
-      fader.style.transition = 'none';
-      fader.style.opacity = '0';
-      void fader.offsetWidth;
-      fader.style.transition = '';
+      phase = 'play'; t = 0; idx = 0; toExit = Infinity;
       state.outro = false;
       state.legDone = false;
       state.visit = 0;
@@ -104,22 +103,24 @@ export function createRoute({ world, vehicle, stops, placeVan }) {
       t += dt;
       if (phase === 'play') {
         if (state.legDone && getStoryMode() === 'long' && state.mode === 'highway') {
-          begin('outro');
+          begin('approach');
           state.outro = true;
           state.zoneAuto = false;
         }
-      } else if (phase === 'outro') {
-        if (t >= OUTRO_S) { begin('fade'); fader.style.opacity = '1'; }
-      } else if (phase === 'fade') {
-        if (t >= FADE_S) { teleportToExit(); begin('exit'); fader.style.opacity = '0'; }
+      } else if (phase === 'approach') {
+        const p0 = world.exitPath[0], v = vehicle.center;
+        toExit = Math.hypot(v.x - p0.x, v.z - p0.z);
+        const eastbound = Math.abs(wrap(vehicle.heading - Math.PI / 2)) < 0.6;
+        if (toExit < ENTER_DIST && eastbound) startExit();
+        else if (t > APPROACH_TIMEOUT_S) finishExit(true);
       } else if (phase === 'exit' && t > EXIT_TIMEOUT_S) {
         finishExit(true);
       }
     },
-    // Fills the drive input while the route is in control. baseHighway() writes the normal highway steering.
+    // Fills the drive input while the route is in control. baseHighway() writes the normal highway steering (the loop path).
     drive(d, baseHighway) {
       if (phase === 'exit') followExit(d);
-      else { baseHighway(); holdSpeed(d, CRUISE_SPEED); }
+      else { baseHighway(); holdSpeed(d, toExit < SLOW_DIST ? APPROACH_SLOW : APPROACH_SPEED); }
     },
   };
 }

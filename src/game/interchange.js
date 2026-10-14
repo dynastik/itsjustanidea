@@ -328,6 +328,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   let exitRailCount = 0;
   for (let i = goreN; i < exitLeft.length - 1; i++) {
     for (const edge of [exitLeft, exitRight]) {
+      if (edge === exitLeft && edge[i].z < EXIT.joinZ - 2) continue; // open on the city-road side: that is where the ramp merges
       const a = edge[i], b = edge[i + 1];
       const dx = b.x - a.x, dz = b.z - a.z;
       const len = Math.hypot(dx, dz);
@@ -376,7 +377,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
     }
   }
   // west end of the deck: a solid barrier across the road (the stub is a dead end for now)
-  railPieces.push({ body: highway.body, x: highwaySamples[0].x + 0.25, y: highwaySamples[0].y + 0.65, z: highwayZ, yaw: 0, len: half * 2 + 0.4, th: 0.5, h: 1.3 });
+  // (the west end of the deck is open now: the return road, returnRoad.js, arrives there)
   // highway: north rail all the way; the city-side rail is open along the merge
   railLine(hwLeft, hwRight, highway.body, () => false);
   railLine(hwRight, hwLeft, highway.body, (i) => (hwRight[i].x > P3[0] - 8 && hwRight[i].x < taperEndX + 6) || (hwRight[i].x > EXIT.goreX - 6 && hwRight[i].x < exitBendX0 + 6));
@@ -498,11 +499,27 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   for (const p of exitCentres) exitPath.push({ x: p.x, z: p.z });
   for (let j = 1; j <= 10; j++) { const u = j / 10; const z = lerp(EXIT.taperZ, 82, u); exitPath.push({ x: lerp(cityLaneX(EXIT.taperZ), roadX(z) - 2.25, smooth01(u)), z }); }
 
+  // ---------- return road (returnRoad.js): the ground highway's end -> round to the west end of the deck ----------
+  const rr = layout.returnRoad;
+  const retPts = rr.sample(5).map((p) => V(p.x, p.y + RIBBON_LIFT + 0.012, p.z));
+  const retSides = retPts.map((_, i) => sideOf(retPts, i));
+  const retMesh = makeVisualRibbon(
+    retPts.map((p, i) => p.clone().addScaledVector(retSides[i], -half)),
+    retPts.map((p, i) => p.clone().addScaledVector(retSides[i], half))
+  );
+  retMesh.material.polygonOffsetFactor = -3;
+  retMesh.material.polygonOffsetUnits = -3;
+  // the whole loop, for the lane-follower: ramp -> deck -> arc -> ground road -> return road -> west stub -> (deck again)
+  const groundPts = [];
+  for (let gz = HW.z + HW.radius + 5; gz < rr.startZ; gz += 5) groundPts.push(V(layout.groundX(gz), layout.groundY(gz) + RIBBON_LIFT, gz));
+  const ringPath = drivePath.concat(groundPts, retPts, highwaySamples.filter((p) => p.x <= taperEndX + 3).map((p) => p.clone()));
+
   // Is (x, z) on the ramp or the highway ribbon? (Point test against the centre lines; samples are <= 5 m apart, so allow a little slack.)
   const roadXZ = [];
   for (const p of path) roadXZ.push(p.x, p.z);
   for (const p of highwaySamples) roadXZ.push(p.x, p.z);
   for (const p of exitCentres) roadXZ.push(p.x, p.z);
+  for (const p of retPts) roadXZ.push(p.x, p.z);
   const onRoadR2 = (half + 1.1) * (half + 1.1);
   function onRoad(x, z) {
     for (let i = 0; i < roadXZ.length; i += 2) {
@@ -513,7 +530,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
   }
 
   return {
-    exitPath, drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
+    ringPath, exitPath, drivePath, mergeStartX: P3[0], taperEndX, highwaySamples, rampLeft: L, rampRight: R, rampCentre: path, onRoad,
     westEndX: HW.westX, pierCount: piers.length, girderCount: girders.length,
   };
 }

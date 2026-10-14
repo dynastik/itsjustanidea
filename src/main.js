@@ -23,6 +23,7 @@ import { getStoryTime, getStoryMode, setStoryMode, getAct, getLongClock } from '
 import { dayFactors } from './game/daycycle.js';
 import { createLot } from './game/lot.js';
 import { createRoute } from './game/route.js';
+import { createReturnScenery } from './game/returnScenery.js';
 import { createSigns } from './game/signs.js';
 import { HIGHWAY_ZONE_Z, ZONE_HYSTERESIS } from './game/zones.js';
 import { createHud } from './ui/hud.js';
@@ -52,6 +53,7 @@ async function main() {
   const trees = await createTrees(scene, physics, RAPIER, world.layout);
   const city = createCity(scene, physics, RAPIER);
   const lot = createLot(scene, physics, RAPIER);
+  if (world.layout.returnRoad) createReturnScenery(scene, world.layout.returnRoad);
   const signs = createSigns(scene);
   const vehicle = createVehicle(scene, physics, RAPIER);
 
@@ -75,6 +77,8 @@ async function main() {
   const driveInput = createDriveInput();
 
   const route = createRoute({ world, vehicle, stops, placeVan });
+  // The highway is a loop (ramp, deck, hill arc, ground road, return road, west stub): the lane-follower tracks that whole path.
+  const ringRoad = { drivePath: world.ringPath || world.drivePath, groundStartZ: world.ringPath ? Infinity : world.groundStartZ, getRoadFrame: world.getRoadFrame };
   let accumulator = 0;
   let clockTotal = getStoryMode() === 'long' ? getLongClock(0) : 0; // long mode: continuous day clock, 1.0 = one day
   const CLOCK_SLEW = 0.1; // max clock speed (days per second) when the story jumps ahead between legs
@@ -223,9 +227,9 @@ async function main() {
     signs.update(vehicle.center.z,act,dayFactors(state.worldTime).night);
 
     const surface = world.surfaceAt(vehicle.center.x, vehicle.center.z);
-    if (route.controlling) route.drive(driveInput, () => input.writeHighway(driveInput, vehicle, world));
+    if (route.controlling) route.drive(driveInput, () => input.writeHighway(driveInput, vehicle, ringRoad));
     else if (state.mode === 'city') input.writeCity(driveInput, vehicle.speed);
-    else input.writeHighway(driveInput, vehicle, world);
+    else input.writeHighway(driveInput, vehicle, ringRoad);
 
     // Highway story progression is typing-driven again: prompts only advance when completed.
     accumulator += dt;

@@ -70,7 +70,7 @@ export function createSheet() {
     }
     const count = v >= 3 ? 4814 + v + state.loops : delivered;
     lines.push(dashes, `DELIVERIES: ${count}`);
-    lines.push(state.mode === 'highway' ? `LEG ${getLegIndex() + 1} OF ${getLegCount()}` : stop.done ? 'NEXT: BACK TO THE HIGHWAY' : `NEXT: ${stop.name}`);
+    lines.push(state.outro ? 'LEG COMPLETE: EXIT AHEAD' : state.mode === 'highway' ? `LEG ${getLegIndex() + 1} OF ${getLegCount()}` : stop.done ? 'NEXT: BACK TO THE HIGHWAY' : `NEXT: ${stop.name}`);
     return lines;
   }
 

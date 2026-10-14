@@ -7,6 +7,7 @@ import { HW, GROUND_START_Z, GROUND_X, RIBBON_LIFT, ARC_CENTER } from '../src/ga
 import { terrainHeight, getRoadFrame, ROAD_HALF_WIDTH } from '../src/game/world.js';
 import { createHighwayInterchange } from '../src/game/interchange.js';
 import { createHighwayLayout } from '../src/game/highwayLayout.js';
+import { createReturnRoad } from '../src/game/returnRoad.js';
 import { CITY_Z_MAX } from '../src/game/zones.js';
 
 let failures = 0;
@@ -22,6 +23,7 @@ const roadCenterX = (z) => {
   return 2.0 * Math.sin(t) + 0.8 * Math.sin(t * 2 + 0.4);
 };
 const layout = createHighwayLayout({ startY: roadHeight(CITY_Z_MAX), roadCenterX, roadHeight });
+layout.returnRoad = createReturnRoad(layout);
 
 // ---- joins
 const a1 = layout.arcPoint(Math.PI / 2);

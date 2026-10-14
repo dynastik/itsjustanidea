@@ -44,7 +44,8 @@ export const HW = {
 };
 export const RIBBON_LIFT = 0.035;                       // ribbon sits this far above the graded terrain
 export const GROUND_START_Z = HW.z + HW.radius;         // 320: first z where the road is z-indexed again (multiple of 2.5 on purpose)
-export const GROUND_X = HW.hillX + HW.radius;           // 570
+export const GROUND_X = HW.hillX + HW.radius;
+export const GROUND_END_Z = GROUND_START_Z + 80; // the z-indexed ground road ends here; returnRoad.js carries on           // 570
 export const ARC_CENTER = { x: HW.hillX, z: HW.z + HW.radius };
 export const ARC_LENGTH = HALF_PI * HW.radius;
 
@@ -98,6 +99,7 @@ export function createHighwayLayout({ startY, roadCenterX, roadHeight }) {
       out.d = d; out.y = underY(x); out.w = w;
       return true;
     }
+    if (z > GROUND_END_Z) return false;                   // past the end of the ground road (returnRoad.js has its own corridor)
     if (z >= ZE) {                                        // ground road
       const d = Math.abs(x - groundX(z));
       if (d >= reach) return false;
