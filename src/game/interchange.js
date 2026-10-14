@@ -349,7 +349,7 @@ export function createHighwayInterchange(scene, physics, RAPIER, roadMaterial, o
 
   // drive path: ramp, then along the deck and round the hill arc. It ends at the arc end (z = GROUND_START_Z); from there
   // the road is z-indexed and the lane-follower switches to getRoadFrame(z) (see writeHighwayInput).
-  const drivePath = path.concat(highwaySamples.filter((p) => p.x > taperEndX + 3).map((p) => p.clone()));
+  const drivePath = path.concat(highwaySamples.filter((p) => p.x > taperEndX).map((p) => p.clone()));
 
   // ---------- guardrails (visible + colliders) ----------
   const railPieces = [];

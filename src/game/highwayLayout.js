@@ -29,7 +29,7 @@ export const HW = {
   z: 170,              // the straight deck runs along x at this z
   westX: -282,         // west end of the road (a barrier closes it), at ground level
   westGroundX: -270,   // the road has reached ground level by here (then runs flat to the barrier)
-  westFlatX: -150,     // the deck is dead flat from here east; it descends towards westGroundX
+  westFlatX: -45,      // the deck is dead flat from here east; a long west grade keeps the slope gentle
   westMeetX: -240,     // ground has risen to meet the road (embankment)
   westClearX: -200,    // ground is still low (pillars) from here east
   deckRise: 4.5,       // deck height above the city road end

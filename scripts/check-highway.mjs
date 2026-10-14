@@ -97,9 +97,13 @@ const ic = createHighwayInterchange(scene, physics, RAPIER, new THREE.MeshStanda
   halfWidth: ROAD_HALF_WIDTH, cityEndZ: CITY_Z_MAX, getRoadFrame, terrainHeight, layout,
 });
 const path = ic.drivePath;
-let maxStep = 0;
-for (let i = 1; i < path.length; i++) maxStep = Math.max(maxStep, Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z));
-check('drive path points are close together', maxStep < 6, `max step ${maxStep.toFixed(2)} m, ${path.length} points`);
+let maxStep = 0, maxStepAt = 0;
+for (let i = 1; i < path.length; i++) {
+  const step = Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z);
+  if (step > maxStep) { maxStep = step; maxStepAt = i; }
+}
+check('drive path points are close together', maxStep < 6,
+  `max step ${maxStep.toFixed(2)} m at ${maxStepAt - 1}->${maxStepAt} (${path[maxStepAt - 1].x.toFixed(1)}, ${path[maxStepAt - 1].z.toFixed(1)}) -> (${path[maxStepAt].x.toFixed(1)}, ${path[maxStepAt].z.toFixed(1)}), ${path.length} points`);
 const last = path[path.length - 1];
 check('drive path ends at the ground road start', Math.abs(last.z - GROUND_START_Z) < 1e-6 && Math.abs(last.x - GROUND_X) < 1e-6);
 check('on-ramp merge ends before the deck starts to descend', ic.taperEndX < HW.descentFromX, `taper ends x=${ic.taperEndX.toFixed(1)}`);
