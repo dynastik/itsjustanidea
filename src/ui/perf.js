@@ -8,11 +8,16 @@ export function createPerf(info) {
   const small = document.createElement('div');
   small.style.cssText = 'color:#b6bbb5';
   el.append(big, small);
+  let shown = !!import.meta.env?.DEV || new URLSearchParams(window.location.search).has('perf');
+  const applyShown = () => { el.style.display = shown ? '' : 'none'; };
+  applyShown();
+  window.addEventListener('keydown', (e) => { if (e.key === 'F10') { e.preventDefault(); shown = !shown; applyShown(); } });
   document.body.appendChild(el);
   big.textContent = '-- FPS';
   let acc = 0, frames = 0, worst = 0;
   return {
     update(dt) {
+      if (!shown) return;
       if (dt <= 0) return;
       acc += dt; frames++; worst = Math.max(worst, dt);
       if (acc < 0.5) return;

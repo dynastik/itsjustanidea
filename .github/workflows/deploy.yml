@@ -27,6 +27,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify generated story files are current
+        run: |
+          npm run story
+          git diff --exit-code src/game/storyText.js src/game/storyLong.js
+      - name: Check highway geometry
+        run: npm run check:highway
       - name: Build site
         run: npm run build
       - name: Configure GitHub Pages

@@ -32,7 +32,8 @@ export function createMenu(cb) {
     <div class="menu-card">
       <h1 id="menu-title">itsjustanidea</h1>
       <p class="menu-sub">One delivery left. Drive the town, then type the highway.</p>
-      <div class="menu-row">
+      ${window.matchMedia?.('(pointer: coarse)').matches ? '<p class="menu-note">This game needs a physical keyboard.</p>' : ''}
+    <div class="menu-row">
         <span class="menu-label">Story</span>
         <div class="seg" data-group="story">
           <button type="button" data-v="short">Short<small>one drive, about 12 minutes</small></button>

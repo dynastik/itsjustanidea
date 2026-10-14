@@ -4,8 +4,7 @@
 // It also owns the few AUTHORED headlight flickers (roadmap Phase 2: never random, only when the story asks).
 import { state } from './state.js';
 import { getAct } from './story.js';
-
-const HIGHWAY_ZONE_Z = 80;
+import { HIGHWAY_ZONE_Z } from './zones.js';
 
 export const DIRECTOR_STATE = {
   CALM: 'calm',

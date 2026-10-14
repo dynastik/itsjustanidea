@@ -277,6 +277,7 @@ async function main() {
     gfx.render();
   }
   animate();
+  document.getElementById('loading')?.remove();
 }
 
 let fatalShown = false;

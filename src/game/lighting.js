@@ -66,20 +66,8 @@ export function createLighting(scene) {
   scene.add(sunTarget);
   sun.target = sunTarget;
 
-  const moon = new THREE.DirectionalLight(0xf0f2ff, 0);
-  moon.castShadow = false;
-  moon.shadow.camera.left = -30;
-  moon.shadow.camera.right = 30;
-  moon.shadow.camera.top = 30;
-  moon.shadow.camera.bottom = -30;
-  moon.shadow.camera.near = 1;
-  moon.shadow.camera.far = 60;
-  moon.shadow.mapSize.set(512, 512);
-  moon.shadow.bias = -0.0015;
-  scene.add(moon);
-  const moonTarget = new THREE.Object3D();
-  scene.add(moonTarget);
-  moon.target = moonTarget;
+  const moonColor = new THREE.Color(0xf0f2ff);
+  const keyDirection = new THREE.Vector3();
 
   const hemi = new THREE.HemisphereLight(0x9ec6ff, 0x6f8f4f, 0.75);
   scene.add(hemi);
@@ -230,10 +218,7 @@ export function createLighting(scene) {
     skyUniforms.sunsetAmount.value = evening * (1 - night);
 
     setCycleColor(sunColor, sunMorning, sunEvening, sunNight, evening, night);
-    sun.color.copy(sunColor);
-    sun.intensity = lerp(SUN_DAY, SUN_EVENING, evening) * sunVisibility;
-    sun.castShadow = sunVisibility > 0.05;
-    moon.castShadow = night > 0.5;
+    const sunI = lerp(SUN_DAY, SUN_EVENING, evening) * sunVisibility;
     hemi.color.copy(hemiSkyMorning).lerp(hemiSkyEvening, evening).lerp(hemiSkyNight, night);
     hemi.groundColor.copy(hemiGroundMorning).lerp(hemiGroundEvening, evening).lerp(hemiGroundNight, night);
     hemi.intensity = lerp(lerp(HEMI_DAY, HEMI_EVENING, evening), HEMI_NIGHT, night);
@@ -243,8 +228,6 @@ export function createLighting(scene) {
       Math.sin(sunElevation),
       Math.cos(sunAzimuth) * Math.cos(sunElevation)
     ).normalize();
-    sun.position.copy(center).addScaledVector(sunDirection, 40);
-    sunTarget.position.copy(center);
     skyUniforms.sunsetSide.value = sunDirection.x < 0 ? -1 : 1;
     skyUniforms.sunDir.value.copy(sunDirection);
     skyUniforms.sunGlowColor.value.copy(glowDay).lerp(glowEvening, evening);
@@ -264,9 +247,14 @@ export function createLighting(scene) {
       Math.sin(moonElevation),
       Math.cos(moonAzimuth) * Math.cos(moonElevation)
     ).normalize();
-    moon.position.copy(center).addScaledVector(moonDirection, 40);
-    moonTarget.position.copy(center);
-    moon.intensity = MOON_NIGHT * moonAmount;
+    const moonI = MOON_NIGHT * moonAmount;
+    const total = sunI + moonI;
+    keyDirection.copy(sunDirection).multiplyScalar(sunI).addScaledVector(moonDirection, moonI);
+    if (keyDirection.lengthSq() < 1e-6) keyDirection.copy(sunDirection); else keyDirection.normalize();
+    sun.intensity = total;
+    sun.color.copy(sunColor).lerp(moonColor, total > 0 ? moonI / total : 0);
+    sun.position.copy(center).addScaledVector(keyDirection, 40);
+    sunTarget.position.copy(center);
     skyUniforms.moonDir.value.copy(moonDirection);
     skyUniforms.moonGlow.value = moonAmount;
     moonDisc.position.copy(center).addScaledVector(moonDirection, SKY_BODY_DISTANCE);
@@ -280,7 +268,7 @@ export function createLighting(scene) {
   }
 
   function getKeyLightDirection(target) {
-    return target.copy(moon.intensity > sun.intensity ? moonDirection : sunDirection);
+    return target.copy(keyDirection);
   }
 
   return { update, getKeyLightDirection };

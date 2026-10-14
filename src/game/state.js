@@ -8,6 +8,10 @@ export const state = {
   paused: false,
   storyDone: false,    // the last paragraph has been typed: the ending plays, then the run restarts
   loops: 0,            // how many full runs have been completed
+  outro: false,        // long mode: leg finished, van is lapping/exiting on autopilot (route.js)
+  legDone: false,      // long mode: last prompt of this highway leg typed
+  visit: 0,            // long mode: which city visit (delivery sheet row)
+  transmission: null,  // mirrored from vehicle.transmission each frame
   debug: false,
   speed: 0,            // forward speed mirrored from the vehicle (HUD, audio, camera read this)
   headlightsOn: false, // manual player-controlled headlights
