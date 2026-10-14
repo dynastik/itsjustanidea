@@ -427,6 +427,13 @@ export function createVehicle(scene, physics, RAPIER) {
     shiftDown: () => shiftGear(-1),
     toggleAutoShift: () => { autoShiftEnabled = !autoShiftEnabled; return autoShiftEnabled; },
     setTouchAutoShift: (enabled) => { touchAutoShift = !!enabled; },
+    setTouchReverse: (enabled) => {
+      if (!touchAutoShift || state.mode !== 'city' || Math.abs(self.speed) > 1.1) return false;
+      const target = enabled ? 1 : 2;
+      if (gearIndex !== target) shiftGear(target - gearIndex, true);
+      return gearIndex === target;
+    },
+    canChangeTouchDirection: () => touchAutoShift && state.mode === 'city' && Math.abs(self.speed) <= 1.1,
     get transmission() { return transmission(); },
     nudgeModel(dy) { cfg.modelYTrim += dy; applyModelOffset(); return cfg.modelYTrim; },
     getLocalBounds,

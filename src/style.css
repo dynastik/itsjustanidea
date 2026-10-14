@@ -375,7 +375,10 @@ body {
 
 #touch-controls {
   position: fixed;
-  inset: 0;
+  top: var(--touch-vv-top, 0px);
+  right: 0;
+  left: 0;
+  height: var(--touch-vv-height, 100dvh);
   z-index: 15;
   pointer-events: none;
   touch-action: none;
@@ -406,6 +409,18 @@ body {
   border-color: var(--ui-accent);
 }
 
+#touch-controls button:disabled {
+  opacity: 0.48;
+}
+
+#touch-controls button span {
+  display: block;
+  margin-top: 3px;
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: 0.4px;
+}
+
 #touch-menu {
   position: absolute;
   top: 12px;
@@ -430,15 +445,41 @@ body {
   gap: 8px;
 }
 
+.touch-pedals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(54px, 68px));
+  grid-template-rows: repeat(2, 58px);
+}
+
 .touch-pedals button {
-  min-width: 72px !important;
-  font-size: 12px !important;
+  min-width: 54px !important;
+  min-height: 54px !important;
+  font-size: 20px !important;
+}
+
+.touch-pedals #touch-reverse {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 15px !important;
+}
+
+.touch-pedals [data-control="brake"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.touch-pedals [data-control="throttle"] {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  min-height: 76px !important;
+  font-size: 26px !important;
 }
 
 #touch-type {
   position: absolute;
   right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  bottom: calc(8px + env(safe-area-inset-bottom));
   left: 12px;
   padding: 10px;
   border: 1px solid var(--ui-line);
@@ -477,4 +518,35 @@ body.touch-controls-enabled #headlight-status {
 
 body.touch-controls-enabled #hint {
   display: none;
+}
+
+body.touch-controls-enabled #ui-overlay {
+  top: var(--touch-vv-top, 10px);
+  max-height: var(--touch-vv-height, 100dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body.touch-controls-enabled #typing-panel {
+  max-height: calc(var(--touch-vv-height, 100dvh) - 30px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body.touch-controls-enabled #touch-drive {
+  bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 400px) {
+  #touch-drive > .touch-cluster:first-child button {
+    min-width: 54px;
+  }
+
+  .touch-pedals {
+    grid-template-columns: repeat(3, minmax(44px, 54px));
+  }
+
+  .touch-pedals button {
+    min-width: 44px !important;
+  }
 }

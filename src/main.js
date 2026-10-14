@@ -176,6 +176,9 @@ async function main() {
     typeBackspace: handleTypingBackspace,
     openMenu: () => menu.open(),
     setTouchAutoShift: (enabled) => vehicle.setTouchAutoShift(enabled),
+    setTouchReverse: (enabled) => vehicle.setTouchReverse(enabled),
+    canChangeTouchDirection: () => vehicle.canChangeTouchDirection(),
+    isTouchReverse: () => vehicle.transmission.gear === 'R',
   });
 
   function updateZoneMode() {
