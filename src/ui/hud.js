@@ -5,6 +5,7 @@ import * as director from '../game/director.js';
 import { HANDOFF_UI_FADE_S } from '../game/zones.js';
 import { getDifficulty } from '../game/difficulty.js';
 import { dayFactors } from '../game/daycycle.js';
+import { hasTouchInput } from './touchControls.js';
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -35,7 +36,7 @@ export function createHud() {
     const highway = state.mode === 'highway';
     const dev = state.zoneAuto ? '' : ' [DEV]';
     const directorState = highway ? ` [${director.getDirectorState().toUpperCase()}]` : '';
-    set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : 'MODE: CITY (WASD)') + dev + directorState + ' · ' + getDifficulty().toUpperCase());
+    set(modeLabel, 'mode', (highway ? 'MODE: HIGHWAY (TYPE)' : `MODE: CITY (${hasTouchInput() ? 'TOUCH' : 'WASD'})`) + dev + directorState + ' · ' + getDifficulty().toUpperCase());
     const typing = highway && !state.storyDone && !state.outro && !state.legDone; // the panel goes away once the last line is typed
     set(typingPanel.style, 'panel', typing ? 'block' : 'none', 'display');
     // typing panel fades in over the handoff instead of popping on

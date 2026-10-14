@@ -30,6 +30,7 @@ import { createHud } from './ui/hud.js';
 import { createEnding } from './ui/ending.js';
 import { createMenu } from './ui/menu.js';
 import { createPerf } from './ui/perf.js';
+import { createTouchControls } from './ui/touchControls.js';
 import * as director from './game/director.js';
 
 const MAX_STEPS_PER_FRAME = 5;
@@ -137,7 +138,7 @@ async function main() {
 
   // Menu first: it registers its key handler before the game's, so it owns the keyboard while open.
   // It opens immediately and pauses the game until "Start driving" (that click also unlocks audio).
-  createMenu({
+  const menu = createMenu({
     onStoryMode: (mode) => { if (getStoryMode() === mode) return; setStoryMode(mode); fullReset(); },
     onVolume: (v) => audio.setVolume(v),
     onMute: (m) => audio.setMuted(m),
@@ -170,6 +171,12 @@ async function main() {
     skipTime: import.meta.env.DEV ? () => skipActDev() : undefined,
     reset: fullReset,
   });
+  const touchControls = createTouchControls(input, {
+    typeKey: handleTypingKey,
+    typeBackspace: handleTypingBackspace,
+    openMenu: () => menu.open(),
+    setTouchAutoShift: (enabled) => vehicle.setTouchAutoShift(enabled),
+  });
 
   function updateZoneMode() {
     if (!state.zoneAuto) return;
@@ -198,6 +205,7 @@ async function main() {
     }
     updateZoneMode();
     route.update(dt);
+    touchControls.update();
     director.update(vehicle.center.z);
     if (state.storyDone && !ending.active) {
       state.loops++;

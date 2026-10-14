@@ -372,3 +372,109 @@ body {
     display: none;
   }
 }
+
+#touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  touch-action: none;
+}
+
+#touch-controls[hidden],
+#touch-drive[hidden],
+#touch-type[hidden] {
+  display: none;
+}
+
+#touch-controls button {
+  min-width: 62px;
+  min-height: 58px;
+  border: 1px solid rgba(225, 229, 222, 0.34);
+  border-radius: 8px;
+  background: rgba(8, 12, 16, 0.78);
+  color: var(--ui-ink);
+  font: 700 18px/1 ui-monospace, Menlo, Consolas, monospace;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+#touch-controls button.pressed {
+  background: rgba(197, 213, 189, 0.42);
+  border-color: var(--ui-accent);
+}
+
+#touch-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 54px !important;
+  min-height: 42px !important;
+  font-size: 11px !important;
+}
+
+#touch-drive {
+  position: absolute;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.touch-cluster {
+  display: flex;
+  gap: 8px;
+}
+
+.touch-pedals button {
+  min-width: 72px !important;
+  font-size: 12px !important;
+}
+
+#touch-type {
+  position: absolute;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: rgba(8, 12, 16, 0.9);
+  pointer-events: auto;
+}
+
+#touch-type label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ui-muted);
+  font: 11px ui-monospace, Menlo, Consolas, monospace;
+}
+
+#touch-type-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid rgba(225, 229, 222, 0.34);
+  border-radius: 5px;
+  background: rgba(225, 229, 222, 0.08);
+  color: var(--ui-ink);
+  font: 16px ui-monospace, Menlo, Consolas, monospace;
+  touch-action: manipulation;
+}
+
+body.touch-controls-enabled #speedo {
+  bottom: calc(94px + env(safe-area-inset-bottom));
+  width: min(220px, calc(100vw - 24px));
+}
+
+body.touch-controls-enabled #headlight-status {
+  bottom: calc(145px + env(safe-area-inset-bottom));
+}
+
+body.touch-controls-enabled #hint {
+  display: none;
+}

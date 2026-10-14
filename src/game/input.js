@@ -24,6 +24,7 @@ export function createDriveInput() {
 
 export function createInput(actions) {
   const held = { w: false, a: false, s: false, d: false };
+  const touch = { steer: 0, throttle: 0, brake: 0 };
   const hotkeys = {
     [KEYS.debug]: actions.toggleDebug,
     [KEYS.devModeSwitch]: actions.devSwitchMode,
@@ -39,6 +40,7 @@ export function createInput(actions) {
   for (const k in hotkeys) if (!hotkeys[k]) delete hotkeys[k];
 
   window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLElement && e.target.matches('input, textarea, select, [contenteditable="true"]')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
 
@@ -103,17 +105,23 @@ export function createInput(actions) {
 
   function clearHeld() {
     for (const k in held) held[k] = false;
+    touch.steer = 0;
+    touch.throttle = 0;
+    touch.brake = 0;
   }
 
   return {
     clearHeld,
+    setTouchControls(controls) {
+      touch.steer = controls.steer;
+      touch.throttle = controls.throttle;
+      touch.brake = controls.brake;
+    },
     writeHighway(d, vehicle, road) { writeHighwayInput(d, vehicle, road, held); },
     writeCity(d, speed) {
-      d.steer = (held.a ? 1 : 0) - (held.d ? 1 : 0);
-      d.throttle = 0;
-      d.brake = 0;
-      if (held.w) d.throttle = 1;
-      else if (held.s) d.brake = 1;
+      d.steer = clamp((held.a ? 1 : 0) - (held.d ? 1 : 0) + touch.steer, -1, 1);
+      d.throttle = held.w || touch.throttle > 0 ? 1 : 0;
+      d.brake = held.s || touch.brake > 0 ? 1 : 0;
       d.speedCap = CITY_SPEED_CAP;
     },
   };
