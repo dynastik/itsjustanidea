@@ -25,13 +25,13 @@ At a stop along the road, Elias checked the delivery label. The address was stil
 
 The sun had begun to sink toward the hills when Elias saw a sign beside the road.
 
-[sign] WELCOME TO BELLWEATHER.
+[gantry] WELCOME TO BELLWEATHER.
 
 He didn't recognize the name. Twelve miles, the smaller sign said.
 
 A few minutes later, he passed another sign.
 
-[sign] WELCOME TO BELLWEATHER.
+[gantry] WELCOME TO BELLWEATHER.
 
 The lettering was different, and the sign looked newer. He checked the mirror. There had been no turn, no junction, no reason to have circled back.
 

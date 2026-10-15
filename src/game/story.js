@@ -46,6 +46,7 @@ export function setStoryMode(m) {
   resetStory();
 }
 export const getStoryLengthChars = () => (mode === 'long' ? legIndexes.reduce((n, l) => n + l.total, 0) : si.total);
+export const getStoryLengthCharsFor = (m) => (m === 'long' ? legIndexes.reduce((n, l) => n + l.total, 0) : si.total);
 export function resetStory() {
   cursor = 0; legIndex = 0; finished = false; currentAct = 'calm';
 }
@@ -61,12 +62,12 @@ export function pickPrompt() {
     }
     const p = leg.items[cursor++];
     currentAct = p.act;
-    return { text: p.text, source: p.kind || 'narration', act: p.act };
+    return { text: p.text, source: p.kind || 'narration', act: p.act, gantry: !!p.gantry };
   }
   if (cursor >= SHORT.length) { finished = true; return null; }
   const p = SHORT[cursor++];
   currentAct = p.act;
-  return { text: p.text, source: p.kind || 'narration', act: p.act };
+  return { text: p.text, source: p.kind || 'narration', act: p.act, gantry: !!p.gantry };
 }
 
 export const getAct = () => currentAct;

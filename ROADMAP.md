@@ -118,7 +118,7 @@ Known implementation details from the current roadmap/source review:
 Target a stylized miniature/diorama driving game: low-poly environmental design, restrained toon shading, a deliberate palette, strong silhouettes, fog, and a toy-like chase camera. The cab camera should feel more grounded.
 
 - [x] Toy-car chase camera profile and restrained tilt-shift effect.
-- [ ] Stylized/toon material treatment and day-cycle colour grading.
+- [x] Stylized/toon material treatment and day-cycle colour grading.
 - [x] Morning, sunset, night, and sunrise lighting transitions.
 - [x] Stylized tree and terrain treatment; no grass props.
 - [x] Improved town scenery with varied building facades, roof styles, parked cars, curbs, and pavement details.
@@ -150,7 +150,7 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 - [ ] Ensure headlights remain readable in both chase and cab camera profiles.
 - [ ] Make manual control reliable through pauses, resets, mode changes, and story transitions.
 - [ ] Test dusk, full night, fog, and sunrise.
-- [ ] Add scripted supernatural flickers or temporary failures only when the story director requests them. Never make the lights randomly unreliable during normal driving.
+- [x] Add scripted supernatural flickers or temporary failures only when the story director requests them. Never make the lights randomly unreliable during normal driving.
 - [ ] Create at least one deliberate reveal that is visible only when the beam catches the right part of the road or scenery.
 - [ ] Profile performance with headlights on, especially on the baseline laptop.
 
@@ -166,7 +166,7 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 - [x] Correct-key handling, backspace behaviour, typing telemetry, and a learner ramp exist in some form.
 - [ ] Re-test character handling, punctuation, capitals, spaces, corrections, and wrong-key behaviour against the actual story text.
 - [ ] Confirm the player can pause without losing progress or receiving unfair pressure.
-- [ ] Add or verify three difficulty settings:
+- [x] Add or verify three difficulty settings:
   - **Easy:** forgiving mistakes, lower pressure, comfortable speed response.
   - **Medium:** intended default balance.
   - **Hard:** less forgiving mistakes and stronger driving pressure, without unfairly hiding story content.
@@ -183,12 +183,12 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 **Done when:** a town stop feels purposeful without turning the game into an open-world simulator.
 
 - [ ] Keep all town interaction inside the van. No walking character, pedestrian NPCs, conversations, or dialogue trees.
-- [ ] Create one simple, readable way to identify a designated parking/delivery spot.
-- [ ] Let the player drive to the spot and park within a forgiving trigger area.
-- [ ] Trigger delivery progress through a short scripted sequence, the delivery sheet, and/or a typing passage. Avoid building a separate dialogue system.
+- [x] Create one simple, readable way to identify a designated parking/delivery spot.
+- [x] Let the player drive to the spot and park within a forgiving trigger area.
+- [x] Trigger delivery progress through a short scripted sequence, the delivery sheet, and/or a typing passage. Avoid building a separate dialogue system.
 - [ ] Make returning to driving straightforward and reliable.
 - [ ] Decide whether fuel is a real resource. Recommendation: start with parking and delivery first; add simple refuelling only if it creates an interesting decision rather than busywork.
-- [ ] Reuse a small number of places and let their text, lighting, or details change as the mystery escalates.
+- [x] Reuse a small number of places and let their text, lighting, or details change as the mystery escalates.
 - [ ] Keep town sections short enough that the highway typing and horror remain the core experience.
 
 ---
@@ -209,12 +209,12 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 
 **Goal:** a longer, multi-night supernatural horror story built from the same core driving and typing systems.
 
-- [ ] Add separate Short Mode and Long Mode selection in the main menu.
-- [ ] Give Long Mode its own story progression and ending; do not simply stretch Short Mode's prompts.
+- [x] Add separate Short Mode and Long Mode selection in the main menu.
+- [x] Give Long Mode its own story progression and ending; do not simply stretch Short Mode's prompts.
 - [ ] Build and playtest one complete day-to-night cycle before choosing the final number of nights.
 - [ ] Expand to additional nights only after the first cycle is satisfying. Each night should change the mystery or the player's trust, not just repeat the same scare.
-- [ ] Make the delivery sheet/records a recurring source of evidence. Entries may show deliveries completed before Elias arrives, impossible timestamps, previous routes, or events he has not experienced.
-- [ ] Use a persistent delivery counter or a small set of selected records to imply an enormous history. Do not simulate hundreds of deliveries or force the player to complete hundreds of stops.
+- [x] Make the delivery sheet/records a recurring source of evidence. Entries may show deliveries completed before Elias arrives, impossible timestamps, previous routes, or events he has not experienced.
+- [x] Use a persistent delivery counter or a small set of selected records to imply an enormous history. Do not simulate hundreds of deliveries or force the player to complete hundreds of stops.
 - [ ] Escalate from ordinary records, to impossible chronology, to narration that predicts or contradicts what the player sees and does.
 - [ ] Keep the identity of the other driver ambiguous: future Elias, previous Elias, another timeline, or something produced by the road are all possible interpretations.
 - [ ] Do not show a replacement-driver model. Evidence should come through text, the road, lighting, delivery records, and the van.
@@ -258,8 +258,8 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [ ] Let vehicle controls become subtly unreliable only during authored events. Keep normal driving trustworthy outside those moments.
 - [ ] Use headlight failures, flickers, and reveals sparingly. Preserve player control wherever possible.
 - [ ] Avoid a visible monster, an explanatory cutscene, a lore dump, or a confirmed identity for the other driver.
-- [ ] Implement the Long Mode nightmare and false-awakening ending.
-- [ ] Add accessibility settings for reduced flashing and reduced scare intensity if effects warrant them.
+- [x] Implement the Long Mode nightmare and false-awakening ending.
+- [x] (reduced flashing is in the menu; reduced scare intensity is still open) Add accessibility settings for reduced flashing and reduced scare intensity if effects warrant them.
 - [ ] Playtest pacing so quiet stretches remain quiet and major moments have room to land.
 
 ---
@@ -286,8 +286,8 @@ These are story targets, not a requirement to implement every beat in one pass. 
 
 **Done when:** a new player can launch the game, understand the controls, finish either mode, and play without major bugs.
 
-- [ ] Main menu with separate Short Mode and Long Mode choices.
-- [ ] Settings for typing difficulty, audio, and relevant accessibility options.
+- [x] Main menu with separate Short Mode and Long Mode choices.
+- [x] Settings for typing difficulty, audio, and relevant accessibility options.
 - [ ] Credits and asset licences in `CREDITS.md`.
 - [x] Vite base path and GitHub Pages deployment configuration exist.
 - [x] Van model is bundled locally rather than hotlinked.
@@ -374,3 +374,13 @@ Edit `story/short.md` and `story/long.md`, then run `npm run story` to regenerat
 ### Highway layout (`src/game/highwayLayout.js`)
 
 Ramp -> elevated deck (short west stub ending in a barrier; `HW.westX`) -> slow descent -> quarter-circle arc round a big hill (`HW.radius`, `HW.hillHeight`) -> z-indexed ground highway from `GROUND_START_Z`, where props, trees, signs and the road strip carry on procedurally. The terrain now recentres in x as well as z. `npm run check:highway` runs the geometry checks in plain node.
+
+## Status update (2026-10-15)
+
+Checkboxes above were reconciled against the source. Still genuinely open: playtests and FPS profiling on the baseline laptop, the beam-only headlight
+reveal, the rear-view mirror event, the audio audit, a reduced-scare-intensity option, and soft-lock checks on the long-mode exit/return loop.
+
+- Fog is a desaturated copy of the horizon colour (lighting.js: FOG_DESAT_*), so haze is always calmer than the sky.
+- Headlights keep both spotlights in the scene on purpose (toggling visibility recompiles every lit material). `?beam=single` uses one beam for weak GPUs.
+- Story format: `[gantry] TEXT` is a road sign that also raises the overhead Bellweather gantry (replaces the old hard-coded string match in main.js).
+- Menu duration labels are computed from the scripts (40 WPM), not hand-written.

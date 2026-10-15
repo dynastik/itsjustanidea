@@ -3,7 +3,7 @@
 import './menu.css';
 import { state } from '../game/state.js';
 import { DIFFICULTIES, getDifficulty, setDifficulty } from '../game/difficulty.js';
-import { getStoryMode } from '../game/story.js';
+import { getStoryMode, getStoryLengthCharsFor } from '../game/story.js';
 import { setReducedFlicker } from '../game/director.js';
 
 const KEY = 'itsjustanidea.settings';
@@ -13,6 +13,8 @@ const DIFF_TEXT = {
   medium: 'The intended balance.',
   hard: 'Sharper mistakes, faster pressure.',
 };
+
+const approxMin = (mode) => Math.round(getStoryLengthCharsFor(mode) / 5 / 40); // minutes of typing at 40 WPM
 
 function load() {
   try { return { ...DEFAULTS, ...JSON.parse(window.localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEFAULTS }; }
@@ -36,8 +38,8 @@ export function createMenu(cb) {
     <div class="menu-row">
         <span class="menu-label">Story</span>
         <div class="seg" data-group="story">
-          <button type="button" data-v="short">Short<small>one drive, about 12 minutes</small></button>
-          <button type="button" data-v="long">Long<small>three days and nights, about 40 minutes</small></button>
+          <button type="button" data-v="short">Short<small>one drive, about ${approxMin('short')} min of typing</small></button>
+          <button type="button" data-v="long">Long<small>three days and nights, about ${approxMin('long')} min of typing</small></button>
         </div>
         <p class="menu-note" id="menu-restart" hidden>Changing the story restarts the run.</p>
       </div>

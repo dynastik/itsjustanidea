@@ -46,6 +46,7 @@ let keystrokes = [];  // rolling window of right/wrong
 let kicks = [];       // recent wrong keys -> decaying wheel jerks { t, sign }
 let sessionStart = null;
 let wrongStreak = 0;  // consecutive wrong keys; any correct key clears it
+let confusions = {}; // "expected>typed" -> count, whole run (kept incrementally, not recomputed per telemetry call)
 let keyLog = [];      // whole-run record { t, key, expected, ok } (telemetry; cleared on a full reset)
 
 export function pickNewWord() {
@@ -55,12 +56,14 @@ export function pickNewWord() {
   if (!p) { // story over: the ending takes it from here (main.js)
     t.target = '';
     t.source = 'end';
+    t.gantry = false;
     if (isStoryFinished()) state.storyDone = true;
     else state.legDone = true; // long mode: this highway leg is over (route.js takes the exit)
     return;
   }
   t.target = p.text;
   t.source = p.source;
+  t.gantry = !!p.gantry; // story-tagged "raise the overhead gantry for this prompt"
 }
 
 // restartStory: true on a full game reset. Re-entering the highway from the city keeps your place in the story.
@@ -74,6 +77,7 @@ export function beginTypingSession({ restartStory = false } = {}) {
   state.typing.lastErrorAt = -Infinity;
   if (restartStory) {
     keyLog = [];
+    confusions = {};
     resetStory();
     state.storyDone = false;
   }
@@ -93,7 +97,7 @@ export function handleTypingKey(key) {
   keystrokes.push(ok);
   if (keystrokes.length > ACCURACY_WINDOW) keystrokes.shift();
   keyLog.push({ t: state.time, key, expected, ok });
-  if (keyLog.length > KEYLOG_MAX) keyLog.shift();
+  if (keyLog.length > KEYLOG_MAX * 2) keyLog.splice(0, keyLog.length - KEYLOG_MAX); // amortised O(1), not a shift() per key
 
   if (ok) {
     t.buffer += insensitive ? expected : key;
@@ -102,6 +106,8 @@ export function handleTypingKey(key) {
   } else {
     t.lastErrorAt = state.time;
     wrongStreak++;
+    const ck = `${expected}>${key}`;
+    confusions[ck] = (confusions[ck] || 0) + 1;
     // a slip or two is forgiven; a streak of mistakes yanks the wheel (each extra wrong key yanks it again)
     if (wrongStreak >= HIGHWAY_CONFIG.jerkStreak) kicks.push({ t: state.time, sign: Math.random() < 0.5 ? -1 : 1 });
   }
@@ -160,7 +166,9 @@ export function getWheelJerk() {
 // The console exposes window.typingTelemetry.summary() / .log() / .logJson().
 export function getTelemetry() {
   const now = state.time;
-  const recent = keyLog.filter((k) => now - k.t <= TELEMETRY_WINDOW_S);
+  let from = keyLog.length;
+  while (from > 0 && now - keyLog[from - 1].t <= TELEMETRY_WINDOW_S) from--;
+  const recent = keyLog.slice(from);
   const gaps = [];
   let longestPause = 0;
   let pauses = 0;
@@ -173,8 +181,6 @@ export function getTelemetry() {
   const std = Math.sqrt(variance);
   const wrong = recent.filter((k) => !k.ok);
 
-  const confusions = {};
-  for (const k of keyLog) if (!k.ok) confusions[`${k.expected}>${k.key}`] = (confusions[`${k.expected}>${k.key}`] || 0) + 1;
   const topConfusions = Object.entries(confusions).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   return {
@@ -193,5 +199,5 @@ export function getTelemetry() {
 }
 
 export function getKeyLog() {
-  return keyLog.slice();
+  return keyLog.slice(-KEYLOG_MAX);
 }

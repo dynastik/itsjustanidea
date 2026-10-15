@@ -34,7 +34,6 @@ import { createTouchControls } from './ui/touchControls.js';
 import * as director from './game/director.js';
 
 const MAX_STEPS_PER_FRAME = 5;
-const SIGN_TEXT = 'WELCOME TO BELLWEATHER.';
 const SIGN_LINGER_PROMPTS = 3; // the second gantry stays up for this many prompts after its text, then goes
 // How loud the horror drone is per act (audio.setMood).
 const ACT_MOOD = { calm: 0, uneasy: 0.1, wrong: 0.45, horror: 1, finale: 0.25 };
@@ -225,7 +224,7 @@ async function main() {
     // down a few prompts later (the old exact-paragraph match never fired, so it stayed up for the whole run).
     const storyTarget = state.typing.target;
     if (storyTarget !== lastStoryTarget) {
-      if (storyTarget === SIGN_TEXT) {
+      if (state.typing.gantry) {
         props.showStorySign(Math.min(storySignCount, 1), world.getAheadPose(vehicle.center.x, vehicle.center.z, 70));
         storySignCount = Math.min(storySignCount + 1, 2);
         promptsSinceSign = 0;

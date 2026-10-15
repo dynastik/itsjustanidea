@@ -48,7 +48,7 @@ const GradeShader = {
 const TILT_FOCUS_Y = 0.5;    // the sharp horizontal strip (0 = bottom, 1 = top); the van sits mid-screen
 
 const GRADE_MORNING = { saturation: 1.2, contrast: 1, lift: 0.004, vignette: 0.2, tint: new THREE.Color(1.02, 1.01, 1.0) };
-const GRADE_EVENING = { saturation: 1.18, contrast: 1, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.95, 0.86) };
+const GRADE_EVENING = { saturation: 1.05, contrast: 1, lift: 0.002, vignette: 0.24, tint: new THREE.Color(1.1, 0.95, 0.86) };
 const GRADE_NIGHT = { saturation: 0.8, contrast: 1, lift: 0.003, vignette: 0.28, tint: new THREE.Color(0.94, 0.92, 1.04) };
 
 // Composer: Render -> SMAA -> tilt-shift (H, V) -> colour grade -> Output.

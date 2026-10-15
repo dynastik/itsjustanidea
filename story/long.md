@@ -5,7 +5,7 @@
   full day: 0.00 morning, 0.46 sunset, 0.64 night, 0.84 sunrise; 1.04 = the next morning ...). The third value is the opening act
   (calm | uneasy | wrong | horror | finale). "@act wrong" on its own line switches the act for what follows. "[break]" forces a new typing paragraph.
   Other rules as in short.md: consecutive narration lines are grouped into paragraphs (about 260 characters); ALL-CAPS line = the road
-  speaking; "[sign] TEXT" = a road sign; lines starting with * are notes. ASCII only (straight quotes), never a backtick.
+  speaking; "[sign] TEXT" = a road sign ("[gantry] TEXT" = a road sign that also raises the overhead gantry); lines starting with * are notes. ASCII only (straight quotes), never a backtick.
   "## Ending" lists the lines shown after the last prompt, over black.
 -->
 # itsjustanidea: Story Script (long, v3)
@@ -26,7 +26,7 @@ He passed a small roadside shop with flower boxes beneath its windows. A handwri
 @act uneasy
 The sun had begun to sink toward the hills when Elias saw a sign beside the road.
 
-[sign] WELCOME TO BELLWEATHER.
+[gantry] WELCOME TO BELLWEATHER.
 
 He didn't recognize the name, but that wasn't surprising. He had taken unfamiliar roads before. A smaller sign beneath it gave the distance to the town. Twelve miles. Twelve miles was nothing. He took the next exit, and the road folded him gently down toward the lights.
 
@@ -37,7 +37,7 @@ Bellweather looked a great deal like the town he had left that morning, but all 
 
 The road bent around a wooded hill, passed a stretch of open farmland, and descended into a shallow valley. Then another sign appeared.
 
-[sign] WELCOME TO BELLWEATHER.
+[gantry] WELCOME TO BELLWEATHER.
 
 Elias frowned. The lettering was different, and the sign looked newer than the first. He checked the mirror. There had been no turn. No junction. No reason he could think of to have circled back.
 

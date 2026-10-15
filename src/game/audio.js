@@ -106,8 +106,15 @@ export function createAudio() {
     init();
     if (ctx && ctx.state === 'suspended') ctx.resume();
   }
-  window.addEventListener('keydown', unlock);
-  window.addEventListener('pointerdown', unlock);
+  function onGesture() {
+    unlock();
+    if (ctx && ctx.state === 'running') {
+      window.removeEventListener('keydown', onGesture);
+      window.removeEventListener('pointerdown', onGesture);
+    }
+  }
+  window.addEventListener('keydown', onGesture);
+  window.addEventListener('pointerdown', onGesture);
 
   function shiftSound(upshift) {
     if (!ctx || muted || !noiseBuf) return;

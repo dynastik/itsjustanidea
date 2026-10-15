@@ -21,6 +21,7 @@ export const state = {
     target: '',
     source: 'story',        // where the current prompt came from: story | sign | radio (HUD label)
     buffer: '',
+    gantry: false,          // current prompt raises the overhead Bellweather gantry (story [gantry] tag)
     wordsCompleted: 0,
     lastErrorAt: -Infinity, // game-clock time of the last wrong key (HUD flash)
   },
