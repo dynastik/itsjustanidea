@@ -83,7 +83,6 @@ export function createLighting(scene) {
     sunGlowColor: { value: new THREE.Color(1, 0.9, 0.7) },
     sunGlow: { value: 0 },
     moonGlow: { value: 0 },
-
   };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(800, 24, 16),
@@ -129,7 +128,6 @@ export function createLighting(scene) {
           float md = max(dot(dir, moonDir), 0.0);
           col += vec3(0.5, 0.62, 1.0) * (pow(md, 9.0) * 0.18 + pow(md, 70.0) * 0.45) * moonGlow;
 
-          // stars fade in with the night, only above the horizon, and are drowned out near the moon
           // Stars intentionally disabled for the game's quieter, clouded night sky.
 
           gl_FragColor = vec4(col, 1.0);
@@ -180,6 +178,8 @@ export function createLighting(scene) {
   const cloudDarkEvening = new THREE.Color(0x85837e);
   const cloudDarkNight = new THREE.Color(0x626873);
   const horizon = new THREE.Color();
+  const fogColor = new THREE.Color();
+  const fogGray = new THREE.Color();
   const skyTop = new THREE.Color();
   const sunColor = new THREE.Color();
   const hemiSky = new THREE.Color();
@@ -195,8 +195,15 @@ export function createLighting(scene) {
   const FOG_DAY = 0.0055, FOG_EVENING = 0.0075, FOG_NIGHT = 0.010;
   const SKY_BODY_DISTANCE = 700;
 
+  // Fog is the horizon colour pulled toward its own grey (0 = same as sky, 1 = fully grey), so distant haze is always
+  // less saturated than the sky behind it. Raise for greyer haze; evening keeps a little more warmth than midday.
+  const FOG_DESAT_DAY = 0.5, FOG_DESAT_EVENING = 0.42, FOG_DESAT_NIGHT = 0.3;
+  // How much of the fog tint the sky's lowest band picks up, so the far terrain edge doesn't meet the sky in a hard
+  // band. 0 = sky horizon keeps its full colour (visible haze line), 1 = sky horizon equals the fog.
+  const SKY_BOTTOM_FOG_MIX = 0.3;
+
   scene.background = horizon;
-  scene.fog = new THREE.FogExp2(horizon, FOG_DAY);
+  scene.fog = new THREE.FogExp2(fogColor, FOG_DAY);
 
   const lerp = THREE.MathUtils.lerp;
   // time = game clock in seconds (star twinkle, cloud drift)
@@ -208,12 +215,18 @@ export function createLighting(scene) {
     const sunVisibility = smooth(-0.08, 0.12, sunElevation);
 
     setCycleColor(horizon, horizonMorning, horizonEvening, horizonNight, evening, night);
-    scene.fog.color.copy(horizon);
+
+    // desaturated fog: same luminance as the horizon, less chroma
+    const lum = horizon.r * 0.2126 + horizon.g * 0.7152 + horizon.b * 0.0722;
+    fogGray.setRGB(lum, lum, lum);
+    const desat = lerp(lerp(FOG_DESAT_DAY, FOG_DESAT_EVENING, evening), FOG_DESAT_NIGHT, night);
+    fogColor.copy(horizon).lerp(fogGray, desat);
+    scene.fog.color.copy(fogColor);
     scene.fog.density = lerp(lerp(FOG_DAY, FOG_EVENING, evening), FOG_NIGHT, night) * fogScale;
 
     setCycleColor(skyTop, topMorning, topEvening, topNight, evening, night);
     sky.position.copy(center);
-    skyUniforms.bottom.value.copy(horizon);
+    skyUniforms.bottom.value.copy(horizon).lerp(fogColor, SKY_BOTTOM_FOG_MIX);
     skyUniforms.top.value.copy(skyTop);
     skyUniforms.sunsetAmount.value = evening * (1 - night);
 
