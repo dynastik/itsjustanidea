@@ -4,10 +4,10 @@ import './menu.css';
 import { state } from '../game/state.js';
 import { DIFFICULTIES, getDifficulty, setDifficulty } from '../game/difficulty.js';
 import { getStoryMode, getStoryLengthCharsFor } from '../game/story.js';
-import { setReducedFlicker } from '../game/director.js';
+import { setReducedFlicker, setReducedScare } from '../game/director.js';
 
 const KEY = 'itsjustanidea.settings';
-const DEFAULTS = { volume: 0.8, sound: true, reducedFlicker: false };
+const DEFAULTS = { volume: 0.8, sound: true, reducedFlicker: false, reducedScare: false };
 const DIFF_TEXT = {
   easy: 'Forgiving mistakes, gentle pace.',
   medium: 'The intended balance.',
@@ -56,6 +56,7 @@ export function createMenu(cb) {
       </div>
       <label class="menu-check"><input id="menu-sound" type="checkbox" /> Sound on</label>
       <label class="menu-check"><input id="menu-flicker" type="checkbox" /> Reduce flashing (headlight flickers become a slow dim)</label>
+      <label class="menu-check"><input id="menu-scare" type="checkbox" /> Reduce scares (no hidden van, no mirror)</label>
       <button id="menu-go" type="button">Start driving</button>
       <p class="menu-keys">City: WASD, Q/E shift. Highway: type the text. F2 cab, F3 camera, F5 headlights, Esc pause, F8 this menu.</p>
     </div>`;
@@ -66,6 +67,7 @@ export function createMenu(cb) {
   const vol = $('#menu-volume');
   const snd = $('#menu-sound');
   const flk = $('#menu-flicker');
+  const scr = $('#menu-scare');
   let started = false;
   let isOpen = false;
 
@@ -77,6 +79,7 @@ export function createMenu(cb) {
     vol.value = Math.round(s.volume * 100);
     snd.checked = !cb.getMuted();
     flk.checked = s.reducedFlicker;
+    scr.checked = s.reducedScare;
   }
 
   function open() {
@@ -108,6 +111,7 @@ export function createMenu(cb) {
   vol.addEventListener('input', () => { s.volume = vol.value / 100; cb.onVolume(s.volume); save(); });
   snd.addEventListener('change', () => { s.sound = snd.checked; cb.onMute(!snd.checked); save(); });
   flk.addEventListener('change', () => { s.reducedFlicker = flk.checked; setReducedFlicker(flk.checked); save(); });
+  scr.addEventListener('change', () => { s.reducedScare = scr.checked; setReducedScare(scr.checked); save(); });
   go.addEventListener('click', () => {
     if (!started) { started = true; go.textContent = 'Resume'; cb.onStart?.(); }
     close();
@@ -129,6 +133,7 @@ export function createMenu(cb) {
   cb.onVolume(s.volume);
   cb.onMute(!s.sound);
   setReducedFlicker(s.reducedFlicker ? true : null);
+  setReducedScare(s.reducedScare);
   open();
   return { open, close, get isOpen() { return isOpen; } };
 }

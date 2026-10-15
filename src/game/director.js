@@ -64,3 +64,18 @@ export function reset() {
   distanceDriven = 0;
   flickerStart = -Infinity;
 }
+
+// ---------- authored reveals (beam-only van, rear-view mirror) ----------
+// Like the headlight flickers, these fire only on specific story prompts, never at random.
+const REVEAL_CUES = new Set(['THE DELIVERY MUST BE COMPLETED.']);
+let reducedScare = false; // menu setting: no hidden van, no mirror
+export function setReducedScare(value) { reducedScare = !!value; }
+export const getReducedScare = () => reducedScare;
+export function isRevealCue(text) { return !reducedScare && REVEAL_CUES.has(text); }
+// How recently sat-in the back seat looks in the mirror (0..1) for a prompt; null = leave it as it is.
+export function getMirrorCue(text) {
+  if (reducedScare) return 0;
+  if (text === 'It was empty yesterday, too.') return 1;
+  if (text.includes('glanced in the mirror')) return 0.45;
+  return null;
+}

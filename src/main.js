@@ -17,6 +17,7 @@ import { createInput, createDriveInput } from './game/input.js';
 import { beginTypingSession, handleTypingKey, handleTypingBackspace, getTelemetry, getKeyLog, skipActDev } from './game/typing.js';
 import { cycleDifficulty } from './game/difficulty.js';
 import { createHeadlights } from './game/headlights.js';
+import { createReveal } from './game/reveal.js';
 import { createStops } from './game/stops.js';
 import { createSheet } from './ui/sheet.js';
 import { getStoryTime, getStoryMode, setStoryMode, getAct, getLongClock } from './game/story.js';
@@ -59,6 +60,11 @@ async function main() {
 
   // Manual headlights with smooth fades and authored story flickers.
   const headlights = createHeadlights(vehicle);
+  const reveal = createReveal(scene, vehicle);
+  if (import.meta.env.DEV) { // console helpers for testing the authored events without typing to them
+    window.debugReveal = () => reveal.place(world.getAheadPose(vehicle.center.x, vehicle.center.z, 90));
+    window.debugMirror = (v = 1) => { mirrorTarget = v; };
+  }
 
   // Cab interior rides on the van and is laid out from the model's size once the model has loaded
   // (and again after the ride height is measured).
@@ -86,6 +92,7 @@ async function main() {
   let lastStoryTarget = null;
   let storySignCount = 0;
   let promptsSinceSign = 0;
+  let mirrorTarget = 0; // 0..1: how recently sat-in the back seat looks in the rear-view mirror (director.getMirrorCue)
   const treeLightDirection = new THREE.Vector3();
 
   // Teleport the van and re-centre everything that is streamed around it (terrain, props, trees).
@@ -121,6 +128,8 @@ async function main() {
     state.dayIndex = Math.floor(clockTotal);
     state.worldTime = clockTotal - state.dayIndex;
     headlights.reset();
+    reveal.reset();
+    mirrorTarget = 0;
     route.reset();
     lastStoryTarget = null;
     storySignCount = 0;
@@ -234,6 +243,11 @@ async function main() {
       }
       if (storyTarget && state.typing.source === 'message') audio.sting();
       director.cueHeadlights(storyTarget, state.time, state.headlightsOn);
+      if (storyTarget) {
+        if (director.isRevealCue(storyTarget) && state.mode === 'highway') reveal.place(world.getAheadPose(vehicle.center.x, vehicle.center.z, 140));
+        const haunt = director.getMirrorCue(storyTarget);
+        if (haunt !== null) mirrorTarget = haunt;
+      }
       lastStoryTarget = storyTarget;
     }
     const act=getAct(), wrongWorld=act==='wrong'||act==='horror'||act==='finale';
@@ -259,6 +273,7 @@ async function main() {
     vehicle.updateVisual(accumulator / FIXED_DT, dt);
     state.speed = vehicle.speed;
     state.transmission = vehicle.transmission;
+    cabin.setHaunt(mirrorTarget);
     cabin.update(dt, vehicle, driveInput);
     stops.update(dt, vehicle.center, vehicle.speed, state.mode === 'city');
 
@@ -282,6 +297,7 @@ async function main() {
     lighting.update(state.worldTime, vehicle.center, rig.profile === 'toy' ? 0.16 : 1, state.time);
     trees.setLighting(state.time, lighting.getKeyLightDirection(treeLightDirection));
     headlights.update(dt, state.time);
+    reveal.update(dt, state.time);
     rig.update(dt);
     hud.update();
     sheet.update();

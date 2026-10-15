@@ -438,6 +438,13 @@ export function createVehicle(scene, physics, RAPIER) {
     nudgeModel(dy) { cfg.modelYTrim += dy; applyModelOffset(); return cfg.modelYTrim; },
     getLocalBounds,
     onModelReady(cb) { readyCallbacks.push(cb); if (ready) cb(); },
+    // An independent copy of the van model, standing on the ground at the group origin (used by reveal.js). Materials are shared: clone them.
+    cloneExterior() {
+      if (!modelRoot) return null;
+      const copy = modelRoot.clone(true);
+      copy.position.set(0, -fit.modelMinY, 0);
+      return copy;
+    },
     // Driver's eye in chassis space: left-hand drive, high in the cab, set back from the front. Placed from
     // the model's size so any model gets a sane default; cabEyeTrim nudges it.
     get cabEye() {

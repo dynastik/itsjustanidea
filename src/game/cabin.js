@@ -3,6 +3,8 @@
 // room: floor, doors, pillars, roof, dash, wheel, mirror, seats. It is also the Phase 5 horror stage, so the
 // pieces that will misbehave (steering wheel, mirror, air freshener, radio) are kept by name.
 import * as THREE from 'three';
+import { state } from './state.js';
+import { dayFactors } from './daycycle.js';
 
 const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const M = {
@@ -50,6 +52,46 @@ const GEAR_GATE = {
 export function createCabInterior(vehicle) {
   // root sits at the driver's eye; everything inside is relative to it (x = left, y = up, z = forward)
   const root = new THREE.Group();
+
+  // Rear-view mirror image: a tiny canvas of the back of the cab. haunt 0..1 makes the left back seat look recently sat in.
+  const mirrorCanvas = document.createElement('canvas');
+  mirrorCanvas.width = 256;
+  mirrorCanvas.height = 64;
+  const mirrorTexture = new THREE.CanvasTexture(mirrorCanvas);
+  mirrorTexture.colorSpace = THREE.SRGBColorSpace;
+  const mirrorMaterial = new THREE.MeshBasicMaterial({ map: mirrorTexture });
+  let haunt = 0, hauntTarget = 0, hauntDrawn = -1;
+  function drawMirror(a) {
+    const g = mirrorCanvas.getContext('2d');
+    const W = mirrorCanvas.width, H = mirrorCanvas.height;
+    g.fillStyle = '#161a20';
+    g.fillRect(0, 0, W, H);
+    const win = g.createLinearGradient(0, 6, 0, 34);
+    win.addColorStop(0, '#53657c');
+    win.addColorStop(1, '#2b3644');
+    g.fillStyle = win;
+    g.fillRect(34, 6, 188, 28);                       // rear window
+    g.fillStyle = '#1b1e24';
+    g.fillRect(44, 24, 72, 38);                       // seat backs
+    g.fillRect(140, 24, 72, 38);
+    g.fillStyle = '#23272e';
+    g.fillRect(64, 16, 32, 12);                       // headrests
+    g.fillRect(160, 16, 32, 12);
+    if (a > 0) {
+      g.fillStyle = 'rgba(0,0,0,' + (0.55 * a).toFixed(2) + ')';
+      g.beginPath();
+      g.ellipse(80, 46, 24, 11, 0, 0, Math.PI * 2);   // a hollow, as if someone had been sitting there
+      g.fill();
+      g.save();
+      g.translate(80, 22);
+      g.rotate(0.28 * a);                             // and a slightly crooked headrest
+      g.fillStyle = '#23272e';
+      g.fillRect(-16, -6, 32, 12);
+      g.restore();
+    }
+    mirrorTexture.needsUpdate = true;
+  }
+  drawMirror(0);
   const parts = { spin: null, steeringWheelHit: null, mirror: null, freshener: null, radioScreen: null, shifter: null };
   // Track the stick tip's projected offset and route it through the H-gate's
   // neutral crossbar whenever the selected gear changes.
@@ -341,6 +383,10 @@ export function createCabInterior(vehicle) {
     // rear-view mirror + hanging air freshener (Phase 5 horror props)
     add(beam(V(xC, yRoof - 0.02, 0.48), V(xC, yRoof - 0.15, 0.44), 0.02, M.trim));
     parts.mirror = add(box(0.3, 0.08, 0.03, M.mirror, xC, yRoof - 0.18, 0.43));
+    const mirrorFace = new THREE.Mesh(new THREE.PlaneGeometry(0.27, 0.065), mirrorMaterial); // faces the driver (-z)
+    mirrorFace.position.set(xC, yRoof - 0.18, 0.43 - 0.018);
+    mirrorFace.rotation.y = Math.PI;
+    add(mirrorFace);
     const freshener = new THREE.Group();
     freshener.position.set(xC + 0.2, yRoof - 0.02, 0.4);
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.12, 4), M.trim);
@@ -357,6 +403,10 @@ export function createCabInterior(vehicle) {
 
   function update(dt, v, driveInput = {}) {
     root.position.copy(vehicle.cabEye); // follows the eye tuner
+    haunt += (hauntTarget - haunt) * (1 - Math.exp(-0.9 * dt)); // eases over a couple of seconds
+    const hauntStep = Math.round(haunt * 24) / 24;
+    if (hauntStep !== hauntDrawn) { hauntDrawn = hauntStep; drawMirror(hauntStep); }
+    mirrorMaterial.color.setScalar(0.35 + 0.65 * (1 - dayFactors(state.worldTime).night)); // dim at night, like everything else in the cab
     setSteeringAngle(v.steerAngle);
     // Accelerator (right) and brake (middle) pivot toward a more upright position
     // while pressed, with a smoothed return when released.
@@ -448,6 +498,7 @@ export function createCabInterior(vehicle) {
     layout,
     update,
     setSteeringAngle,
+    setHaunt(v) { hauntTarget = Math.min(1, Math.max(0, v)); },
     get wheelSpin() { return parts.spin; },
     get steeringWheelHit() { return parts.steeringWheelHit; },
     get mirror() { return parts.mirror; },

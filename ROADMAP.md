@@ -151,7 +151,7 @@ Target a stylized miniature/diorama driving game: low-poly environmental design,
 - [ ] Make manual control reliable through pauses, resets, mode changes, and story transitions.
 - [ ] Test dusk, full night, fog, and sunrise.
 - [x] Add scripted supernatural flickers or temporary failures only when the story director requests them. Never make the lights randomly unreliable during normal driving.
-- [ ] Create at least one deliberate reveal that is visible only when the beam catches the right part of the road or scenery.
+- [x] Create at least one deliberate reveal that is visible only when the beam catches the right part of the road or scenery.
 - [ ] Profile performance with headlights on, especially on the baseline laptop.
 
 **Design note:** build ordinary, dependable headlights first. Their later failure matters only if the player has learned to trust them.
@@ -248,7 +248,7 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [x] World time can be driven by story progress.
 - [ ] Re-read the current cab and director code before deciding what is actually missing.
 - [ ] Verify whether the existing cab interior is sufficient. Add only the minimum useful detail needed for atmosphere and readability.
-- [ ] Use the rear-view mirror only if it supports a specific, effective event and can be implemented reliably.
+- [x] Use the rear-view mirror only if it supports a specific, effective event and can be implemented reliably.
 - [x] Add the first authored repeated-sign event: Bellweather appears twice with the same twelve-mile distance along the uninterrupted highway.
 - [x] Reveal each sign when its associated story paragraph begins typing; use two side supports so the pole does not obscure the sign text.
 - [x] Remove the motion-blur post-processing pass after performance/readability feedback.
@@ -259,7 +259,7 @@ These are story targets, not a requirement to implement every beat in one pass. 
 - [ ] Use headlight failures, flickers, and reveals sparingly. Preserve player control wherever possible.
 - [ ] Avoid a visible monster, an explanatory cutscene, a lore dump, or a confirmed identity for the other driver.
 - [x] Implement the Long Mode nightmare and false-awakening ending.
-- [x] (reduced flashing is in the menu; reduced scare intensity is still open) Add accessibility settings for reduced flashing and reduced scare intensity if effects warrant them.
+- [x] (reduced flashing and reduced scares are both in the menu) Add accessibility settings for reduced flashing and reduced scare intensity if effects warrant them.
 - [ ] Playtest pacing so quiet stretches remain quiet and major moments have room to land.
 
 ---
@@ -377,10 +377,12 @@ Ramp -> elevated deck (short west stub ending in a barrier; `HW.westX`) -> slow 
 
 ## Status update (2026-10-15)
 
-Checkboxes above were reconciled against the source. Still genuinely open: playtests and FPS profiling on the baseline laptop, the beam-only headlight
-reveal, the rear-view mirror event, the audio audit, a reduced-scare-intensity option, and soft-lock checks on the long-mode exit/return loop.
+Checkboxes above were reconciled against the source. Still genuinely open: playtests and FPS profiling on the baseline laptop, the audio audit, a playtest of the two new events, and soft-lock checks on the long-mode exit/return loop.
 
 - Fog is a desaturated copy of the horizon colour (lighting.js: FOG_DESAT_*), so haze is always calmer than the sky.
 - Headlights keep both spotlights in the scene on purpose (toggling visibility recompiles every lit material). `?beam=single` uses one beam for weak GPUs.
 - Story format: `[gantry] TEXT` is a road sign that also raises the overhead Bellweather gantry (replaces the old hard-coded string match in main.js).
 - Menu duration labels are computed from the scripts (40 WPM), not hand-written.
+- Beam-only reveal (reveal.js): an empty second van in the oncoming lane, visible only inside the headlight cone, placed on "THE DELIVERY MUST BE COMPLETED." (director.REVEAL_CUES). Dev console: `debugReveal()`.
+- Rear-view mirror (cabin.js): the back seat looks sat in on "glanced in the mirror" and "It was empty yesterday, too." (director.getMirrorCue). Dev console: `debugMirror(1)`.
+- Menu: "Reduce scares" disables both.
