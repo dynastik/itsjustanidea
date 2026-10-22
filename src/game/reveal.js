@@ -27,7 +27,7 @@ function fallbackVan() {
   return g;
 }
 
-export function createReveal(scene, vehicle) {
+export function createReveal(scene, vehicle, { onSeen } = {}) {
   const group = new THREE.Group();
   group.visible = false;
   scene.add(group);
@@ -35,6 +35,7 @@ export function createReveal(scene, vehicle) {
   let built = false;
   let active = false;
   let opacity = 0;
+  let seen = false;
 
   function build() {
     if (built) return;
@@ -76,6 +77,7 @@ export function createReveal(scene, vehicle) {
       opacity = 0;
       group.visible = false;
       active = true;
+      seen = false;
     },
     reset: hide,
     update(dt, now) {
@@ -104,6 +106,7 @@ export function createReveal(scene, vehicle) {
       opacity += (target - opacity) * (1 - Math.exp(-(target > opacity ? FADE_IN : FADE_OUT) * dt));
       group.visible = opacity > 0.01;
       for (const m of mats) m.opacity = opacity;
+      if (!seen && opacity > 0.5) { seen = true; if (onSeen) onSeen(); }
     },
   };
 }
