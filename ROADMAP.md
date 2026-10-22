@@ -270,13 +270,13 @@ These are story targets, not a requirement to implement every beat in one pass. 
 
 **Done when:** audio communicates speed, road, time of day, and horror without needing a radio.
 
-- [ ] Audit the current audio manager and all sound hooks. Record what works, what is missing, and what is broken before changing anything.
+- [x] Audit the current audio manager and all sound hooks. Record what works, what is missing, and what is broken before changing anything.
 - [ ] Verify the synthesized engine sound responds sensibly to speed.
 - [ ] Review road/tire sound, wind, town ambience, highway ambience, and night ambience. Add only the layers that materially help.
-- [ ] Tune the cab/exterior mix if the current camera/audio architecture supports it cleanly.
-- [ ] Build a small horror audio vocabulary: silence, distant ambiguous sounds, low ambience, brief mechanical irregularities, and positional sound only where it has a clear purpose.
+- [x] Tune the cab/exterior mix if the current camera/audio architecture supports it cleanly.
+- [x] Build a small horror audio vocabulary: silence, distant ambiguous sounds, low ambience, brief mechanical irregularities, and positional sound only where it has a clear purpose.
 - [ ] No radio, DJ, radio music loop, or radio-dependent story beat.
-- [ ] Add master volume and any necessary separate volume controls.
+- [x] Add master volume and any necessary separate volume controls.
 - [ ] Use only free/licensed audio and record sources in `CREDITS.md`.
 - [ ] Keep a playable experience with audio muted. Important story information must remain available through text and visuals.
 
@@ -386,3 +386,18 @@ Checkboxes above were reconciled against the source. Still genuinely open: playt
 - Beam-only reveal (reveal.js): an empty second van in the oncoming lane, visible only inside the headlight cone, placed on "THE DELIVERY MUST BE COMPLETED." (director.REVEAL_CUES). Dev console: `debugReveal()`.
 - Rear-view mirror (cabin.js): the back seat looks sat in on "glanced in the mirror" and "It was empty yesterday, too." (director.getMirrorCue). Dev console: `debugMirror(1)`.
 - Menu: "Reduce scares" disables both.
+
+## Audio audit (2026-10-16)
+
+Read from source (not by ear: still needs a listening pass with headphones and with laptop speakers).
+
+- Existing: periodic-wave engine oscillator + muffler low-pass + exhaust resonance, all driven by the vehicle's simulated RPM; intake, wind and road/gravel noise beds;
+  gear clack; collision thump; road-message sting; a three-sine horror drone scaled by the act (`audio.setMood`); master volume + mute from the menu (F9 toggles mute).
+- Added: cab/exterior low-pass (muffled in cab view), night insects (calm acts only, fade out when the van speeds up or the mood turns), an authored engine stutter
+  (on the three headlight-flicker prompts) and a short hush when the hidden van is first seen. Both are skipped by "Reduce scares".
+- Not done: positional sound, tyre squeal, a tuning pass of the bed levels against each other, and a listening pass on the engine pitch range.
+- Still true: no audio files are used, so there is nothing to credit; the game is fully playable muted.
+
+## Soft-lock safety (2026-10-16)
+
+`route.js` now abandons autopilot (places the van in the city) if it sits nearly still for 8 s during the long-mode approach or exit, on top of the existing 240 s / 60 s timeouts.
