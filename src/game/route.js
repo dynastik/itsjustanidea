@@ -25,6 +25,7 @@ export function createRoute({ world, vehicle, stops, placeVan }) {
   let t = 0;
   let idx = 0;
   let toExit = Infinity;
+  let stuckT = 0; // seconds the van has been (nearly) stationary while the route is driving it
 
   function begin(p) { phase = p; t = 0; }
 
@@ -101,6 +102,11 @@ export function createRoute({ world, vehicle, stops, placeVan }) {
     update(dt) {
       if (dt <= 0) return;
       t += dt;
+      // Safety net: if autopilot has the van wedged against a rail (speed ~0) for 8 s, put it in the city instead of waiting for the long timeouts.
+      if (phase !== 'play') {
+        stuckT = Math.abs(vehicle.speed) < 0.8 ? stuckT + dt : 0;
+        if (stuckT > 8) { stuckT = 0; finishExit(true); return; }
+      } else stuckT = 0;
       if (phase === 'play') {
         if (state.legDone && getStoryMode() === 'long' && state.mode === 'highway') {
           begin('approach');
