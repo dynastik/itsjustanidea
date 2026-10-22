@@ -60,8 +60,8 @@ async function main() {
 
   // Manual headlights with smooth fades and authored story flickers.
   const headlights = createHeadlights(vehicle);
-  const reveal = createReveal(scene, vehicle);
-  if (import.meta.env.DEV) { // console helpers for testing the authored events without typing to them
+  const reveal = createReveal(scene, vehicle, { onSeen: () => { if (!director.getReducedScare()) audio.duck(5); } }); // the world hushes when the van is first seen
+  { // console helpers for testing the authored events without typing to them (also in production builds)
     window.debugReveal = () => reveal.place(world.getAheadPose(vehicle.center.x, vehicle.center.z, 90));
     window.debugMirror = (v = 1) => { mirrorTarget = v; };
   }
@@ -118,6 +118,16 @@ async function main() {
     beginTypingSession();
   });
 
+  // Debug helpers (any build). Console: debugReveal(), debugMirror(1), debugStutter(). With debug mode on (`): Insert = hidden van, Delete = toggle the mirror haunt, End = engine stutter.
+  window.debugReveal = () => reveal.place(world.getAheadPose(vehicle.center.x, vehicle.center.z, 90));
+  window.debugMirror = (v = 1) => { mirrorTarget = v; };
+  window.debugStutter = () => audio.stutter();
+  window.addEventListener('keydown', (e) => {
+    if (!state.debug) return;
+    if (e.key === 'Insert') window.debugReveal();
+    else if (e.key === 'Delete') mirrorTarget = mirrorTarget > 0 ? 0 : 1;
+    else if (e.key === 'End') window.debugStutter();
+  });
   window.typingTelemetry = { summary: getTelemetry, log: getKeyLog, logJson: () => JSON.stringify(getKeyLog()) };
 
   function fullReset() {
@@ -245,6 +255,7 @@ async function main() {
       director.cueHeadlights(storyTarget, state.time, state.headlightsOn);
       if (storyTarget) {
         if (director.isRevealCue(storyTarget) && state.mode === 'highway') reveal.place(world.getAheadPose(vehicle.center.x, vehicle.center.z, 140));
+        if (!director.getReducedScare() && director.isHeadlightCue(storyTarget)) audio.stutter(); // the engine coughs with the lights
         const haunt = director.getMirrorCue(storyTarget);
         if (haunt !== null) mirrorTarget = haunt;
       }
@@ -288,6 +299,8 @@ async function main() {
       speed: vehicle.speed,
       throttle: driveInput.throttle,
       offRoad: surface.offRoad,
+      night: dayFactors(state.worldTime).night,
+      cab: rig.profile === 'cab',
       paused: state.paused,
       ...vehicle.transmission,
     });
