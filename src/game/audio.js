@@ -4,13 +4,16 @@ export function createAudio() {
   let ctx = null;
   let master, engineOsc, mufflerFilter, exhaustResonance, engineGain;
   let intakeFilter, intakeGain, windGain, windFilter, roadGain, roadFilter, noiseBuf;
-  let droneGain;
+  let droneGain, cabFilter, cricketGain;
   let muted = true; // the menu sets this from saved settings; F9 toggles mute.
   let volume = 0.8;
   let mood = 0;
   let audioRpm = 850;
   let audioClutch = 0;
   let lastGear = null;
+  let stutterUntil = 0; // ctx time until which the engine is coughing (authored cue)
+  let duckUntil = 0;    // ctx time until which the world is hushed
+  let hushLevel = 1;
 
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -30,7 +33,12 @@ export function createAudio() {
 
     master = ctx.createGain();
     master.gain.value = 0;
-    master.connect(ctx.destination);
+    // everything goes through one low-pass: open outdoors, muffled inside the cab (see update's `cab`)
+    cabFilter = ctx.createBiquadFilter();
+    cabFilter.type = 'lowpass';
+    cabFilter.frequency.value = 18000;
+    master.connect(cabFilter);
+    cabFilter.connect(ctx.destination);
 
     // Use a stronger second harmonic so the engine has a recognizable, audible motor tone
     // instead of a nearly inaudible sub-bass rumble at idle.
@@ -100,6 +108,27 @@ export function createAudio() {
     }
     droneFilter.connect(droneGain);
     droneGain.connect(master);
+
+    // Night insects: band-passed noise pulsed by a slow LFO. Only audible at night while the story is calm and the van is slow.
+    const cricketFilter = ctx.createBiquadFilter();
+    cricketFilter.type = 'bandpass';
+    cricketFilter.frequency.value = 4300;
+    cricketFilter.Q.value = 9;
+    const cricketPulse = ctx.createGain();
+    cricketPulse.gain.value = 0.5;
+    const cricketLfo = ctx.createOscillator();
+    cricketLfo.frequency.value = 7.5;
+    const cricketDepth = ctx.createGain();
+    cricketDepth.gain.value = 0.5;
+    cricketLfo.connect(cricketDepth);
+    cricketDepth.connect(cricketPulse.gain);
+    cricketLfo.start();
+    cricketGain = ctx.createGain();
+    cricketGain.gain.value = 0;
+    loopedNoise().connect(cricketFilter);
+    cricketFilter.connect(cricketPulse);
+    cricketPulse.connect(cricketGain);
+    cricketGain.connect(master);
   }
 
   function unlock() {
@@ -150,7 +179,7 @@ export function createAudio() {
     o.stop(t + 0.095);
   }
 
-  function update(dt, { speed, throttle, offRoad, paused, gear = '1', rpm: engineRPM = 850, clutch = 0 }) {
+  function update(dt, { speed, throttle, offRoad, paused, gear = '1', rpm: engineRPM = 850, clutch = 0, night = 0, cab = false }) {
     if (!ctx) return;
     const t = ctx.currentTime;
     if (lastGear !== null && gear !== lastGear) {
@@ -159,6 +188,9 @@ export function createAudio() {
     }
     lastGear = gear;
     const v = Math.abs(speed);
+    const stutDip = t < stutterUntil ? (Math.sin(t * 38) > 0 ? 0.12 : 1) : 1;
+    const hush = t < duckUntil ? 0.3 : 1;
+    hushLevel += (hush - hushLevel) * (1 - Math.exp(-(hush < hushLevel ? 6 : 0.7) * dt)); // drops fast, returns slowly
     const load = clamp(throttle, 0, 1);
     const rev = clamp((engineRPM - 700) / 5800, 0, 1);
     const lugging = ['3', '4', '5'].includes(gear) && v < (gear === '3' ? 5 : 8) && load > 0.05;
@@ -175,7 +207,7 @@ export function createAudio() {
     // The transmission's RPM is the source of truth, so shifts and rev-matched downshifts are heard.
     const rpmNorm = clamp((audioRpm - 700) / (5300 - 700), 0, 1);
     const crankHz = clamp((38 + rpmNorm * 255) * limiterFlutter, 38, 310);
-    engineOsc.frequency.setTargetAtTime(crankHz, t, 0.045);
+    engineOsc.frequency.setTargetAtTime(crankHz * (stutDip < 1 ? 0.88 : 1), t, 0.045);
 
     const cutoff = 650 + rev * 3200 + load * 1450;
     mufflerFilter.frequency.setTargetAtTime(cutoff, t, 0.055);
@@ -188,7 +220,7 @@ export function createAudio() {
     intakeGain.gain.setTargetAtTime(0.0015 + load * 0.004 + rev * 0.0025, t, 0.1);
     const shiftDucking = 1 - audioClutch * 0.88;
     engineGain.gain.setTargetAtTime(
-      (0.25 + load * 0.21 + rev * 0.11 + (lugging ? 0.045 : 0)) * shiftDucking, t, 0.055
+      (0.25 + load * 0.21 + rev * 0.11 + (lugging ? 0.045 : 0)) * shiftDucking * stutDip, t, 0.055
     );
 
     const vn = clamp(v / 30, 0, 1);
@@ -199,8 +231,16 @@ export function createAudio() {
     roadFilter.frequency.setTargetAtTime(offRoad ? 1250 : 420, t, 0.12);
 
     droneGain.gain.setTargetAtTime(mood * 0.07, t, 2);
-    master.gain.setTargetAtTime(paused || muted ? 0 : volume, t, 0.06);
+    const cricket = 0.03 * night * Math.min(1, Math.max(0, 1 - mood * 2)) * (1 - clamp(v / 15, 0, 1) * 0.85);
+    cricketGain.gain.setTargetAtTime(cricket, t, 0.8);
+    cabFilter.frequency.setTargetAtTime(cab ? 2600 : 18000, t, 0.15);
+    master.gain.setTargetAtTime(paused || muted ? 0 : volume * hushLevel, t, 0.06);
   }
+
+  // A brief mechanical irregularity: the engine coughs and dips for under a second. Only on authored cues (main.js).
+  function stutter() { if (ctx) stutterUntil = ctx.currentTime + 0.9; }
+  // The world goes quiet for a few seconds (the hidden van is first seen).
+  function duck(seconds = 4) { if (ctx) duckUntil = ctx.currentTime + seconds; }
 
   function bump(intensity) {
     if (!ctx || muted) return;
@@ -269,7 +309,7 @@ export function createAudio() {
   }
 
   return {
-    update, bump, sting,
+    update, bump, sting, stutter, duck,
     toggleMute: () => { muted = !muted; },
     setMuted: (m) => { muted = !!m; },
     getMuted: () => muted,
