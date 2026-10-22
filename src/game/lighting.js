@@ -68,6 +68,10 @@ export function createLighting(scene) {
 
   const moonColor = new THREE.Color(0xf0f2ff);
   const keyDirection = new THREE.Vector3();
+  const shadowCenter = new THREE.Vector3();
+  const shadowX = new THREE.Vector3();
+  const shadowY = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0);
 
   const hemi = new THREE.HemisphereLight(0x9ec6ff, 0x6f8f4f, 0.75);
   scene.add(hemi);
@@ -266,8 +270,17 @@ export function createLighting(scene) {
     if (keyDirection.lengthSq() < 1e-6) keyDirection.copy(sunDirection); else keyDirection.normalize();
     sun.intensity = total;
     sun.color.copy(sunColor).lerp(moonColor, total > 0 ? moonI / total : 0);
-    sun.position.copy(center).addScaledVector(keyDirection, 40);
-    sunTarget.position.copy(center);
+    // snap the shadow frustum to whole shadow-map texels in light space, so shadows do not crawl as the van moves
+    const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
+    shadowX.crossVectors(UP, keyDirection);
+    if (shadowX.lengthSq() < 1e-6) shadowX.set(1, 0, 0);
+    shadowX.normalize();
+    shadowY.crossVectors(keyDirection, shadowX);
+    const snapX = Math.round(center.dot(shadowX) / texel) * texel - center.dot(shadowX);
+    const snapY = Math.round(center.dot(shadowY) / texel) * texel - center.dot(shadowY);
+    shadowCenter.copy(center).addScaledVector(shadowX, snapX).addScaledVector(shadowY, snapY);
+    sun.position.copy(shadowCenter).addScaledVector(keyDirection, 40);
+    sunTarget.position.copy(shadowCenter);
     skyUniforms.moonDir.value.copy(moonDirection);
     skyUniforms.moonGlow.value = moonAmount;
     moonDisc.position.copy(center).addScaledVector(moonDirection, SKY_BODY_DISTANCE);
