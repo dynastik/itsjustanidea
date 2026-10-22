@@ -79,3 +79,5 @@ export function getMirrorCue(text) {
   if (text.includes('glanced in the mirror')) return 0.45;
   return null;
 }
+
+export function isHeadlightCue(text) { return HEADLIGHT_CUES.has(text); }
