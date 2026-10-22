@@ -34,3 +34,12 @@ npm run story
 
 This regenerates `src/game/storyText.js` (committed, so a plain `npm run dev` does not need it). In the city, press **1** for the
 short story or **2** for the long one before driving onto the highway.
+
+## URL options and debugging
+
+- `?mode=short|long`, `?difficulty=easy|medium|hard`: start in a given story mode / typing difficulty.
+- `?perf`: show the frame-time meter (always on in dev; F10 toggles it).
+- `?beam=single`: one headlight spotlight instead of two (cheaper on weak GPUs).
+- Debug mode (`` ` ``): Insert = spawn the hidden van ahead, Delete = toggle the rear-view-mirror haunt, End = engine stutter.
+  The same helpers are available in the console as `debugReveal()`, `debugMirror(1)` and `debugStutter()`.
+- Menu (F8): story mode, typing difficulty, volume, "Reduce flashing" and "Reduce scares".
