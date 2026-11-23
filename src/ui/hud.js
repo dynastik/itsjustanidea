@@ -1,6 +1,6 @@
 import { state } from '../game/state.js';
 import { getWpm, getAccuracy } from '../game/typing.js';
-import { getSourceLabel } from '../game/story.js';
+import { getSourceLabel, getStoryProgress } from '../game/story.js';
 import * as director from '../game/director.js';
 import { HANDOFF_UI_FADE_S } from '../game/zones.js';
 import { getDifficulty } from '../game/difficulty.js';
@@ -88,7 +88,7 @@ export function createHud() {
       set(sourceEl, 'source', getSourceLabel(t.source));
       set(targetWordEl, 'word', html, 'innerHTML');
       set(typedInputEl, 'typed', t.buffer);
-      set(statsEl, 'stats', `WPM: ${Math.round(getWpm())} | Accuracy: ${Math.round(getAccuracy() * 100)}%`);
+      set(statsEl, 'stats', `WPM: ${Math.round(getWpm())} | Accuracy: ${Math.round(getAccuracy() * 100)}% | Story: ${Math.round(getStoryProgress(t.buffer.length) * 100)}%`);
     }
   }
 

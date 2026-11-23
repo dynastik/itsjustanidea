@@ -274,6 +274,52 @@ export function createAudio() {
     n.stop(t + 0.2);
   }
 
+  // Typing feedback: a soft key tick for right keys, a low thud for wrong ones.
+  function tick(ok) {
+    if (!ctx || muted || !noiseBuf) return;
+    const t = ctx.currentTime;
+    const g = ctx.createGain();
+    g.connect(master);
+    if (ok) {
+      const n = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      n.buffer = noiseBuf;
+      f.type = 'bandpass'; f.frequency.value = 2400 + Math.random() * 600; f.Q.value = 2;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.03, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+      n.connect(f); f.connect(g);
+      n.start(t, Math.random() * 1.5); n.stop(t + 0.04);
+    } else {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(70, t + 0.1);
+      g.gain.setValueAtTime(0.07, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(g); o.start(t); o.stop(t + 0.14);
+    }
+  }
+
+  // City horn (H).
+  function honk() {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 1600;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.1, t + 0.02);
+    g.gain.setValueAtTime(0.1, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    f.connect(g); g.connect(master);
+    for (const hz of [392, 494]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = hz;
+      o.connect(f); o.start(t); o.stop(t + 0.45);
+    }
+  }
+
   // A road message arrives as a soft, low, slightly wrong tone with a thin breath of noise.
   function sting() {
     if (!ctx || muted || !noiseBuf) return;
@@ -309,7 +355,7 @@ export function createAudio() {
   }
 
   return {
-    update, bump, sting, stutter, duck,
+    update, bump, sting, stutter, duck, tick, honk,
     toggleMute: () => { muted = !muted; },
     setMuted: (m) => { muted = !!m; },
     getMuted: () => muted,

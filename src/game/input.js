@@ -56,6 +56,12 @@ export function createInput(actions) {
       return;
     }
 
+    if (key === 'h' && state.mode === 'city') {
+      e.preventDefault();
+      if (!e.repeat && !state.paused) actions.honk?.();
+      return;
+    }
+
     if (key in hotkeys) {
       e.preventDefault();
       if (key === KEYS.cabView || key === KEYS.debug) clearHeld();

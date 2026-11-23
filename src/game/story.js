@@ -112,3 +112,18 @@ export function skipToNextAct() {
   while (i < list.length && list[i].act === cur) i++;
   cursor = i;
 }
+
+// 0..1 progress through the whole story (short: the one run; long: all legs), for the HUD.
+export function getStoryProgress(bufferLen = 0) {
+  if (finished) return 1;
+  if (mode === 'long') {
+    const total = legIndexes.reduce((n, l) => n + l.total, 0);
+    let done = 0;
+    for (let i = 0; i < legIndex; i++) done += legIndexes[i].total;
+    const ix = legIndexes[legIndex], leg = LEGS[legIndex];
+    if (ix && leg) done += cursor >= leg.items.length ? ix.total : cursor > 0 ? ix.offsets[cursor - 1] + bufferLen : 0;
+    return clamp01(done / Math.max(1, total));
+  }
+  const typed = cursor > 0 ? si.offsets[cursor - 1] + bufferLen : 0;
+  return clamp01(typed / Math.max(1, si.total));
+}

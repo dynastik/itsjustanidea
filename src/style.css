@@ -579,3 +579,19 @@ body.touch-controls-enabled #touch-drive {
     grid-template-rows: repeat(2, clamp(46px, 13vw, 56px));
   }
 }
+
+#ending-stats {
+  position: absolute;
+  left: 0; right: 0; bottom: 14%;
+  text-align: center;
+  color: #7d7f7c;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 2.5px;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+#ending-stats.on { opacity: 1; }
+
+body.big-text #target-word { font-size: 25px; line-height: 1.7; }
+body.big-text #typing-panel.message #target-word { font-size: 26px; }
+body.big-text #typing-panel { width: 780px; }

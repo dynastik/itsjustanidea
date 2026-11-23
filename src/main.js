@@ -33,6 +33,7 @@ import { createMenu } from './ui/menu.js';
 import { createPerf } from './ui/perf.js';
 import { createTouchControls } from './ui/touchControls.js';
 import * as director from './game/director.js';
+import * as runstats from './game/runstats.js';
 
 const MAX_STEPS_PER_FRAME = 5;
 const SIGN_LINGER_PROMPTS = 3; // the second gantry stays up for this many prompts after its text, then goes
@@ -141,6 +142,7 @@ async function main() {
     reveal.reset();
     mirrorTarget = 0;
     route.reset();
+    runstats.reset();
     lastStoryTarget = null;
     storySignCount = 0;
     promptsSinceSign = 0;
@@ -150,6 +152,19 @@ async function main() {
     prevSpeed = 0;
     director.reset();
     setMode('city');
+  }
+
+  // Typing keystrokes: feed run stats and play a key tick / error thud.
+  function typeKey(k) {
+    const t = state.typing;
+    const target = t.target, len = t.buffer.length;
+    handleTypingKey(k);
+    if (!target) return;
+    const wrong = t.lastErrorAt === state.time;
+    const ok = !wrong && (t.target !== target || t.buffer.length !== len);
+    if (!wrong && !ok) return;
+    runstats.record(ok, state.time);
+    audio.tick(ok);
   }
 
   // Menu first: it registers its key handler before the game's, so it owns the keyboard while open.
@@ -162,11 +177,12 @@ async function main() {
   });
 
   const input = createInput({
-    typeKey: handleTypingKey,
+    typeKey,
     typeBackspace: handleTypingBackspace,
     toggleCab: () => rig.toggleCab(),
     cycleLook: () => rig.cycleLook(),
     toggleMute: () => audio.toggleMute(),
+    honk: () => audio.honk(),
     smartShift: () => vehicle.smartShift(),
     shiftUp: () => vehicle.shiftUp(),
     shiftDown: () => vehicle.shiftDown(),
@@ -188,7 +204,7 @@ async function main() {
     reset: fullReset,
   });
   const touchControls = createTouchControls(input, {
-    typeKey: handleTypingKey,
+    typeKey,
     typeBackspace: handleTypingBackspace,
     openMenu: () => menu.open(),
     setTouchAutoShift: (enabled) => vehicle.setTouchAutoShift(enabled),
